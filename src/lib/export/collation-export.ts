@@ -14,10 +14,14 @@ import { collate } from "@/lib/collate/collate";
 import { buildApparatus } from "@/lib/collate/apparatus";
 import { computeCollationMetrics } from "@/lib/collate/metrics";
 
-/** The two witnesses the braid currently compares: base on the left. */
+/** The two witnesses the braid currently compares (the panel selections). */
 export function pairOf(c: Collation): [Witness, Witness] {
-  const a = c.witnesses[c.baseIndex] ?? c.witnesses[0];
-  const b = c.witnesses.find((w) => w.id !== a.id) ?? c.witnesses[1] ?? a;
+  const a = c.witnesses.find((w) => w.id === c.leftId) ?? c.witnesses[0];
+  const b =
+    c.witnesses.find((w) => w.id === c.rightId) ??
+    c.witnesses.find((w) => w.id !== a.id) ??
+    c.witnesses[1] ??
+    a;
   return [a, b];
 }
 
@@ -74,13 +78,16 @@ export function parseProjectFile(text: string): SavedCollation | null {
       (data.mode === "source" || data.mode === "text")
     ) {
       // Backfill optional fields older files may lack.
+      const witnesses: Witness[] = data.witnesses;
       return {
         schemaVersion: 1,
         id: data.id ?? "loaded",
         name: data.name ?? "Loaded collation",
         mode: data.mode,
-        witnesses: data.witnesses,
+        witnesses,
         baseIndex: typeof data.baseIndex === "number" ? data.baseIndex : 0,
+        leftId: data.leftId ?? witnesses[0]?.id,
+        rightId: data.rightId ?? witnesses[1]?.id ?? witnesses[0]?.id,
         annotations: data.annotations ?? {},
         links: data.links ?? [],
         apparatusEdits: data.apparatusEdits ?? {},

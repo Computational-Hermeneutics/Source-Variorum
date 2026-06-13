@@ -1,23 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, Upload, BookOpen, X, Info, FileText, FilePlus, FolderOpen, Save, Download, ChevronDown } from "lucide-react";
+import {
+  Moon, Sun, Upload, BookOpen, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
+  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Plus, Type, Trash2,
+} from "lucide-react";
 import type { Collation, CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
+import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
 import { normalizeNewlines } from "@/lib/utils";
-import {
-  deriveView,
-  download,
-  parseProjectFile,
-  slugify,
-  toJSON,
-  toMarkdown,
-  toPDF,
-} from "@/lib/export/collation-export";
+import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF } from "@/lib/export/collation-export";
 
 const CURRENT_KEY = "source-variorum-current";
+const FONT_KEY = "source-variorum-fontsize";
 
 function uid(): string {
   try {
@@ -31,8 +28,6 @@ function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
   return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text };
 }
 
-/** Resolve a demo witness's text: inline if present, otherwise fetch the file
- *  from /public and normalise its line endings. */
 async function resolveWitnessText(w: DemoWitness): Promise<string> {
   if (w.text != null) return normalizeNewlines(w.text);
   if (w.file) {
@@ -50,6 +45,8 @@ function makeCollation(name: string, mode: CollationMode, witnesses: Witness[]):
     mode,
     witnesses,
     baseIndex: 0,
+    leftId: witnesses[0]?.id ?? "a",
+    rightId: witnesses[1]?.id ?? witnesses[0]?.id ?? "b",
     annotations: {},
     links: [],
     apparatusEdits: {},
@@ -58,7 +55,6 @@ function makeCollation(name: string, mode: CollationMode, witnesses: Witness[]):
   };
 }
 
-/** Synchronous build for inline (text) demos — used for the initial render. */
 function inlineCollation(demo: Demo): Collation {
   return makeCollation(demo.name, demo.mode, [
     witnessFrom(demo.witnessA, "a", normalizeNewlines(demo.witnessA.text ?? "")),
@@ -66,43 +62,47 @@ function inlineCollation(demo: Demo): Collation {
   ]);
 }
 
-/** Async build for any demo (resolves file-based witnesses). */
 async function collationFromDemo(demoId: string): Promise<Collation> {
   const demo = DEMOS.find((d) => d.id === demoId) ?? DEMOS[0];
-  const [textA, textB] = await Promise.all([
-    resolveWitnessText(demo.witnessA),
-    resolveWitnessText(demo.witnessB),
-  ]);
-  return makeCollation(demo.name, demo.mode, [
-    witnessFrom(demo.witnessA, "a", textA),
-    witnessFrom(demo.witnessB, "b", textB),
+  const [textA, textB] = await Promise.all([resolveWitnessText(demo.witnessA), resolveWitnessText(demo.witnessB)]);
+  return makeCollation(demo.name, demo.mode, [witnessFrom(demo.witnessA, "a", textA), witnessFrom(demo.witnessB, "b", textB)]);
+}
+
+function blankCollation(mode: CollationMode): Collation {
+  return makeCollation("Untitled collation", mode, [
+    { id: uid(), siglum: "A", title: "Witness A", text: "" },
+    { id: uid(), siglum: "B", title: "Witness B", text: "" },
   ]);
 }
 
-// First render uses the first INLINE demo so the initial paint needs no fetch.
 const DEFAULT_DEMO = DEMOS.find((d) => d.witnessA.text != null && d.witnessB.text != null) ?? DEMOS[0];
 
 export default function Home() {
-  const [collation, setCollation] = useState<Collation>(() => inlineCollation(DEFAULT_DEMO));
+  const project = useProject(useMemo(() => inlineCollation(DEFAULT_DEMO), []));
+  const { collation } = project;
   const [isDark, setIsDark] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [fontSize, setFontSize] = useState(13);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hydrate the working collation from localStorage after mount (SSR-safe).
+  // Hydrate working collation + font size on mount.
   useEffect(() => {
     try {
       const stored = localStorage.getItem(CURRENT_KEY);
       if (stored) {
         const parsed = parseProjectFile(stored);
-        if (parsed) setCollation(parsed);
+        if (parsed) project.load(parsed);
       }
+      const fs = localStorage.getItem(FONT_KEY);
+      if (fs) setFontSize(Math.min(22, Math.max(9, parseInt(fs, 10) || 13)));
     } catch {
       /* ignore */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Autosave the working collation on every change.
   useEffect(() => {
     try {
       localStorage.setItem(CURRENT_KEY, toJSON(collation));
@@ -112,66 +112,64 @@ export default function Home() {
   }, [collation]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(FONT_KEY, String(fontSize));
+    } catch {
+      /* ignore */
+    }
+  }, [fontSize]);
+
+  useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
+  // Undo/redo keyboard shortcuts (skip when typing in a field — let native undo work).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) project.redo();
+        else project.undo();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [project]);
+
   const view = useMemo(() => deriveView(collation), [collation]);
 
-  const setMode = (mode: CollationMode) =>
-    setCollation((c) => ({ ...c, mode, updatedAt: new Date().toISOString() }));
-
-  const rename = (name: string) =>
-    setCollation((c) => ({ ...c, name, updatedAt: new Date().toISOString() }));
-
-  const editNote = useCallback((variantId: string, note: string) => {
-    setCollation((c) => {
-      const prev = c.apparatusEdits[variantId];
-      return {
-        ...c,
-        apparatusEdits: { ...c.apparatusEdits, [variantId]: { ...prev, note } },
-        updatedAt: new Date().toISOString(),
-      };
-    });
-  }, []);
-
   const loadDemo = (id: string) => {
-    setShowImport(false);
-    collationFromDemo(id)
-      .then(setCollation)
-      .catch(() => alert("Could not load that demo's source files."));
+    collationFromDemo(id).then(project.load).catch(() => alert("Could not load that demo's source files."));
   };
 
   const onLoadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const text = await file.text();
-    const parsed = parseProjectFile(text);
-    if (parsed) setCollation(parsed);
+    const parsed = parseProjectFile(await file.text());
+    if (parsed) project.load(parsed);
     else alert("That file is not a valid Source Variorum project (.svar / JSON).");
   };
 
-  const saveProject = () => download(`${slugify(collation.name)}.svar`, toJSON(collation), "application/json");
-  const exportMarkdown = () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown");
-  const exportJSON = () => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json");
-  const exportPDF = () => toPDF(collation).save(`${slugify(collation.name)}.pdf`);
+  const saveProject = () => {
+    download(`${slugify(collation.name)}.svar`, toJSON(collation), "application/json");
+    project.markSaved();
+  };
+
+  const setFont = (delta: number) => setFontSize((s) => Math.min(22, Math.max(9, s + delta)));
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
-        <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-2.5">
+        <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2.5 mr-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
             <div className="leading-tight">
               <div className="text-[15px] font-semibold tracking-tight">Source Variorum</div>
-              <a
-                href="https://computational-hermeneutics.github.io"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
-                title="Computational Hermeneutics family hub"
-              >
+              <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/ch-mark.svg" alt="" width={11} height={11} className="w-[11px] h-[11px] opacity-70" />
                 Part of Computational Hermeneutics
@@ -179,101 +177,90 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <FileMenu
-              name={collation.name}
-              onRename={rename}
-              onNew={() => setShowImport(true)}
-              onLoad={() => fileInputRef.current?.click()}
-              onSave={saveProject}
-              onExportMd={exportMarkdown}
-              onExportJson={exportJSON}
-              onExportPdf={exportPDF}
-            />
+          <FileMenu
+            name={collation.name}
+            onRename={project.rename}
+            onNew={() => project.load(blankCollation(collation.mode))}
+            onLoad={() => fileInputRef.current?.click()}
+            onSave={saveProject}
+            onExportMd={() => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown")}
+            onExportJson={() => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json")}
+            onExportPdf={() => toPDF(collation).save(`${slugify(collation.name)}.pdf`)}
+          />
 
-            <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <BookOpen className="w-3.5 h-3.5" />
-              <select
-                onChange={(e) => loadDemo(e.target.value)}
-                value=""
-                className="bg-card border border-border rounded px-2 py-1 text-[12px] text-foreground max-w-[210px]"
-              >
-                <option value="" disabled>
-                  Load a demo…
-                </option>
-                {DEMOS.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {/* Undo / redo / revert */}
+          <div className="flex items-center rounded border border-border overflow-hidden">
+            <IconBtn title="Undo (⌘Z)" disabled={!project.canUndo} onClick={project.undo}><Undo2 className="w-3.5 h-3.5" /></IconBtn>
+            <IconBtn title="Redo (⌘⇧Z)" disabled={!project.canRedo} onClick={project.redo}><Redo2 className="w-3.5 h-3.5" /></IconBtn>
+          </div>
+          {project.isDirty && (
+            <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
+              <RotateCcw className="w-3.5 h-3.5" /> Revert
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            <button onClick={() => setEditMode((v) => !v)} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (editMode ? "bg-amber-500/20 border-amber-500 text-amber-800 dark:text-amber-300" : "border-border bg-card hover:bg-muted")} title="Edit witness text">
+              <Pencil className="w-3.5 h-3.5" /> {editMode ? "Editing" : "Edit"}
+            </button>
+
+            {/* Font size */}
+            <div className="flex items-center rounded border border-border overflow-hidden">
+              <IconBtn title="Smaller text" onClick={() => setFont(-1)}><span className="text-[11px]">A−</span></IconBtn>
+              <span className="px-1 text-[10px] text-muted-foreground tabular-nums w-7 text-center"><Type className="w-3 h-3 inline -mt-0.5" /></span>
+              <IconBtn title="Larger text" onClick={() => setFont(1)}><span className="text-[14px]">A+</span></IconBtn>
+            </div>
 
             <div className="flex rounded border border-border overflow-hidden text-[12px]">
               {(["source", "text"] as CollationMode[]).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMode(m)}
-                  className={
-                    "px-2.5 py-1 capitalize transition-colors " +
-                    (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")
-                  }
-                >
-                  {m}
-                </button>
+                <button key={m} onClick={() => project.setMode(m)} className={"px-2.5 py-1 capitalize transition-colors " + (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m}</button>
               ))}
             </div>
 
-            <button
-              onClick={() => setShowImport((v) => !v)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]"
-            >
-              <Upload className="w-3.5 h-3.5" /> Import
+            <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <BookOpen className="w-3.5 h-3.5" />
+              <select onChange={(e) => loadDemo(e.target.value)} value="" className="bg-card border border-border rounded px-2 py-1 text-[12px] text-foreground max-w-[190px]">
+                <option value="" disabled>Load a demo…</option>
+                {DEMOS.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+              </select>
+            </label>
+
+            <button onClick={() => setShowAdd((v) => !v)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Add a source text to the project">
+              <Plus className="w-3.5 h-3.5" /> Add source
             </button>
 
-            <button onClick={() => setShowAbout(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="About Source Variorum">
-              <Info className="w-3.5 h-3.5" />
-            </button>
-
-            <button onClick={() => setIsDark((v) => !v)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Toggle theme">
-              {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
+            <button onClick={() => setShowAbout(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="About"><Info className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setIsDark((v) => !v)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Toggle theme">{isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}</button>
           </div>
         </div>
       </header>
 
       <input ref={fileInputRef} type="file" accept=".svar,.json,application/json" className="hidden" onChange={onLoadFile} />
 
-      {showImport && (
-        <ImportPanel
-          onClose={() => setShowImport(false)}
-          onCollate={(name, witnesses, m) => {
-            setCollation(makeCollation(name, m, witnesses));
-            setShowImport(false);
-          }}
-          initialMode={collation.mode}
+      {showAdd && (
+        <AddSourcePanel
+          mode={collation.mode}
+          onClose={() => setShowAdd(false)}
+          onAdd={(w) => { project.addWitness(w); setShowAdd(false); }}
         />
       )}
 
-      <main className="flex-1">
-        <CollationView
-          witnessA={view.a}
-          witnessB={view.b}
-          mode={collation.mode}
-          variants={view.variants}
-          metrics={view.metrics}
-          apparatusEdits={collation.apparatusEdits}
-          onEditNote={editNote}
-        />
-      </main>
+      <div className="flex-1 flex min-h-0">
+        <Sidebar project={project} />
+        <main className="flex-1 min-w-0">
+          <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
+        </main>
+      </div>
 
       <footer className="border-t border-border px-4 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
         <span>Source Variorum v{APP_VERSION}</span>
         <span className="opacity-50">·</span>
+        <span>by David M. Berry</span>
+        <span className="opacity-50">·</span>
         <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ch-mark.svg" alt="" width={12} height={12} className="w-3 h-3 opacity-70" />
-          An instrument in the Computational Hermeneutics family
+          Computational Hermeneutics
         </a>
       </footer>
 
@@ -282,37 +269,109 @@ export default function Home() {
   );
 }
 
+function IconBtn({ children, title, onClick, disabled }: { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} title={title} className="px-1.5 py-1 bg-card hover:bg-muted disabled:opacity-30 disabled:hover:bg-card flex items-center justify-center">
+      {children}
+    </button>
+  );
+}
+
+function Sidebar({ project }: { project: ReturnType<typeof useProject> }) {
+  const c = project.collation;
+  return (
+    <aside className="w-56 shrink-0 border-r border-border bg-muted/20 flex flex-col">
+      <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
+        Sources · {c.witnesses.length}
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {c.witnesses.map((w, i) => {
+          const isLeft = c.leftId === w.id;
+          const isRight = c.rightId === w.id;
+          const isBase = c.baseIndex === i;
+          return (
+            <div key={w.id} className="px-2.5 py-2 border-b border-border/60 hover:bg-muted/40">
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[11px] px-1 rounded bg-primary/10 text-primary font-semibold">{w.siglum}</span>
+                <span className="text-[12px] truncate flex-1" title={w.title}>{w.title}</span>
+              </div>
+              <div className="flex items-center gap-1 mt-1.5">
+                <button onClick={() => project.setLeft(w.id)} disabled={isRight} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isLeft ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted disabled:opacity-30")} title="Show in left panel">L</button>
+                <button onClick={() => project.setRight(w.id)} disabled={isLeft} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isRight ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted disabled:opacity-30")} title="Show in right panel">R</button>
+                <button onClick={() => project.setBase(w.id)} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isBase ? "bg-secondary/40 border-secondary" : "border-border bg-card hover:bg-muted")} title="Mark as base / copy-text">base</button>
+                {c.witnesses.length > 2 && (
+                  <button onClick={() => project.removeWitness(w.id)} className="ml-auto p-0.5 rounded hover:bg-muted text-muted-foreground" title="Remove from project"><Trash2 className="w-3 h-3" /></button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function AddSourcePanel({ mode, onClose, onAdd }: { mode: CollationMode; onClose: () => void; onAdd: (w: Witness) => void }) {
+  const [sig, setSig] = useState("");
+  const [title, setTitle] = useState("");
+  const [text, setText] = useState("");
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setText(normalizeNewlines(await file.text()));
+    if (!title) setTitle(file.name);
+  };
+  const fetchUrl = async () => {
+    if (!url) return;
+    setBusy(true);
+    try {
+      const res = await fetch(url);
+      setText(normalizeNewlines(await res.text()));
+    } catch {
+      alert("Could not fetch that URL (CORS or network). Paste or upload instead.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = () => {
+    onAdd({ id: uid(), siglum: sig || "?", title: title || "Untitled witness", text: normalizeNewlines(text) });
+  };
+
+  return (
+    <div className="border-b border-border bg-muted/20 px-4 py-3">
+      <div className="flex items-center gap-3 mb-2">
+        <span className="text-[12px] font-semibold">Add source ({mode})</span>
+        <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+      </div>
+      <div className="flex items-center gap-2 mb-2">
+        <input value={sig} onChange={(e) => setSig(e.target.value)} className="w-20 bg-background border border-border rounded px-2 py-1 text-[12px] font-mono" placeholder="Siglum" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[12px]" placeholder="Title" />
+        <input value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[11px]" placeholder="Fetch from URL…" />
+        <button onClick={fetchUrl} disabled={busy} className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] disabled:opacity-50">{busy ? "…" : "Fetch"}</button>
+        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer">File<input type="file" className="hidden" onChange={onFile} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" /></label>
+      </div>
+      <textarea value={text} onChange={(e) => setText(e.target.value)} className="w-full h-32 bg-background border border-border rounded px-2 py-1.5 text-[12px] font-mono resize-y" placeholder="Paste source text…" />
+      <div className="flex justify-end mt-2">
+        <button onClick={add} disabled={!text.trim()} className="px-4 py-1.5 rounded bg-primary text-primary-foreground text-[12px] font-medium disabled:opacity-50">Add to project</button>
+      </div>
+    </div>
+  );
+}
+
 function FileMenu({
-  name,
-  onRename,
-  onNew,
-  onLoad,
-  onSave,
-  onExportMd,
-  onExportJson,
-  onExportPdf,
+  name, onRename, onNew, onLoad, onSave, onExportMd, onExportJson, onExportPdf,
 }: {
-  name: string;
-  onRename: (s: string) => void;
-  onNew: () => void;
-  onLoad: () => void;
-  onSave: () => void;
-  onExportMd: () => void;
-  onExportJson: () => void;
-  onExportPdf: () => void;
+  name: string; onRename: (s: string) => void; onNew: () => void; onLoad: () => void; onSave: () => void; onExportMd: () => void; onExportJson: () => void; onExportPdf: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const item = "w-full text-left px-3 py-1.5 text-[12px] hover:bg-muted flex items-center gap-2";
-  const close = (fn: () => void) => () => {
-    fn();
-    setOpen(false);
-  };
+  const close = (fn: () => void) => () => { fn(); setOpen(false); };
   return (
     <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]"
-      >
+      <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]">
         <FileText className="w-3.5 h-3.5" /> File <ChevronDown className="w-3 h-3 opacity-60" />
       </button>
       {open && (
@@ -321,174 +380,20 @@ function FileMenu({
           <div className="absolute left-0 mt-1 w-60 z-50 bg-card border border-border rounded-md shadow-lg py-1.5">
             <div className="px-3 pb-2 pt-1">
               <label className="text-[10px] uppercase tracking-wide text-muted-foreground">Collation name</label>
-              <input
-                value={name}
-                onChange={(e) => onRename(e.target.value)}
-                className="w-full mt-1 bg-background border border-border rounded px-2 py-1 text-[12px]"
-              />
+              <input value={name} onChange={(e) => onRename(e.target.value)} className="w-full mt-1 bg-background border border-border rounded px-2 py-1 text-[12px]" />
             </div>
             <div className="border-t border-border my-1" />
-            <button className={item} onClick={close(onNew)}>
-              <FilePlus className="w-3.5 h-3.5 text-muted-foreground" /> New collation…
-            </button>
-            <button className={item} onClick={close(onLoad)}>
-              <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" /> Open project (.svar)…
-            </button>
-            <button className={item} onClick={close(onSave)}>
-              <Save className="w-3.5 h-3.5 text-muted-foreground" /> Save project (.svar)
-            </button>
+            <button className={item} onClick={close(onNew)}><FilePlus className="w-3.5 h-3.5 text-muted-foreground" /> New collation…</button>
+            <button className={item} onClick={close(onLoad)}><FolderOpen className="w-3.5 h-3.5 text-muted-foreground" /> Open project (.svar)…</button>
+            <button className={item} onClick={close(onSave)}><Save className="w-3.5 h-3.5 text-muted-foreground" /> Save project (.svar)</button>
             <div className="border-t border-border my-1" />
             <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Export</div>
-            <button className={item} onClick={close(onExportMd)}>
-              <Download className="w-3.5 h-3.5 text-muted-foreground" /> Markdown (.md)
-            </button>
-            <button className={item} onClick={close(onExportPdf)}>
-              <Download className="w-3.5 h-3.5 text-muted-foreground" /> PDF (.pdf)
-            </button>
-            <button className={item} onClick={close(onExportJson)}>
-              <Download className="w-3.5 h-3.5 text-muted-foreground" /> JSON (.json)
-            </button>
+            <button className={item} onClick={close(onExportMd)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> Markdown (.md)</button>
+            <button className={item} onClick={close(onExportPdf)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> PDF (.pdf)</button>
+            <button className={item} onClick={close(onExportJson)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> JSON (.json)</button>
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-function WitnessImportColumn({
-  side,
-  sig,
-  setSig,
-  title,
-  setTitle,
-  text,
-  setText,
-  url,
-  setUrl,
-  urlBusy,
-  onFetch,
-  onFile,
-}: {
-  side: "a" | "b";
-  sig: string;
-  setSig: (s: string) => void;
-  title: string;
-  setTitle: (s: string) => void;
-  text: string;
-  setText: (s: string) => void;
-  url: string;
-  setUrl: (s: string) => void;
-  urlBusy: boolean;
-  onFetch: () => void;
-  onFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="flex-1 min-w-0 flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <input value={sig} onChange={(e) => setSig(e.target.value)} className="w-16 bg-background border border-border rounded px-2 py-1 text-[12px] font-mono" placeholder="Siglum" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[12px]" placeholder="Title" />
-      </div>
-      <div className="flex items-center gap-2">
-        <input value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[11px]" placeholder="Fetch from URL…" />
-        <button onClick={onFetch} disabled={urlBusy} className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] disabled:opacity-50">
-          {urlBusy ? "…" : "Fetch"}
-        </button>
-        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer">
-          File
-          <input type="file" className="hidden" onChange={onFile} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
-        </label>
-      </div>
-      <textarea value={text} onChange={(e) => setText(e.target.value)} className="w-full h-40 bg-background border border-border rounded px-2 py-1.5 text-[12px] font-mono resize-y" placeholder={`Paste witness ${side.toUpperCase()} text…`} />
-    </div>
-  );
-}
-
-function ImportPanel({
-  onClose,
-  onCollate,
-  initialMode,
-}: {
-  onClose: () => void;
-  onCollate: (name: string, witnesses: Witness[], mode: CollationMode) => void;
-  initialMode: CollationMode;
-}) {
-  const [mode, setMode] = useState<CollationMode>(initialMode);
-  const [name, setName] = useState("Untitled collation");
-  const [sigA, setSigA] = useState("A");
-  const [sigB, setSigB] = useState("B");
-  const [titleA, setTitleA] = useState("Witness A");
-  const [titleB, setTitleB] = useState("Witness B");
-  const [textA, setTextA] = useState("");
-  const [textB, setTextB] = useState("");
-  const [urlA, setUrlA] = useState("");
-  const [urlB, setUrlB] = useState("");
-  const [urlBusy, setUrlBusy] = useState<"a" | "b" | null>(null);
-
-  const onFile = (side: "a" | "b") => async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const text = await file.text();
-    if (side === "a") {
-      setTextA(text);
-      if (titleA === "Witness A") setTitleA(file.name);
-    } else {
-      setTextB(text);
-      if (titleB === "Witness B") setTitleB(file.name);
-    }
-  };
-
-  const fetchUrl = (side: "a" | "b") => async () => {
-    const url = side === "a" ? urlA : urlB;
-    if (!url) return;
-    setUrlBusy(side);
-    try {
-      const res = await fetch(url);
-      const text = await res.text();
-      if (side === "a") setTextA(text);
-      else setTextB(text);
-    } catch {
-      alert("Could not fetch that URL from the browser (CORS or network). Paste the text instead, or upload a file.");
-    } finally {
-      setUrlBusy(null);
-    }
-  };
-
-  const collateNow = () => {
-    onCollate(
-      name || "Untitled collation",
-      [
-        { id: "a", siglum: sigA || "A", title: titleA || "Witness A", text: normalizeNewlines(textA) },
-        { id: "b", siglum: sigB || "B", title: titleB || "Witness B", text: normalizeNewlines(textB) },
-      ],
-      mode
-    );
-  };
-
-  return (
-    <div className="border-b border-border bg-muted/20 px-4 py-3">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="text-[12px] font-semibold">Import witnesses</span>
-        <input value={name} onChange={(e) => setName(e.target.value)} className="bg-background border border-border rounded px-2 py-1 text-[12px] w-56" placeholder="Collation name" />
-        <div className="flex rounded border border-border overflow-hidden text-[11px]">
-          {(["source", "text"] as CollationMode[]).map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={"px-2 py-0.5 capitalize " + (mode === m ? "bg-primary text-primary-foreground" : "bg-card")}>
-              {m}
-            </button>
-          ))}
-        </div>
-        <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close">
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="flex gap-4 flex-col md:flex-row">
-        <WitnessImportColumn side="a" sig={sigA} setSig={setSigA} title={titleA} setTitle={setTitleA} text={textA} setText={setTextA} url={urlA} setUrl={setUrlA} urlBusy={urlBusy === "a"} onFetch={fetchUrl("a")} onFile={onFile("a")} />
-        <WitnessImportColumn side="b" sig={sigB} setSig={setSigB} title={titleB} setTitle={setTitleB} text={textB} setText={setTextB} url={urlB} setUrl={setUrlB} urlBusy={urlBusy === "b"} onFetch={fetchUrl("b")} onFile={onFile("b")} />
-      </div>
-      <div className="flex justify-end mt-3">
-        <button onClick={collateNow} disabled={!textA.trim() || !textB.trim()} className="px-4 py-1.5 rounded bg-primary text-primary-foreground text-[12px] font-medium disabled:opacity-50">
-          Collate
-        </button>
-      </div>
     </div>
   );
 }
@@ -502,41 +407,19 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <img src="/sv-icon.svg" alt="" width={36} height={36} className="w-9 h-9 shrink-0" />
           <div>
             <h2 className="text-[18px] font-semibold leading-tight">Source Variorum</h2>
-            <p className="text-[11px] text-muted-foreground">A braided collation workbench · v{APP_VERSION}</p>
+            <p className="text-[11px] text-muted-foreground">A braided collation workbench · v{APP_VERSION} · by David M. Berry</p>
           </div>
-          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close">
-            <X className="w-4 h-4" />
-          </button>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
         </div>
         <div className="space-y-3 text-[13px] leading-relaxed text-foreground/85">
-          <p>
-            A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a
-            text so a reader can track how textual decisions were made. Source Variorum brings that
-            apparatus of textual criticism to computational close reading, in two modes — source code
-            and prose.
-          </p>
-          <p>
-            Two witnesses are shown side by side with a central <strong>braid</strong>: ribbons
-            connecting matching passages, including text that has <strong>moved</strong>. The crossing
-            of those ribbons is the analytical payload. Variants are typed (match, substitution,
-            addition, deletion, transposition, near-identical variant) and gathered into an
-            auto-generated critical apparatus you can annotate, save, and export.
-          </p>
-          <p className="text-[12px] text-muted-foreground">
-            Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first,
-            no model calls. Reuses the close-reading scaffolding of LLMbench.
-          </p>
+          <p>A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a text so a reader can track how textual decisions were made. Source Variorum brings that apparatus of textual criticism to computational close reading, in two modes — source code and prose.</p>
+          <p>Load several witnesses into a project, pick any two for the left and right panels, and read the <strong>braid</strong> between them: ribbons connecting matching passages, including text that has <strong>moved</strong>. Variants are typed and gathered into an editable critical apparatus. Edit witness text to correct errors, annotate with ⌘/Ctrl-click, and save or export the project.</p>
+          <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first, no model calls.</p>
         </div>
         <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ch-mark.svg" alt="" width={16} height={16} className="w-4 h-4 opacity-80" />
-          <span className="text-[12px] text-muted-foreground">
-            Part of the{" "}
-            <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="text-primary hover:underline">
-              Computational Hermeneutics
-            </a>{" "}
-            family
-          </span>
+          <span className="text-[12px] text-muted-foreground">Part of the <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="text-primary hover:underline">Computational Hermeneutics</a> family</span>
         </div>
       </div>
     </div>

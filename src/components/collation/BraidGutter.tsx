@@ -62,10 +62,20 @@ export function BraidGutter({
         if (!visibleTypes.has(r.type)) return null;
         const color = VARIANT_TYPE_COLORS[r.type];
         const active = r.id === selectedId || r.id === hoveredId;
-        const dimmed = (anySelected && r.id !== selectedId) || (!active && r.type === "match");
-        const w = thickness(r.type, r.length, maxLength) * (active ? 1.5 : 1);
+        const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
+        // When a variant is selected, fade everything else right back so the one
+        // being worked on stands alone; otherwise matches stay faint, changes mid.
+        const opacity = anySelected
+          ? active
+            ? 0.95
+            : 0.05
+          : active
+            ? 0.95
+            : r.type === "match"
+              ? 0.16
+              : 0.6;
         return (
           <path
             key={r.id}
@@ -74,7 +84,7 @@ export function BraidGutter({
             stroke={color}
             strokeWidth={w}
             strokeLinecap="round"
-            opacity={active ? 0.95 : dimmed ? (r.type === "match" ? 0.18 : 0.3) : 0.65}
+            opacity={opacity}
             style={{ cursor: r.type === "match" ? "default" : "pointer", transition: "opacity 120ms, stroke-width 120ms" }}
             onMouseEnter={() => onHover(r.id)}
             onMouseLeave={() => onHover(null)}

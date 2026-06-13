@@ -1,54 +1,60 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
+import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from "@/types/collation";
+import type { useProject } from "@/hooks/useProject";
+import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
 import { BraidGutter, type Ribbon } from "./BraidGutter";
 
 type Side = "a" | "b";
-
+type Project = ReturnType<typeof useProject>;
+type View = ReturnType<typeof deriveView>;
 type ApparatusEdit = Pick<ApparatusEntry, "note" | "category">;
 
+function uid(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `a${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+  }
+}
+
 export function CollationView({
-  witnessA,
-  witnessB,
-  mode,
-  variants,
-  metrics,
-  apparatusEdits,
-  onEditNote,
+  project,
+  view,
+  fontSize,
+  editMode,
 }: {
-  witnessA: Witness;
-  witnessB: Witness;
-  mode: CollationMode;
-  variants: Variant[];
-  metrics: CollationMetrics;
-  apparatusEdits: Record<string, ApparatusEdit>;
-  onEditNote: (variantId: string, note: string) => void;
+  project: Project;
+  view: View;
+  fontSize: number;
+  editMode: boolean;
 }) {
+  const { collation } = project;
+  const { a: witnessA, b: witnessB, variants, metrics } = view;
+  const mode = collation.mode;
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(
-    () => new Set(VARIANT_TYPES)
-  );
+  const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
+  const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
 
-  // Anchor registry: key `${vid}:${side}` → element.
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const [ribbons, setRibbons] = useState<Ribbon[]>([]);
   const [gutterSize, setGutterSize] = useState({ width: 0, height: 0 });
 
-  const registerAnchor = useCallback(
-    (id: string, side: Side, el: HTMLElement | null) => {
-      const key = `${id}:${side}`;
-      if (el) anchorsRef.current.set(key, el);
-      else anchorsRef.current.delete(key);
-    },
-    []
-  );
+  const registerAnchor = useCallback((id: string, side: Side, el: HTMLElement | null) => {
+    const key = `${id}:${side}`;
+    if (el) anchorsRef.current.set(key, el);
+    else anchorsRef.current.delete(key);
+  }, []);
 
   const measure = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -59,7 +65,7 @@ export function CollationView({
     for (const v of variants) {
       const elA = anchorsRef.current.get(`${v.id}:a`);
       const elB = anchorsRef.current.get(`${v.id}:b`);
-      if (!elA || !elB) continue; // additions/deletions have only one side: no ribbon
+      if (!elA || !elB) continue;
       const rA = elA.getBoundingClientRect();
       const rB = elB.getBoundingClientRect();
       next.push({
@@ -75,20 +81,30 @@ export function CollationView({
   }, [variants]);
 
   useLayoutEffect(() => {
+    if (editMode) return; // braid is hidden while editing text
     measure();
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const ro = new ResizeObserver(() => measure());
     ro.observe(wrapper);
-    // Re-measure once fonts have settled (web-font swap shifts line heights).
     const t = setTimeout(measure, 250);
     return () => {
       ro.disconnect();
       clearTimeout(t);
     };
-  }, [measure]);
+  }, [measure, editMode, fontSize]);
 
-  // Scroll the selected variant into view so its correspondence is on screen.
+  const scrollToLine = useCallback(
+    (side: Side, line: number) => {
+      const v = variants.find((x) => {
+        const sp = side === "a" ? x.a : x.b;
+        return sp && sp.startLine <= line && line <= sp.endLine;
+      });
+      if (v) anchorsRef.current.get(`${v.id}:${side}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    },
+    [variants]
+  );
+
   const onSelect = useCallback((id: string | null) => {
     setSelectedId(id);
     if (id) {
@@ -110,10 +126,11 @@ export function CollationView({
       return next;
     });
 
-  const apparatus = useMemo(
-    () => variants.filter((v) => v.type !== "match"),
-    [variants]
-  );
+  const apparatus = useMemo(() => variants.filter((v) => v.type !== "match"), [variants]);
+
+  const annotationsFor = (id: string): LineAnnotation[] => collation.annotations[id] ?? [];
+
+  const requestAnnotate = (witnessId: string) => (line: number) => setPendingAnn({ witnessId, line });
 
   return (
     <div className="flex flex-col">
@@ -135,102 +152,222 @@ export function CollationView({
                 opacity: on ? 1 : 0.55,
               }}
             >
-              <span
-                className="w-2 h-2 rounded-full"
-                style={{ background: VARIANT_TYPE_COLORS[t] }}
-              />
+              <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
               {VARIANT_TYPE_LABELS[t]} ({count})
             </button>
           );
         })}
+        {editMode && <span className="ml-auto text-[10px] text-amber-700 dark:text-amber-400">Editing text — braid paused; click away to recollate</span>}
       </div>
 
       {/* Three-column braid */}
       <div ref={wrapperRef} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
-        {/* Witness A */}
         <div className="border-r border-border min-w-0">
-          <WitnessHeader witness={witnessA} side="A" />
+          <WitnessHeader witness={witnessA} side="A" project={project} which="left" annCount={annotationsFor(witnessA.id).length} />
           <WitnessPanel
             side="a"
             witness={witnessA}
             variants={variants}
             mode={mode}
+            fontSize={fontSize}
+            editMode={editMode}
             selectedId={selectedId}
             hoveredId={hoveredId}
             onSelect={onSelect}
             onHover={setHoveredId}
+            onEditText={(text) => project.updateWitness(witnessA.id, { text })}
+            onAnnotate={requestAnnotate(witnessA.id)}
             registerAnchor={registerAnchor}
           />
         </div>
 
-        {/* Braid gutter */}
         <div ref={gutterRef} className="relative bg-muted/10">
-          <div className="absolute inset-0">
-            <BraidGutter
-              width={gutterSize.width}
-              height={gutterSize.height}
-              ribbons={ribbons}
-              maxLength={maxLength}
-              selectedId={selectedId}
-              hoveredId={hoveredId}
-              visibleTypes={visibleTypes}
-              onSelect={onSelect}
-              onHover={setHoveredId}
-            />
-          </div>
+          {!editMode && (
+            <div className="absolute inset-0">
+              <BraidGutter
+                width={gutterSize.width}
+                height={gutterSize.height}
+                ribbons={ribbons}
+                maxLength={maxLength}
+                selectedId={selectedId}
+                hoveredId={hoveredId}
+                visibleTypes={visibleTypes}
+                onSelect={onSelect}
+                onHover={setHoveredId}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Witness B */}
         <div className="border-l border-border min-w-0">
-          <WitnessHeader witness={witnessB} side="B" />
+          <WitnessHeader witness={witnessB} side="B" project={project} which="right" annCount={annotationsFor(witnessB.id).length} />
           <WitnessPanel
             side="b"
             witness={witnessB}
             variants={variants}
             mode={mode}
+            fontSize={fontSize}
+            editMode={editMode}
             selectedId={selectedId}
             hoveredId={hoveredId}
             onSelect={onSelect}
             onHover={setHoveredId}
+            onEditText={(text) => project.updateWitness(witnessB.id, { text })}
+            onAnnotate={requestAnnotate(witnessB.id)}
             registerAnchor={registerAnchor}
           />
         </div>
       </div>
 
-      {/* Apparatus */}
+      <AnnotationsPanel
+        witnessA={witnessA}
+        witnessB={witnessB}
+        annotationsA={annotationsFor(witnessA.id)}
+        annotationsB={annotationsFor(witnessB.id)}
+        onRemove={project.removeAnnotation}
+        onJump={scrollToLine}
+      />
+
       <ApparatusList
         entries={apparatus}
         witnessA={witnessA}
         witnessB={witnessB}
         mode={mode}
         selectedId={selectedId}
-        apparatusEdits={apparatusEdits}
-        onEditNote={onEditNote}
+        apparatusEdits={collation.apparatusEdits}
+        onEditNote={project.editNote}
         onSelect={onSelect}
         onHover={setHoveredId}
       />
 
-      {/* Deep dive */}
-      <DeepDivePanel
-        metrics={metrics}
-        open={showDeepDive}
-        onToggle={() => setShowDeepDive((v) => !v)}
-        witnessA={witnessA}
-        witnessB={witnessB}
-      />
+      <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={() => setShowDeepDive((v) => !v)} witnessA={witnessA} witnessB={witnessB} />
+
+      {pendingAnn && (
+        <AnnotationPopover
+          line={pendingAnn.line}
+          onCancel={() => setPendingAnn(null)}
+          onSave={(content) => {
+            const ann: LineAnnotation = {
+              id: uid(),
+              outputId: pendingAnn.witnessId,
+              lineNumber: pendingAnn.line,
+              lineContent: "",
+              type: "observation",
+              content,
+              createdAt: new Date().toISOString(),
+            };
+            project.addAnnotation(pendingAnn.witnessId, ann);
+            setPendingAnn(null);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function WitnessHeader({ witness, side }: { witness: Witness; side: "A" | "B" }) {
+function WitnessHeader({
+  witness,
+  side,
+  project,
+  which,
+  annCount,
+}: {
+  witness: Witness;
+  side: "A" | "B";
+  project: Project;
+  which: "left" | "right";
+  annCount: number;
+}) {
+  const c = project.collation;
+  const witnesses = c.witnesses;
+  const otherId = which === "left" ? c.rightId : c.leftId;
+  const isBase = witnesses[c.baseIndex]?.id === witness.id;
   return (
-    <div className="px-4 py-2 border-b border-border bg-card/60 flex items-baseline gap-2 sticky top-[37px] z-10">
-      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold">
-        {witness.siglum}
-      </span>
-      <span className="text-[13px] font-medium truncate">{witness.title}</span>
-      {witness.date && <span className="text-[11px] text-muted-foreground">{witness.date}</span>}
-      <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide">{side}</span>
+    <div className="px-3 py-2 border-b border-border bg-card/60 flex items-center gap-2 sticky top-[37px] z-10">
+      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold shrink-0">{witness.siglum}</span>
+      <select
+        value={witness.id}
+        onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
+        className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[60%] truncate"
+        title={witness.title}
+      >
+        {witnesses.map((w) => (
+          <option key={w.id} value={w.id} disabled={w.id === otherId}>
+            {w.siglum} — {w.title}
+          </option>
+        ))}
+      </select>
+      {isBase && <span className="text-[9px] uppercase tracking-wide text-secondary-foreground bg-secondary/30 px-1 rounded">base</span>}
+      {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
+      {witness.date && <span className="text-[11px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
+      <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>
+    </div>
+  );
+}
+
+function AnnotationPopover({ line, onCancel, onSave }: { line: number; onCancel: () => void; onSave: (content: string) => void }) {
+  const [text, setText] = useState("");
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onCancel}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-sm p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[12px] font-semibold mb-2">Annotate line {line}</div>
+        <textarea
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && text.trim()) onSave(text.trim());
+            if (e.key === "Escape") onCancel();
+          }}
+          placeholder="Note… (⌘/Ctrl-Enter to save)"
+          className="w-full h-24 bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y"
+        />
+        <div className="flex justify-end gap-2 mt-2">
+          <button onClick={onCancel} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Cancel</button>
+          <button onClick={() => text.trim() && onSave(text.trim())} disabled={!text.trim()} className="px-3 py-1 rounded bg-primary text-primary-foreground text-[12px] disabled:opacity-50">Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnnotationsPanel({
+  witnessA,
+  witnessB,
+  annotationsA,
+  annotationsB,
+  onRemove,
+  onJump,
+}: {
+  witnessA: Witness;
+  witnessB: Witness;
+  annotationsA: LineAnnotation[];
+  annotationsB: LineAnnotation[];
+  onRemove: (witnessId: string, annId: string) => void;
+  onJump: (side: Side, line: number) => void;
+}) {
+  const total = annotationsA.length + annotationsB.length;
+  if (total === 0) return null;
+  const row = (w: Witness, side: Side, ann: LineAnnotation) => (
+    <div key={ann.id} className="px-4 py-1.5 flex gap-2 items-baseline hover:bg-muted/40 text-[12px]">
+      <button onClick={() => onJump(side, ann.lineNumber)} className="shrink-0 font-mono text-[10px] text-primary w-16 text-left hover:underline">
+        {w.siglum} l.{ann.lineNumber}
+      </button>
+      <span className="flex-1">{ann.content}</span>
+      <button onClick={() => onRemove(w.id, ann.id)} className="shrink-0 p-0.5 rounded hover:bg-muted text-muted-foreground" title="Delete annotation">
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+  return (
+    <div className="border-t border-border">
+      <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border">
+        Annotations · {total}
+      </div>
+      <div className="divide-y divide-border/60 max-h-[28vh] overflow-y-auto">
+        {annotationsA.map((ann) => row(witnessA, "a", ann))}
+        {annotationsB.map((ann) => row(witnessB, "b", ann))}
+      </div>
     </div>
   );
 }
@@ -273,58 +410,26 @@ function ApparatusList({
         {noted > 0 && <span className="text-[10px] font-normal text-muted-foreground">· {noted} noted</span>}
         <span className="ml-auto text-[10px] font-normal text-muted-foreground">click an entry to add a note</span>
       </div>
-      <div className="divide-y divide-border/60 max-h-[44vh] overflow-y-auto">
-        {entries.length === 0 && (
-          <div className="px-4 py-3 text-[12px] text-muted-foreground">No variants — the witnesses are identical.</div>
-        )}
+      <div className="divide-y divide-border/60 max-h-[40vh] overflow-y-auto">
+        {entries.length === 0 && <div className="px-4 py-3 text-[12px] text-muted-foreground">No variants — the witnesses are identical.</div>}
         {entries.map((v) => {
           const selected = v.id === selectedId;
           const note = apparatusEdits[v.id]?.note ?? "";
           return (
-            <div
-              key={v.id}
-              onMouseEnter={() => onHover(v.id)}
-              onMouseLeave={() => onHover(null)}
-              style={{ background: selected ? "color-mix(in srgb, var(--sv-sel) 12%, transparent)" : undefined }}
-            >
-              <button
-                onClick={() => onSelect(selected ? null : v.id)}
-                className="w-full text-left px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline"
-              >
-                <span
-                  className="shrink-0 w-2 h-2 rounded-full mt-1.5"
-                  style={{ background: VARIANT_TYPE_COLORS[v.type] }}
-                  title={VARIANT_TYPE_LABELS[v.type]}
-                />
+            <div key={v.id} onMouseEnter={() => onHover(v.id)} onMouseLeave={() => onHover(null)} style={{ background: selected ? "color-mix(in srgb, var(--sv-sel) 12%, transparent)" : undefined }}>
+              <button onClick={() => onSelect(selected ? null : v.id)} className="w-full text-left px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline">
+                <span className="shrink-0 w-2 h-2 rounded-full mt-1.5" style={{ background: VARIANT_TYPE_COLORS[v.type] }} title={VARIANT_TYPE_LABELS[v.type]} />
                 <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || VARIANT_TYPE_LABELS[v.type]}</span>
                 <span className="text-[12.5px] leading-snug flex-1">
-                  {v.textA.trim() && (
-                    <span>
-                      <span className="font-mono text-[10px] text-primary mr-1">{witnessA.siglum}</span>
-                      {lead(v.textA)}
-                    </span>
-                  )}
+                  {v.textA.trim() && (<span><span className="font-mono text-[10px] text-primary mr-1">{witnessA.siglum}</span>{lead(v.textA)}</span>)}
                   {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
-                  {v.textB.trim() && (
-                    <span>
-                      <span className="font-mono text-[10px] text-primary mr-1">{witnessB.siglum}</span>
-                      {lead(v.textB)}
-                    </span>
-                  )}
+                  {v.textB.trim() && (<span><span className="font-mono text-[10px] text-primary mr-1">{witnessB.siglum}</span>{lead(v.textB)}</span>)}
                 </span>
-                {note.trim() && !selected && (
-                  <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[30%] truncate">“{note.trim()}”</span>
-                )}
+                {note.trim() && !selected && <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[30%] truncate">“{note.trim()}”</span>}
               </button>
               {selected && (
                 <div className="px-4 pb-3 pl-[4.5rem]">
-                  <textarea
-                    value={note}
-                    onChange={(e) => onEditNote(v.id, e.target.value)}
-                    placeholder="Editor's note for this locus…"
-                    className="w-full bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y min-h-[3rem]"
-                    autoFocus
-                  />
+                  <textarea value={note} onChange={(e) => onEditNote(v.id, e.target.value)} placeholder="Editor's note for this locus…" className="w-full bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y min-h-[3rem]" autoFocus />
                 </div>
               )}
             </div>
@@ -356,10 +461,7 @@ function DeepDivePanel({
   );
   return (
     <div className="border-t border-border">
-      <button
-        onClick={onToggle}
-        className="w-full px-4 py-2 text-left text-[12px] font-semibold text-foreground/80 bg-muted/30 hover:bg-muted/50 flex items-center gap-2"
-      >
+      <button onClick={onToggle} className="w-full px-4 py-2 text-left text-[12px] font-semibold text-foreground/80 bg-muted/30 hover:bg-muted/50 flex items-center gap-2">
         <span className="text-muted-foreground">{open ? "▾" : "▸"}</span>
         Deep dive · quantitative summary
       </button>

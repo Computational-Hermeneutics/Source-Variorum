@@ -143,6 +143,10 @@ export interface Collation {
   witnesses: Witness[];
   /** Index into `witnesses` marked as base / copy-text. */
   baseIndex: number;
+  /** Witness id shown in the left (A) panel of the braid. */
+  leftId: string;
+  /** Witness id shown in the right (B) panel of the braid. */
+  rightId: string;
   /** Per-witness marginal annotations, keyed by witness id. */
   annotations: Record<string, LineAnnotation[]>;
   /** Cross-witness interpretive links (apparatus relations). */

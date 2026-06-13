@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CollationMode, Variant, Witness } from "@/types/collation";
 import { VARIANT_TYPE_COLORS } from "@/types/collation";
 
@@ -8,18 +8,20 @@ type Side = "a" | "b";
 
 /** Background tint for a variant span on a given side. Matches stay untinted so
  *  the eye rests on what changed; everything else carries its type colour at low
- *  alpha, lifted when selected. */
-function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean) {
+ *  alpha, lifted when selected. When a variant is selected, every other span is
+ *  faded so the locus under work stands alone. */
+function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean, anySelected: boolean) {
   if (type === "match") {
     return selected || hovered
       ? { background: "color-mix(in srgb, var(--sv-match) 14%, transparent)" }
       : {};
   }
   const color = VARIANT_TYPE_COLORS[type];
-  const alpha = selected ? 42 : hovered ? 30 : 20;
+  const alpha = selected ? 46 : hovered ? 30 : anySelected ? 8 : 22;
   return {
     background: `color-mix(in srgb, ${color} ${alpha}%, transparent)`,
     boxShadow: selected ? `inset 0 -2px 0 0 ${color}` : undefined,
+    opacity: anySelected && !selected && !hovered ? 0.55 : 1,
   };
 }
 
@@ -28,25 +30,38 @@ export function WitnessPanel({
   witness,
   variants,
   mode,
+  fontSize,
+  editMode,
   selectedId,
   hoveredId,
   onSelect,
   onHover,
+  onEditText,
+  onAnnotate,
   registerAnchor,
 }: {
   side: Side;
   witness: Witness;
   variants: Variant[];
   mode: CollationMode;
+  fontSize: number;
+  editMode: boolean;
   selectedId: string | null;
   hoveredId: string | null;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
+  onEditText: (text: string) => void;
+  onAnnotate: (line: number) => void;
   registerAnchor: (id: string, side: Side, el: HTMLElement | null) => void;
 }) {
-  // This side's variants in document order. Every character of the witness
-  // belongs to exactly one such variant (matches/subs/variants/transpositions
-  // plus this side's del-or-add), so concatenating their slices is verbatim.
+  const isMono = mode === "source";
+  const anySelected = selectedId !== null;
+
+  // Local editing buffer; commit to the project on blur so undo history records
+  // one entry per edit session rather than one per keystroke.
+  const [draft, setDraft] = useState(witness.text);
+  useEffect(() => setDraft(witness.text), [witness.text, witness.id]);
+
   const ordered = useMemo(() => {
     const span = (v: Variant) => (side === "a" ? v.a : v.b);
     return variants
@@ -54,17 +69,40 @@ export function WitnessPanel({
       .sort((x, y) => span(x)!.start - span(y)!.start);
   }, [variants, side]);
 
-  const isMono = mode === "source";
+  const fontFamily = isMono
+    ? "var(--code-font-family)"
+    : "var(--font-source-serif), Georgia, serif";
+
+  if (editMode) {
+    return (
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft !== witness.text) onEditText(draft);
+        }}
+        spellCheck={false}
+        className="w-full min-h-[60vh] bg-amber-50/40 dark:bg-amber-900/10 border-0 outline-none px-4 py-3 resize-none"
+        style={{
+          fontFamily,
+          fontSize: `${fontSize}px`,
+          lineHeight: isMono ? 1.55 : 1.75,
+          whiteSpace: isMono ? "pre" : "pre-wrap",
+          tabSize: 8,
+        }}
+      />
+    );
+  }
 
   return (
     <div
       className="px-4 py-3"
       style={{
-        fontFamily: isMono ? "var(--code-font-family)" : "var(--font-source-serif), Georgia, serif",
-        fontSize: isMono ? "12.5px" : "15px",
-        lineHeight: isMono ? "1.55" : "1.75",
+        fontFamily,
+        fontSize: `${fontSize}px`,
+        lineHeight: isMono ? 1.55 : 1.75,
         whiteSpace: "pre-wrap",
-        wordBreak: isMono ? "normal" : "normal",
+        tabSize: 8,
       }}
     >
       {ordered.map((v) => {
@@ -79,13 +117,20 @@ export function WitnessPanel({
             data-vid={v.id}
             onMouseEnter={() => onHover(v.id)}
             onMouseLeave={() => onHover(null)}
-            onClick={() => onSelect(selected ? null : v.id)}
-            title={`${v.type}${sp.startLine === sp.endLine ? ` · l.${sp.startLine}` : ` · ll.${sp.startLine}–${sp.endLine}`}`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) {
+                e.preventDefault();
+                onAnnotate(sp.startLine);
+                return;
+              }
+              onSelect(selected ? null : v.id);
+            }}
+            title={`${v.type}${sp.startLine === sp.endLine ? ` · l.${sp.startLine}` : ` · ll.${sp.startLine}–${sp.endLine}`}  ·  ⌘/Ctrl-click to annotate`}
             className={
               "rounded-[2px] transition-colors duration-100 " +
-              (v.type === "match" ? "cursor-default" : "cursor-pointer")
+              (v.type === "match" ? "cursor-pointer" : "cursor-pointer")
             }
-            style={tintStyle(v.type, selected, hovered)}
+            style={tintStyle(v.type, selected, hovered, anySelected)}
           >
             {text}
           </span>

@@ -2,6 +2,8 @@
 
 > An instrument in the **Computational Hermeneutics** family.
 
+**Author:** David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) · **Version:** 0.2.0 · **Licence:** MIT
+
 **Source Variorum** is a side-by-side textual collation workbench. A *variorum*
 (from *cum notis variorum*, "with the notes of various people") collates all
 known variants of a text so that a reader can track how textual decisions were
