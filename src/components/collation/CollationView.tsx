@@ -105,9 +105,12 @@ export function CollationView({
     [variants]
   );
 
-  const onSelect = useCallback((id: string | null) => {
+  // `scroll` is true only when the selection comes from the apparatus list or a
+  // ribbon (where the locus may be off-screen). A plain click on the text just
+  // highlights it in place — no jump.
+  const onSelect = useCallback((id: string | null, scroll = true) => {
     setSelectedId(id);
-    if (id) {
+    if (id && scroll) {
       const el = anchorsRef.current.get(`${id}:a`) ?? anchorsRef.current.get(`${id}:b`);
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
@@ -281,7 +284,6 @@ function WitnessHeader({
   const c = project.collation;
   const witnesses = c.witnesses;
   const otherId = which === "left" ? c.rightId : c.leftId;
-  const isBase = witnesses[c.baseIndex]?.id === witness.id;
   return (
     <div className="px-3 py-2 border-b border-border bg-card/60 flex items-center gap-2 sticky top-[37px] z-10">
       <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold shrink-0">{witness.siglum}</span>
@@ -297,7 +299,7 @@ function WitnessHeader({
           </option>
         ))}
       </select>
-      {isBase && <span className="text-[9px] uppercase tracking-wide text-secondary-foreground bg-secondary/30 px-1 rounded">base</span>}
+      {which === "left" && <span className="text-[9px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
       {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
       {witness.date && <span className="text-[11px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
       <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>

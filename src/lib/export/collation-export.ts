@@ -122,7 +122,7 @@ export function toMarkdown(c: Collation): string {
   out.push("## Witnesses");
   out.push("");
   for (const w of c.witnesses) {
-    const base = c.witnesses[c.baseIndex]?.id === w.id ? " *(base / copy-text)*" : "";
+    const base = w.id === c.leftId ? " *(base / copy-text)*" : "";
     out.push(`- **${w.siglum}** — ${w.title}${w.date ? ` (${w.date})` : ""}${base}`);
   }
   out.push("");
@@ -193,7 +193,7 @@ export function toPDF(c: Collation): jsPDF {
 
   line("Witnesses", 12, "bold");
   for (const w of c.witnesses) {
-    const base = c.witnesses[c.baseIndex]?.id === w.id ? " (base / copy-text)" : "";
+    const base = w.id === c.leftId ? " (base / copy-text)" : "";
     line(`${w.siglum} — ${w.title}${w.date ? ` (${w.date})` : ""}${base}`, 10, "normal", 12);
   }
   gap(10);

@@ -103,7 +103,7 @@ export function WitnessPanel({
   editMode: boolean;
   selectedId: string | null;
   hoveredId: string | null;
-  onSelect: (id: string | null) => void;
+  onSelect: (id: string | null, scroll?: boolean) => void;
   onHover: (id: string | null) => void;
   onEditText: (text: string) => void;
   onAnnotate: (line: number) => void;
@@ -171,12 +171,14 @@ export function WitnessPanel({
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
                     onClick={(e) => {
+                      // Annotate only on modifier-click; a plain click just
+                      // highlights the variant in place (no scroll/jump).
                       if (e.metaKey || e.ctrlKey) {
                         e.preventDefault();
                         onAnnotate(row.n);
                         return;
                       }
-                      onSelect(selected ? null : seg.vid);
+                      onSelect(selected ? null : seg.vid, false);
                     }}
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
                     style={tintStyle(seg.type, selected, hovered, anySelected)}

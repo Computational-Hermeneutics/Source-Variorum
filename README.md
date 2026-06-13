@@ -3,7 +3,7 @@
 > An instrument in the **Computational Hermeneutics** family.
 
 **Author:** David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366))
-**Version:** 0.4.0 · **Licence:** MIT
+**Version:** 0.4.1 · **Licence:** MIT
 
 **Source Variorum** is a side-by-side textual collation workbench. A *variorum*
 (from *cum notis variorum*, "with the notes of various people") collates all
@@ -44,10 +44,12 @@ glance, where text has been added, deleted, substituted, or transposed.
 A project holds many sources, organised in a small file organiser:
 
 - A **Sources** sidebar with a toolbar: add a source, import several files at
-  once, create folders. Sources can be filed into **collapsible folders**,
-  renamed, moved, and sent to a **trash** (with restore / empty).
-- Pick any two sources for the **left** and **right** panels (the L/R controls
-  or the per-panel dropdowns); mark one as the **base** / copy-text.
+  once, load a **sample** collation, create folders. Sources can be filed into
+  **collapsible folders**, renamed, moved, and sent to a **trash** (with restore
+  / empty).
+- **Click a source** to open it in the right (comparison) panel against the
+  left, which acts as the **base** / copy-text; the per-panel dropdowns and each
+  source's actions menu place either side explicitly.
 - **Edit** witness text in place to correct or normalise it, with **undo/redo**
   and **revert to the last saved project**.
 - **⌘/Ctrl-click** any passage to attach a marginal annotation.

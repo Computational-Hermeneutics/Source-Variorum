@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Moon, Sun, Upload, BookOpen, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
-  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Plus, Type,
+  Moon, Sun, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
+  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Type,
 } from "lucide-react";
 import type { Collation, CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
@@ -103,19 +103,25 @@ export default function Home() {
   const [fontSize, setFontSize] = useState(13);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Hydrate working collation + font size on mount.
+  // Hydrate working collation + font size on mount; otherwise load a default
+  // sample (all sample texts are fetched from /public, so there is no inline one).
   useEffect(() => {
+    let restored = false;
     try {
       const stored = localStorage.getItem(CURRENT_KEY);
       if (stored) {
         const parsed = parseProjectFile(stored);
-        if (parsed) project.load(parsed);
+        if (parsed && parsed.witnesses.some((w) => w.text.trim())) {
+          project.load(parsed);
+          restored = true;
+        }
       }
       const fs = localStorage.getItem(FONT_KEY);
       if (fs) setFontSize(Math.min(22, Math.max(9, parseInt(fs, 10) || 13)));
     } catch {
       /* ignore */
     }
+    if (!restored) collationFromDemo(DEFAULT_DEMO.id).then(project.load).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -240,18 +246,6 @@ export default function Home() {
               ))}
             </div>
 
-            <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <BookOpen className="w-3.5 h-3.5" />
-              <select onChange={(e) => loadDemo(e.target.value)} value="" className="bg-card border border-border rounded px-2 py-1 text-[12px] text-foreground max-w-[190px]">
-                <option value="" disabled>Load a demo…</option>
-                {DEMOS.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
-              </select>
-            </label>
-
-            <button onClick={() => setShowAdd((v) => !v)} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Add a source text to the project">
-              <Plus className="w-3.5 h-3.5" /> Add source
-            </button>
-
             <button onClick={() => setShowAbout(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="About"><Info className="w-3.5 h-3.5" /></button>
             <button onClick={() => setIsDark((v) => !v)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Toggle theme">{isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}</button>
           </div>
@@ -270,7 +264,7 @@ export default function Home() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        <SourceOrganiser project={project} onAddSource={() => setShowAdd(true)} onImport={importSources} />
+        <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
         <main className="flex-1 min-w-0">
           <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
         </main>

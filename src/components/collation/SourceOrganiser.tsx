@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  FilePlus, Upload, FolderPlus, Folder, ChevronRight, ChevronDown,
-  MoreVertical, Pencil, Trash2, RotateCcw, X, Check,
+  FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
+  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, ArrowLeftToLine, ArrowRightToLine,
 } from "lucide-react";
 import type { Witness } from "@/types/collation";
+import type { Demo } from "@/data/demos";
 import type { useProject } from "@/hooks/useProject";
 
 type Project = ReturnType<typeof useProject>;
@@ -13,16 +14,21 @@ const COLLAPSE_KEY = "source-variorum-collapsed-folders";
 
 export function SourceOrganiser({
   project,
+  demos,
+  onLoadDemo,
   onAddSource,
   onImport,
 }: {
   project: Project;
+  demos: Demo[];
+  onLoadDemo: (id: string) => void;
   onAddSource: () => void;
   onImport: (sources: { siglum: string; title: string; text: string }[]) => void;
 }) {
   const c = project.collation;
   const trash = c.trash ?? [];
   const importRef = useRef<HTMLInputElement>(null);
+  const [samplesOpen, setSamplesOpen] = useState(false);
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -76,15 +82,32 @@ export function SourceOrganiser({
   return (
     <aside className="w-60 shrink-0 border-r border-border bg-muted/20 flex flex-col">
       {/* Toolbar */}
-      <div className="px-2.5 py-1.5 border-b border-border flex items-center gap-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mr-auto">Sources · {c.witnesses.length}</span>
-        <ToolBtn title="Add a source" onClick={onAddSource}><FilePlus className="w-3.5 h-3.5" /></ToolBtn>
-        <ToolBtn title="Import files…" onClick={() => importRef.current?.click()}><Upload className="w-3.5 h-3.5" /></ToolBtn>
-        <ToolBtn title="New folder" onClick={newFolder}><FolderPlus className="w-3.5 h-3.5" /></ToolBtn>
+      <div className="px-2 py-1.5 border-b border-border flex items-center gap-0.5">
+        <ToolBtn title="Add a source" onClick={onAddSource}><FilePlus className="w-4 h-4" /></ToolBtn>
+        <ToolBtn title="Import files…" onClick={() => importRef.current?.click()}><Upload className="w-4 h-4" /></ToolBtn>
+        <div className="relative">
+          <ToolBtn title="Load a sample collation" onClick={() => setSamplesOpen((v) => !v)}><BookOpen className="w-4 h-4" /></ToolBtn>
+          {samplesOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setSamplesOpen(false)} />
+              <div className="absolute left-0 mt-1 w-64 z-50 bg-card border border-border rounded-md shadow-lg py-1 text-[12px]">
+                <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Sample collations</div>
+                {demos.map((d) => (
+                  <button key={d.id} className="w-full text-left px-3 py-1.5 hover:bg-muted" onClick={() => { onLoadDemo(d.id); setSamplesOpen(false); }}>
+                    <div className="font-medium truncate">{d.name}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{d.blurb}</div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <ToolBtn title="New folder" onClick={newFolder}><FolderPlus className="w-4 h-4" /></ToolBtn>
+        <span className="ml-auto text-[10px] text-muted-foreground pr-1">{c.witnesses.length}</span>
         <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto py-1">
         {root.map((w) => (
           <SourceRow key={w.id} witness={w} project={project} folders={folders} />
         ))}
@@ -94,12 +117,11 @@ export function SourceOrganiser({
           const isCollapsed = collapsed.has(f);
           return (
             <div key={f}>
-              <div className="group flex items-center gap-1 px-2 py-1 bg-muted/40 border-y border-border/60">
-                <button onClick={() => toggleCollapse(f)} className="flex items-center gap-1 flex-1 min-w-0 text-left">
+              <div className="group flex items-center gap-1 px-2 py-1">
+                <button onClick={() => toggleCollapse(f)} className="flex items-center gap-1 flex-1 min-w-0 text-left text-muted-foreground hover:text-foreground">
                   {isCollapsed ? <ChevronRight className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
-                  <Folder className="w-3 h-3 shrink-0 text-muted-foreground" />
-                  <span className="text-[11px] font-medium truncate">{f}</span>
-                  <span className="text-[10px] text-muted-foreground">{items.length}</span>
+                  <Folder className="w-3.5 h-3.5 shrink-0" />
+                  <span className="text-[11px] uppercase tracking-wide truncate">{f}</span>
                 </button>
                 <button onClick={() => { if (confirm(`Delete folder "${f}"? Its sources move to the root.`)) project.deleteFolder(f); }} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Delete folder (keep sources)">
                   <X className="w-3 h-3" />
@@ -111,7 +133,6 @@ export function SourceOrganiser({
         })}
       </div>
 
-      {/* Trash */}
       <TrashSection trash={trash} project={project} />
     </aside>
   );
@@ -119,7 +140,7 @@ export function SourceOrganiser({
 
 function ToolBtn({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: () => void }) {
   return (
-    <button onClick={onClick} title={title} className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+    <button onClick={onClick} title={title} className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
       {children}
     </button>
   );
@@ -130,7 +151,8 @@ function SourceRow({ witness, project, folders, indent }: { witness: Witness; pr
   const w = witness;
   const isLeft = c.leftId === w.id;
   const isRight = c.rightId === w.id;
-  const isBase = c.witnesses[c.baseIndex]?.id === w.id;
+  const shown = isLeft || isRight;
+  const annCount = (c.annotations[w.id] ?? []).length;
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [sig, setSig] = useState(w.siglum);
@@ -141,90 +163,93 @@ function SourceRow({ witness, project, folders, indent }: { witness: Witness; pr
     setEditing(false);
   };
 
-  return (
-    <div className={"group border-b border-border/60 hover:bg-muted/40 " + (indent ? "pl-4" : "")}>
-      <div className="px-2.5 py-2">
-        {editing ? (
-          <div className="flex items-center gap-1">
-            <input value={sig} onChange={(e) => setSig(e.target.value)} className="w-12 bg-background border border-primary rounded px-1 py-0.5 text-[11px] font-mono" />
-            <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus className="flex-1 min-w-0 bg-background border border-primary rounded px-1 py-0.5 text-[11px]" onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setEditing(false); }} />
-            <button onClick={saveRename} className="p-0.5 rounded hover:bg-muted text-green-600" title="Save"><Check className="w-3 h-3" /></button>
-            <button onClick={() => setEditing(false)} className="p-0.5 rounded hover:bg-muted text-muted-foreground" title="Cancel"><X className="w-3 h-3" /></button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[11px] px-1 rounded bg-primary/10 text-primary font-semibold shrink-0">{w.siglum}</span>
-            <span className="text-[12px] truncate flex-1" title={w.title}>{w.title}</span>
-            <div className="relative">
-              <button onClick={() => setMenu((v) => !v)} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Actions">
-                <MoreVertical className="w-3.5 h-3.5" />
-              </button>
-              {menu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 w-40 z-50 bg-card border border-border rounded-md shadow-lg py-1 text-[12px]">
-                    <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
-                      <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
-                    </button>
-                    <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Move to</div>
-                    {w.folder && (
-                      <button className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2" onClick={() => { project.moveToFolder(w.id, ""); setMenu(false); }}>
-                        <Folder className="w-3 h-3 text-muted-foreground" /> Root
-                      </button>
-                    )}
-                    {folders.filter((f) => f !== w.folder).map((f) => (
-                      <button key={f} className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2" onClick={() => { project.moveToFolder(w.id, f); setMenu(false); }}>
-                        <Folder className="w-3 h-3 text-muted-foreground" /> {f}
-                      </button>
-                    ))}
-                    <button className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2 text-muted-foreground" onClick={() => { const n = prompt("New folder name:")?.trim(); if (n) project.moveToFolder(w.id, n); setMenu(false); }}>
-                      <FolderPlus className="w-3 h-3" /> New folder…
-                    </button>
-                    <div className="border-t border-border my-1" />
-                    <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-destructive disabled:opacity-40" disabled={c.witnesses.length <= 2} title={c.witnesses.length <= 2 ? "Keep at least two sources" : "Send to trash"} onClick={() => { project.trashWitness(w.id); setMenu(false); }}>
-                      <Trash2 className="w-3 h-3" /> Send to trash
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-        <div className="flex items-center gap-1 mt-1.5">
-          <PanelBtn active={isLeft} disabled={isRight} onClick={() => project.setLeft(w.id)} title="Show in left panel">L</PanelBtn>
-          <PanelBtn active={isRight} disabled={isLeft} onClick={() => project.setRight(w.id)} title="Show in right panel">R</PanelBtn>
-          <button onClick={() => project.setBase(w.id)} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isBase ? "bg-secondary/40 border-secondary" : "border-border bg-card hover:bg-muted")} title="Mark as base / copy-text">base</button>
-          {w.date && <span className="ml-auto text-[10px] text-muted-foreground truncate">{w.date}</span>}
+  if (editing) {
+    return (
+      <div className={"px-2 py-1 " + (indent ? "pl-5" : "")}>
+        <div className="flex items-center gap-1">
+          <input value={sig} onChange={(e) => setSig(e.target.value)} className="w-12 bg-background border border-primary rounded px-1 py-0.5 text-[11px] font-mono" placeholder="Sig" />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus className="flex-1 min-w-0 bg-background border border-primary rounded px-1 py-0.5 text-[11px]" onKeyDown={(e) => { if (e.key === "Enter") saveRename(); if (e.key === "Escape") setEditing(false); }} />
+          <button onClick={saveRename} className="p-0.5 rounded hover:bg-muted text-green-600" title="Save"><Check className="w-3 h-3" /></button>
+          <button onClick={() => setEditing(false)} className="p-0.5 rounded hover:bg-muted text-muted-foreground" title="Cancel"><X className="w-3 h-3" /></button>
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={() => project.setRight(w.id)}
+      title={`${w.title}${w.date ? ` (${w.date})` : ""}\nClick to compare on the right; ⋮ for more`}
+      className={
+        "group flex items-center gap-1.5 pr-1.5 py-1 cursor-pointer border-l-2 " +
+        (indent ? "pl-4 " : "pl-2 ") +
+        (isRight ? "bg-primary/10 border-primary " : isLeft ? "border-primary/50 " : "border-transparent hover:bg-muted/50 ")
+      }
+    >
+      <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+      <span className={"text-[12px] truncate flex-1 " + (shown ? "text-foreground" : "")}>{w.title}</span>
+      {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
+      {annCount > 0 && <span className="text-[9px] px-1 rounded bg-secondary/30 text-secondary-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
+      <div className="relative" onClick={(e) => e.stopPropagation()}>
+        <button onClick={() => setMenu((v) => !v)} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Actions">
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+        {menu && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
+            <div className="absolute right-0 top-full mt-1 w-44 z-50 bg-card border border-border rounded-md shadow-lg py-1 text-[12px]">
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.setLeft(w.id); setMenu(false); }}>
+                <ArrowLeftToLine className="w-3 h-3 text-muted-foreground" /> Show on left (base)
+              </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.setRight(w.id); setMenu(false); }}>
+                <ArrowRightToLine className="w-3 h-3 text-muted-foreground" /> Show on right
+              </button>
+              <div className="border-t border-border my-1" />
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
+                <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
+              </button>
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Move to</div>
+              {w.folder && (
+                <button className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2" onClick={() => { project.moveToFolder(w.id, ""); setMenu(false); }}>
+                  <Folder className="w-3 h-3 text-muted-foreground" /> Root
+                </button>
+              )}
+              {folders.filter((f) => f !== w.folder).map((f) => (
+                <button key={f} className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2" onClick={() => { project.moveToFolder(w.id, f); setMenu(false); }}>
+                  <Folder className="w-3 h-3 text-muted-foreground" /> {f}
+                </button>
+              ))}
+              <button className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2 text-muted-foreground" onClick={() => { const n = prompt("New folder name:")?.trim(); if (n) project.moveToFolder(w.id, n); setMenu(false); }}>
+                <FolderPlus className="w-3 h-3" /> New folder…
+              </button>
+              <div className="border-t border-border my-1" />
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-destructive disabled:opacity-40" disabled={c.witnesses.length <= 2} title={c.witnesses.length <= 2 ? "Keep at least two sources" : "Send to trash"} onClick={() => { project.trashWitness(w.id); setMenu(false); }}>
+                <Trash2 className="w-3 h-3" /> Send to trash
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function PanelBtn({ children, active, disabled, onClick, title }: { children: React.ReactNode; active: boolean; disabled: boolean; onClick: () => void; title: string }) {
-  return (
-    <button onClick={onClick} disabled={disabled} title={title} className={"px-1.5 py-0.5 rounded text-[10px] border " + (active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted disabled:opacity-30")}>
-      {children}
-    </button>
-  );
-}
-
 function TrashSection({ trash, project }: { trash: Witness[]; project: Project }) {
   const [open, setOpen] = useState(false);
-  if (trash.length === 0) return null;
+  const empty = trash.length === 0;
   return (
     <div className="border-t border-border">
-      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-muted/40 text-[11px] text-muted-foreground">
-        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        <Trash2 className="w-3 h-3" />
+      <button onClick={() => !empty && setOpen((v) => !v)} className={"w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-muted-foreground " + (empty ? "cursor-default opacity-60" : "hover:bg-muted/40")}>
+        {empty ? <ChevronRight className="w-3 h-3 opacity-40" /> : open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <Trash2 className="w-3.5 h-3.5" />
         <span>Trash</span>
-        <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-destructive/10 text-destructive rounded-full">{trash.length}</span>
+        {!empty && <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-destructive/10 text-destructive rounded-full">{trash.length}</span>}
       </button>
-      {open && (
+      {open && !empty && (
         <div className="max-h-[24vh] overflow-y-auto">
           {trash.map((w) => (
             <div key={w.id} className="group flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-muted/40 text-[12px]">
-              <span className="font-mono text-[10px] px-1 rounded bg-muted text-muted-foreground shrink-0">{w.siglum}</span>
+              <File className="w-3 h-3 shrink-0 text-muted-foreground" />
               <span className="truncate flex-1 text-muted-foreground" title={w.title}>{w.title}</span>
               <button onClick={() => project.restoreWitness(w.id)} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-foreground" title="Restore"><RotateCcw className="w-3 h-3" /></button>
               <button onClick={() => { if (confirm(`Permanently delete "${w.title}"?`)) project.deleteForever(w.id); }} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-destructive" title="Delete permanently"><X className="w-3 h-3" /></button>
