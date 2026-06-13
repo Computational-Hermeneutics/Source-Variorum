@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun, Upload, BookOpen, X, Info, FileText, FilePlus, FolderOpen, Save, Download, ChevronDown } from "lucide-react";
 import type { Collation, CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
-import { DEMOS, type DemoWitness } from "@/data/demos";
+import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
+import { normalizeNewlines } from "@/lib/utils";
 import {
   deriveView,
   download,
@@ -26,8 +27,19 @@ function uid(): string {
   }
 }
 
-function witnessFrom(w: DemoWitness, id: string): Witness {
-  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text: w.text };
+function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
+  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text };
+}
+
+/** Resolve a demo witness's text: inline if present, otherwise fetch the file
+ *  from /public and normalise its line endings. */
+async function resolveWitnessText(w: DemoWitness): Promise<string> {
+  if (w.text != null) return normalizeNewlines(w.text);
+  if (w.file) {
+    const res = await fetch(`/${w.file}`);
+    return normalizeNewlines(await res.text());
+  }
+  return "";
 }
 
 function makeCollation(name: string, mode: CollationMode, witnesses: Witness[]): Collation {
@@ -46,16 +58,32 @@ function makeCollation(name: string, mode: CollationMode, witnesses: Witness[]):
   };
 }
 
-function collationFromDemo(demoId: string): Collation {
-  const demo = DEMOS.find((d) => d.id === demoId) ?? DEMOS[0];
+/** Synchronous build for inline (text) demos — used for the initial render. */
+function inlineCollation(demo: Demo): Collation {
   return makeCollation(demo.name, demo.mode, [
-    witnessFrom(demo.witnessA, "a"),
-    witnessFrom(demo.witnessB, "b"),
+    witnessFrom(demo.witnessA, "a", normalizeNewlines(demo.witnessA.text ?? "")),
+    witnessFrom(demo.witnessB, "b", normalizeNewlines(demo.witnessB.text ?? "")),
   ]);
 }
 
+/** Async build for any demo (resolves file-based witnesses). */
+async function collationFromDemo(demoId: string): Promise<Collation> {
+  const demo = DEMOS.find((d) => d.id === demoId) ?? DEMOS[0];
+  const [textA, textB] = await Promise.all([
+    resolveWitnessText(demo.witnessA),
+    resolveWitnessText(demo.witnessB),
+  ]);
+  return makeCollation(demo.name, demo.mode, [
+    witnessFrom(demo.witnessA, "a", textA),
+    witnessFrom(demo.witnessB, "b", textB),
+  ]);
+}
+
+// First render uses the first INLINE demo so the initial paint needs no fetch.
+const DEFAULT_DEMO = DEMOS.find((d) => d.witnessA.text != null && d.witnessB.text != null) ?? DEMOS[0];
+
 export default function Home() {
-  const [collation, setCollation] = useState<Collation>(() => collationFromDemo(DEMOS[0].id));
+  const [collation, setCollation] = useState<Collation>(() => inlineCollation(DEFAULT_DEMO));
   const [isDark, setIsDark] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -107,8 +135,10 @@ export default function Home() {
   }, []);
 
   const loadDemo = (id: string) => {
-    setCollation(collationFromDemo(id));
     setShowImport(false);
+    collationFromDemo(id)
+      .then(setCollation)
+      .catch(() => alert("Could not load that demo's source files."));
   };
 
   const onLoadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -427,8 +457,8 @@ function ImportPanel({
     onCollate(
       name || "Untitled collation",
       [
-        { id: "a", siglum: sigA || "A", title: titleA || "Witness A", text: textA },
-        { id: "b", siglum: sigB || "B", title: titleB || "Witness B", text: textB },
+        { id: "a", siglum: sigA || "A", title: titleA || "Witness A", text: normalizeNewlines(textA) },
+        { id: "b", siglum: sigB || "B", title: titleB || "Witness B", text: normalizeNewlines(textB) },
       ],
       mode
     );

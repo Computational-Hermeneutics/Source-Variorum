@@ -18,7 +18,10 @@ export interface DemoWitness {
   title: string;
   date?: string;
   provenance?: string;
-  text: string;
+  /** Inline witness text (for short demos). */
+  text?: string;
+  /** Path under /public to fetch the witness text from (for large real sources). */
+  file?: string;
 }
 
 export interface Demo {
@@ -32,79 +35,6 @@ export interface Demo {
   witnessA: DemoWitness;
   witnessB: DemoWitness;
 }
-
-// Real excerpt of the Spacewar! macro definitions (fio-dec system, June 1963).
-const SPACEWAR_A = `/macro fio-dec system, june 1963
-
-	szm=sza sma-szf
-	spq=szm i
-	clc=cma+cla-opr
-
-	define senseswitch A
-	repeat 3, A=A+A
-	szs A
-	term
-
-	define init A,B
-	law B
-	dap A
-	term
-
-	define index A,B,C
-	idx A
-	sas B
-	jmp C
-	term
-
-	define listen
-	cla+cli+clf 1-opr-opr
-	szf i 1
-	jmp .-1
-	tyi
-	term
-
-	define swap
-	rcl 9s
-	rcl 9s
-	term
-`;
-
-// The same excerpt with the `index` macro relocated to the foot of the block —
-// an illustrative reordering, so the braid shows a clean transposition ribbon.
-const SPACEWAR_B = `/macro fio-dec system, june 1963
-
-	szm=sza sma-szf
-	spq=szm i
-	clc=cma+cla-opr
-
-	define senseswitch A
-	repeat 3, A=A+A
-	szs A
-	term
-
-	define init A,B
-	law B
-	dap A
-	term
-
-	define listen
-	cla+cli+clf 1-opr-opr
-	szf i 1
-	jmp .-1
-	tyi
-	term
-
-	define swap
-	rcl 9s
-	rcl 9s
-	term
-
-	define index A,B,C
-	idx A
-	sas B
-	jmp C
-	term
-`;
 
 // Illustrative Othello 5.2 readings. "ought/aught", "lou'd/loued" are spelling
 // variants; "Indian/Iudean" is the celebrated Quarto/Folio crux (substitution).
@@ -126,24 +56,24 @@ Meno, of old the Thessalians were famous and admired among the Greeks for their 
 
 export const DEMOS: Demo[] = [
   {
-    id: "spacewar-macros",
-    name: "Spacewar! macro block (source)",
+    id: "spacewar-2b-41d",
+    name: "Spacewar! 2b (1962) / 4.1d (1963)",
     mode: "source",
-    blurb: "Two arrangements of the Spacewar! fio-dec macro definitions",
-    shows: "Transposition (a relocated macro), verbatim matches",
+    blurb: "Two historical versions of the Spacewar! PDP-1 source",
+    shows: "Real version-to-version evolution: additions, transpositions, substitutions",
     witnessA: {
-      siglum: "S1",
-      title: "Spacewar! source — fio-dec system",
-      date: "June 1963",
-      provenance: "Excerpt of spacewar.mac (illustrative)",
-      text: SPACEWAR_A,
+      siglum: "2b",
+      title: "Spacewar! 2b",
+      date: "25 March 1962",
+      provenance: "spacewar_2b_25mar62.txt (via CCS Workbench sample corpus)",
+      file: "demos/spacewar_2b_25mar62.txt",
     },
     witnessB: {
-      siglum: "S2",
-      title: "Spacewar! source — reordered macros",
-      date: "illustrative",
-      provenance: "Same excerpt with the index macro relocated",
-      text: SPACEWAR_B,
+      siglum: "4.1d",
+      title: "Spacewar! 4.1d",
+      date: "20 Feb 1963 (CHM listing, 2005)",
+      provenance: "sw41d.txt (bitsavers.org/pdf/mit/rle_pdp1/spacewar)",
+      file: "demos/sw41d.txt",
     },
   },
   {
