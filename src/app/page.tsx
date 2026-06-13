@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Moon, Sun, Upload, BookOpen, X } from "lucide-react";
+import { Moon, Sun, Upload, BookOpen, X, Info } from "lucide-react";
 import type { CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
 import { DEMOS, type DemoWitness } from "@/data/demos";
@@ -25,6 +25,7 @@ export default function Home() {
   const [mode, setMode] = useState<CollationMode>(firstDemo.mode);
   const [isDark, setIsDark] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -43,22 +44,21 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
         <div className="px-4 py-2.5 flex items-center gap-3 flex-wrap">
-          {/* Wordmark + family lockup (placeholder until the hub assets land) */}
+          {/* Wordmark + family lockup */}
           <div className="flex items-center gap-2.5">
-            <div
-              className="w-7 h-7 rounded-sm flex items-center justify-center font-serif text-[15px] font-bold"
-              style={{ background: "var(--foreground)", color: "var(--background)" }}
-              aria-hidden
-            >
-              SV
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
             <div className="leading-tight">
               <div className="text-[15px] font-semibold tracking-tight">Source Variorum</div>
               <a
-                href="#"
-                className="text-[10px] text-muted-foreground hover:text-foreground"
-                title="Computational Hermeneutics (family hub — coming soon)"
+                href="https://computational-hermeneutics.github.io"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+                title="Computational Hermeneutics family hub"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/ch-mark.svg" alt="" width={11} height={11} className="w-[11px] h-[11px] opacity-70" />
                 Part of Computational Hermeneutics
               </a>
             </div>
@@ -105,6 +105,14 @@ export default function Home() {
             </button>
 
             <button
+              onClick={() => setShowAbout(true)}
+              className="p-1.5 rounded border border-border bg-card hover:bg-muted"
+              title="About Source Variorum"
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
+
+            <button
               onClick={() => setIsDark((v) => !v)}
               className="p-1.5 rounded border border-border bg-card hover:bg-muted"
               title="Toggle theme"
@@ -135,8 +143,80 @@ export default function Home() {
       <footer className="border-t border-border px-4 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
         <span>Source Variorum v{APP_VERSION}</span>
         <span className="opacity-50">·</span>
-        <span>An instrument in the Computational Hermeneutics family</span>
+        <a
+          href="https://computational-hermeneutics.github.io"
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 hover:text-foreground"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ch-mark.svg" alt="" width={12} height={12} className="w-3 h-3 opacity-70" />
+          An instrument in the Computational Hermeneutics family
+        </a>
       </footer>
+
+      {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+    </div>
+  );
+}
+
+function AboutModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-card border border-border rounded-lg max-w-lg w-full p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 mb-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/sv-icon.svg" alt="" width={36} height={36} className="w-9 h-9 shrink-0" />
+          <div>
+            <h2 className="text-[18px] font-semibold leading-tight">Source Variorum</h2>
+            <p className="text-[11px] text-muted-foreground">A braided collation workbench · v{APP_VERSION}</p>
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="space-y-3 text-[13px] leading-relaxed text-foreground/85">
+          <p>
+            A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a
+            text so a reader can track how textual decisions were made. Source Variorum brings that
+            apparatus of textual criticism to computational close reading, in two modes — source code
+            and prose.
+          </p>
+          <p>
+            Two witnesses are shown side by side with a central <strong>braid</strong>: ribbons
+            connecting matching passages, including text that has <strong>moved</strong>. The crossing
+            of those ribbons is the analytical payload. Variants are typed (match, substitution,
+            addition, deletion, transposition, near-identical variant) and gathered into an
+            auto-generated critical apparatus.
+          </p>
+          <p className="text-[12px] text-muted-foreground">
+            Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first,
+            no model calls. Reuses the close-reading scaffolding of LLMbench.
+          </p>
+        </div>
+        <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/ch-mark.svg" alt="" width={16} height={16} className="w-4 h-4 opacity-80" />
+          <span className="text-[12px] text-muted-foreground">
+            Part of the{" "}
+            <a
+              href="https://computational-hermeneutics.github.io"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline"
+            >
+              Computational Hermeneutics
+            </a>{" "}
+            family
+          </span>
+        </div>
+      </div>
     </div>
   );
 }

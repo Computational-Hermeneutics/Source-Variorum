@@ -1,0 +1,9 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Computational Hermeneutics">
+  <!-- The hermeneutic circle (the ring) woven with a collation braid (two
+       crossing strands): interpretation as a circle, reading as collation. -->
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#1a1a1a" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M15 23 C 26 23 38 41 49 41" stroke="#7a2e2e" stroke-width="3"/>
+    <path d="M15 41 C 26 41 38 23 49 23" stroke="#b8862e" stroke-width="3"/>
+  </g>
+</svg>

@@ -1,0 +1,24 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Source Variorum">
+  <!-- Two witness columns of text, with a braid strand transposing a line
+       between them: the collation braid that is the tool's signature view. -->
+  <g stroke-linecap="round" fill="none">
+    <!-- Witness A (left column) -->
+    <g stroke="#7a2e2e" stroke-width="3">
+      <line x1="9" y1="14" x2="23" y2="14"/>
+      <line x1="9" y1="24" x2="23" y2="24"/>
+      <line x1="9" y1="40" x2="23" y2="40"/>
+      <line x1="9" y1="50" x2="23" y2="50"/>
+    </g>
+    <!-- Witness B (right column) -->
+    <g stroke="#7a2e2e" stroke-width="3">
+      <line x1="41" y1="14" x2="55" y2="14"/>
+      <line x1="41" y1="30" x2="55" y2="30"/>
+      <line x1="41" y1="40" x2="55" y2="40"/>
+      <line x1="41" y1="50" x2="55" y2="50"/>
+    </g>
+    <!-- Braid: a line at A:24 transposed to B:30 (the crossing strand) -->
+    <path d="M23 24 C 32 24 32 30 41 30" stroke="#3563a8" stroke-width="3.5"/>
+    <!-- A resting (in-place) strand below it -->
+    <path d="M23 40 C 32 40 32 40 41 40" stroke="#9fb8c4" stroke-width="2.5"/>
+  </g>
+</svg>
