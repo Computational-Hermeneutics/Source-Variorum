@@ -3,7 +3,7 @@
 > An instrument in the **Computational Hermeneutics** family.
 
 **Author:** David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366))
-**Version:** 0.3.1 · **Licence:** MIT
+**Version:** 0.4.0 · **Licence:** MIT
 
 **Source Variorum** is a side-by-side textual collation workbench. A *variorum*
 (from *cum notis variorum*, "with the notes of various people") collates all
@@ -36,7 +36,33 @@ glance, where text has been added, deleted, substituted, or transposed.
 - A **deep-dive** panel of quantitative summary statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
 - Live filtering by variant type; click any passage or ribbon to highlight the
-  shared reading in both witnesses.
+  shared reading in both witnesses (and fade the rest).
+- Line numbers in both panels for reference.
+
+## The project workbench
+
+A project holds many sources, organised in a small file organiser:
+
+- A **Sources** sidebar with a toolbar: add a source, import several files at
+  once, create folders. Sources can be filed into **collapsible folders**,
+  renamed, moved, and sent to a **trash** (with restore / empty).
+- Pick any two sources for the **left** and **right** panels (the L/R controls
+  or the per-panel dropdowns); mark one as the **base** / copy-text.
+- **Edit** witness text in place to correct or normalise it, with **undo/redo**
+  and **revert to the last saved project**.
+- **⌘/Ctrl-click** any passage to attach a marginal annotation.
+- **New / Open / Save** projects as `.svar` files; **export** to Markdown, PDF,
+  or JSON. The working project autosaves to the browser.
+
+## How the collation is computed
+
+The app computes the collation **live in the browser**, every time the view
+renders. The engine in `src/lib/collate/` is a set of pure, deterministic
+functions: it segments each witness, aligns them, types each variant, and detects
+moved blocks. A saved `.svar` project stores **only the source of truth** —
+witnesses, mode, your apparatus notes and annotations — and **never the variants**,
+which are recomputed deterministically on load. Nothing about the collation is
+precomputed or baked into the data.
 
 ## Provenance
 

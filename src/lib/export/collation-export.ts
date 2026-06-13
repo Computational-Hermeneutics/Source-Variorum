@@ -91,6 +91,8 @@ export function parseProjectFile(text: string): SavedCollation | null {
         annotations: data.annotations ?? {},
         links: data.links ?? [],
         apparatusEdits: data.apparatusEdits ?? {},
+        folders: Array.isArray(data.folders) ? data.folders : [],
+        trash: Array.isArray(data.trash) ? data.trash : [],
         createdAt: data.createdAt ?? new Date().toISOString(),
         updatedAt: data.updatedAt ?? new Date().toISOString(),
       };

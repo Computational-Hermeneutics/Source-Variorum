@@ -26,6 +26,8 @@ export interface Witness {
   provenance?: string;
   /** Optional date string (free-form: "1622", "1962-04", etc.). */
   date?: string;
+  /** Optional folder this witness is filed under in the Sources organiser. */
+  folder?: string;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */
   text: string;
 }
@@ -153,6 +155,10 @@ export interface Collation {
   links: CrossPanelLink[];
   /** Editor-edited apparatus entries, keyed by variant id (auto-entries merged at runtime). */
   apparatusEdits: Record<string, Pick<ApparatusEntry, "note" | "category">>;
+  /** Explicit folder names in the Sources organiser (incl. ones with no witness yet). */
+  folders?: string[];
+  /** Soft-deleted witnesses, recoverable from the organiser's trash. */
+  trash?: Witness[];
   createdAt: string;
   updatedAt: string;
 }

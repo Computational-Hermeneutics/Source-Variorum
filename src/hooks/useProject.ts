@@ -157,6 +157,79 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
+  // ----- folders -----
+  const createFolder = useCallback(
+    (name: string) =>
+      commit((c) => {
+        const folders = c.folders ?? [];
+        if (!name.trim() || folders.includes(name)) return c;
+        return { ...c, folders: [...folders, name] };
+      }),
+    [commit]
+  );
+
+  const moveToFolder = useCallback(
+    (witnessId: string, folder: string) =>
+      commit((c) => ({
+        ...c,
+        witnesses: c.witnesses.map((w) => (w.id === witnessId ? { ...w, folder: folder || undefined } : w)),
+        folders: folder && !(c.folders ?? []).includes(folder) ? [...(c.folders ?? []), folder] : c.folders,
+      })),
+    [commit]
+  );
+
+  const deleteFolder = useCallback(
+    (folder: string) =>
+      commit((c) => ({
+        ...c,
+        // Files in the folder fall back to the root; the folder name is removed.
+        witnesses: c.witnesses.map((w) => (w.folder === folder ? { ...w, folder: undefined } : w)),
+        folders: (c.folders ?? []).filter((f) => f !== folder),
+      })),
+    [commit]
+  );
+
+  // ----- trash -----
+  const trashWitness = useCallback(
+    (id: string) =>
+      commit((c) => {
+        // Keep at least two active witnesses so the braid always has a pair.
+        if (c.witnesses.length <= 2) return c;
+        const w = c.witnesses.find((x) => x.id === id);
+        if (!w) return c;
+        const witnesses = c.witnesses.filter((x) => x.id !== id);
+        const leftId = c.leftId === id ? witnesses[0].id : c.leftId;
+        let rightId = c.rightId === id ? (witnesses.find((x) => x.id !== leftId)?.id ?? witnesses[0].id) : c.rightId;
+        if (rightId === leftId) rightId = witnesses.find((x) => x.id !== leftId)?.id ?? rightId;
+        return {
+          ...c,
+          witnesses,
+          trash: [w, ...(c.trash ?? [])],
+          leftId,
+          rightId,
+          baseIndex: Math.min(c.baseIndex, witnesses.length - 1),
+        };
+      }),
+    [commit]
+  );
+
+  const restoreWitness = useCallback(
+    (id: string) =>
+      commit((c) => {
+        const w = (c.trash ?? []).find((x) => x.id === id);
+        if (!w) return c;
+        return { ...c, witnesses: [...c.witnesses, w], trash: (c.trash ?? []).filter((x) => x.id !== id) };
+      }),
+    [commit]
+  );
+
+  const deleteForever = useCallback(
+    (id: string) => commit((c) => ({ ...c, trash: (c.trash ?? []).filter((x) => x.id !== id) })),
+    [commit]
+  );
+
+  const emptyTrash = useCallback(() => commit((c) => ({ ...c, trash: [] })), [commit]);
+
   const editNote = useCallback(
     (variantId: string, note: string) =>
       commit((c) => ({
@@ -211,6 +284,13 @@ export function useProject(initial: Collation) {
     addWitnesses,
     removeWitness,
     updateWitness,
+    createFolder,
+    moveToFolder,
+    deleteFolder,
+    trashWitness,
+    restoreWitness,
+    deleteForever,
+    emptyTrash,
     editNote,
     addAnnotation,
     removeAnnotation,

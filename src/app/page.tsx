@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Moon, Sun, Upload, BookOpen, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
-  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Plus, Type, Trash2,
+  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Plus, Type,
 } from "lucide-react";
 import type { Collation, CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
+import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
@@ -175,6 +176,13 @@ export default function Home() {
 
   const setFont = (delta: number) => setFontSize((s) => Math.min(22, Math.max(9, s + delta)));
 
+  const importSources = useCallback(
+    (sources: { siglum: string; title: string; text: string }[]) => {
+      project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text) })));
+    },
+    [project]
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
@@ -257,15 +265,12 @@ export default function Home() {
           mode={collation.mode}
           onClose={() => setShowAdd(false)}
           onAdd={(w) => { project.addWitness(w); setShowAdd(false); }}
-          onAddMany={(sources) => {
-            project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text) })));
-            setShowAdd(false);
-          }}
+          onAddMany={(sources) => { importSources(sources); setShowAdd(false); }}
         />
       )}
 
       <div className="flex-1 flex min-h-0">
-        <Sidebar project={project} />
+        <SourceOrganiser project={project} onAddSource={() => setShowAdd(true)} onImport={importSources} />
         <main className="flex-1 min-w-0">
           <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
         </main>
@@ -293,40 +298,6 @@ function IconBtn({ children, title, onClick, disabled }: { children: React.React
     <button onClick={onClick} disabled={disabled} title={title} className="px-1.5 py-1 bg-card hover:bg-muted disabled:opacity-30 disabled:hover:bg-card flex items-center justify-center">
       {children}
     </button>
-  );
-}
-
-function Sidebar({ project }: { project: ReturnType<typeof useProject> }) {
-  const c = project.collation;
-  return (
-    <aside className="w-56 shrink-0 border-r border-border bg-muted/20 flex flex-col">
-      <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground border-b border-border">
-        Sources · {c.witnesses.length}
-      </div>
-      <div className="flex-1 overflow-y-auto">
-        {c.witnesses.map((w, i) => {
-          const isLeft = c.leftId === w.id;
-          const isRight = c.rightId === w.id;
-          const isBase = c.baseIndex === i;
-          return (
-            <div key={w.id} className="px-2.5 py-2 border-b border-border/60 hover:bg-muted/40">
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-[11px] px-1 rounded bg-primary/10 text-primary font-semibold">{w.siglum}</span>
-                <span className="text-[12px] truncate flex-1" title={w.title}>{w.title}</span>
-              </div>
-              <div className="flex items-center gap-1 mt-1.5">
-                <button onClick={() => project.setLeft(w.id)} disabled={isRight} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isLeft ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted disabled:opacity-30")} title="Show in left panel">L</button>
-                <button onClick={() => project.setRight(w.id)} disabled={isLeft} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isRight ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted disabled:opacity-30")} title="Show in right panel">R</button>
-                <button onClick={() => project.setBase(w.id)} className={"px-1.5 py-0.5 rounded text-[10px] border " + (isBase ? "bg-secondary/40 border-secondary" : "border-border bg-card hover:bg-muted")} title="Mark as base / copy-text">base</button>
-                {c.witnesses.length > 2 && (
-                  <button onClick={() => project.removeWitness(w.id)} className="ml-auto p-0.5 rounded hover:bg-muted text-muted-foreground" title="Remove from project"><Trash2 className="w-3 h-3" /></button>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </aside>
   );
 }
 
