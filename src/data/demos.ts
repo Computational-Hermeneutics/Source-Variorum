@@ -115,6 +115,27 @@ export const DEMOS: Demo[] = [
     },
   },
   {
+    id: "othello-editions",
+    name: "Othello — Globe 1866 / Craig 1914",
+    mode: "text",
+    blurb: "Two modern editions of Othello, fifty years apart",
+    shows: "Editorial variation: punctuation, capitalisation, lineation, readings",
+    witnessA: {
+      siglum: "G",
+      title: "Othello — Globe edition",
+      date: "1866",
+      provenance: "Clark & Wright, Globe edition (public domain; via the MIT Shakespeare / Moby text)",
+      file: "demos/othello_globe.txt",
+    },
+    witnessB: {
+      siglum: "C",
+      title: "Othello — Oxford edition (Craig)",
+      date: "1914",
+      provenance: "W. J. Craig, Oxford Shakespeare (public domain; via Bartleby)",
+      file: "demos/othello_craig.txt",
+    },
+  },
+  {
     id: "meno-full",
     name: "Plato, Meno — full (Jowett / Lamb)",
     mode: "text",
