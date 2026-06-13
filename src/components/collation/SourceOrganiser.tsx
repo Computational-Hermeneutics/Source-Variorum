@@ -11,6 +11,7 @@ import type { useProject } from "@/hooks/useProject";
 
 type Project = ReturnType<typeof useProject>;
 const COLLAPSE_KEY = "source-variorum-collapsed-folders";
+const FZ_KEY = "source-variorum-sidebar-fontsize";
 
 export function SourceOrganiser({
   project,
@@ -30,11 +31,26 @@ export function SourceOrganiser({
   const importRef = useRef<HTMLInputElement>(null);
   const [samplesOpen, setSamplesOpen] = useState(false);
 
+  // Tiny by default; the toolbar A−/A+ nudges it. Persisted.
+  const [fz, setFz] = useState(11);
+  const stepFz = (d: number) =>
+    setFz((s) => {
+      const next = Math.min(16, Math.max(9, s + d));
+      try {
+        localStorage.setItem(FZ_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSE_KEY);
       if (raw) setCollapsed(new Set(JSON.parse(raw)));
+      const f = localStorage.getItem(FZ_KEY);
+      if (f) setFz(Math.min(16, Math.max(9, parseInt(f, 10) || 11)));
     } catch {
       /* ignore */
     }
@@ -103,13 +119,16 @@ export function SourceOrganiser({
           )}
         </div>
         <ToolBtn title="New folder" onClick={newFolder}><FolderPlus className="w-4 h-4" /></ToolBtn>
-        <span className="ml-auto text-[10px] text-muted-foreground pr-1">{c.witnesses.length}</span>
+        <div className="ml-auto flex items-center">
+          <button onClick={() => stepFz(-1)} title="Smaller file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[10px]">A−</button>
+          <button onClick={() => stepFz(1)} title="Larger file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[13px]">A+</button>
+        </div>
         <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
       </div>
 
-      <div className="flex-1 overflow-y-auto py-1">
+      <div className="flex-1 overflow-y-auto py-1" style={{ fontSize: `${fz}px` }}>
         {root.map((w) => (
-          <SourceRow key={w.id} witness={w} project={project} folders={folders} />
+          <SourceRow key={w.id} witness={w} project={project} folders={folders} fz={fz} />
         ))}
 
         {folders.map((f) => {
@@ -121,13 +140,13 @@ export function SourceOrganiser({
                 <button onClick={() => toggleCollapse(f)} className="flex items-center gap-1 flex-1 min-w-0 text-left text-muted-foreground hover:text-foreground">
                   {isCollapsed ? <ChevronRight className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
                   <Folder className="w-3.5 h-3.5 shrink-0" />
-                  <span className="text-[11px] uppercase tracking-wide truncate">{f}</span>
+                  <span className="uppercase tracking-wide truncate" style={{ fontSize: `${fz}px` }}>{f}</span>
                 </button>
                 <button onClick={() => { if (confirm(`Delete folder "${f}"? Its sources move to the root.`)) project.deleteFolder(f); }} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Delete folder (keep sources)">
                   <X className="w-3 h-3" />
                 </button>
               </div>
-              {!isCollapsed && items.map((w) => <SourceRow key={w.id} witness={w} project={project} folders={folders} indent />)}
+              {!isCollapsed && items.map((w) => <SourceRow key={w.id} witness={w} project={project} folders={folders} fz={fz} indent />)}
             </div>
           );
         })}
@@ -146,7 +165,7 @@ function ToolBtn({ children, title, onClick }: { children: React.ReactNode; titl
   );
 }
 
-function SourceRow({ witness, project, folders, indent }: { witness: Witness; project: Project; folders: string[]; indent?: boolean }) {
+function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness; project: Project; folders: string[]; fz: number; indent?: boolean }) {
   const c = project.collation;
   const w = witness;
   const isLeft = c.leftId === w.id;
@@ -187,7 +206,7 @@ function SourceRow({ witness, project, folders, indent }: { witness: Witness; pr
       }
     >
       <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-      <span className={"text-[12px] truncate flex-1 " + (shown ? "text-foreground" : "")}>{w.title}</span>
+      <span className={"truncate flex-1 " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</span>
       {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
       {annCount > 0 && <span className="text-[9px] px-1 rounded bg-secondary/30 text-secondary-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
       <div className="relative" onClick={(e) => e.stopPropagation()}>

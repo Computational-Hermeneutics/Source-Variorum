@@ -60,27 +60,6 @@ export const DEMOS: Demo[] = [
     witnesses: SPACEWAR_CORPUS,
   },
   {
-    id: "spacewar-2b-41d",
-    name: "Spacewar! 2b (1962) / 4.1d (1963)",
-    mode: "source",
-    blurb: "Two historical versions of the Spacewar! PDP-1 source",
-    shows: "Real version-to-version evolution: additions, transpositions, substitutions",
-    witnessA: {
-      siglum: "2b",
-      title: "Spacewar! 2b",
-      date: "25 March 1962",
-      provenance: "spacewar_2b_25mar62.txt (via CCS Workbench sample corpus)",
-      file: "demos/spacewar_2b_25mar62.txt",
-    },
-    witnessB: {
-      siglum: "4.1d",
-      title: "Spacewar! 4.1d",
-      date: "20 Feb 1963 (CHM listing, 2005)",
-      provenance: "sw41d.txt (bitsavers.org/pdf/mit/rle_pdp1/spacewar)",
-      file: "demos/sw41d.txt",
-    },
-  },
-  {
     id: "othello-editions",
     name: "Othello — Globe 1866 / Craig 1914",
     mode: "text",

@@ -190,7 +190,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="h-screen overflow-hidden flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
         <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2.5 mr-1">
@@ -265,7 +265,7 @@ export default function Home() {
 
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
-        <main className="flex-1 min-w-0">
+        <main className="flex-1 min-w-0 overflow-y-auto">
           <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
         </main>
       </div>
