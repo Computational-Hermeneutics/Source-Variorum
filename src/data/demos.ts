@@ -112,6 +112,18 @@ const OTHELLO_Q = `Speake of me as I am, nothing extenuate, nor set downe ought 
 
 const OTHELLO_F = `Speake of me as I am, nothing extenuate, nor set downe aught in malice. Then must you speake of one that loued not wisely, but too well. Of one whose hand, like the base Iudean, threw a pearle away richer then all his tribe.`;
 
+// Plato, Meno, opening (Stephanus 70a–71a) in two public-domain English
+// translations. Verbatim: Jowett (1892, via the MIT Classics Archive) and Lamb
+// (1924 Loeb, via Perseus). A real translation-variant collation — note the
+// word-order transposition "riches and their riding" / "riding and their riches".
+const MENO_JOWETT = `Can you tell me, Socrates, whether virtue is acquired by teaching or by practice; or if neither by teaching nor practice, then whether it comes to man by nature, or in what other way?
+
+O Meno, there was a time when the Thessalians were famous among the other Hellenes only for their riches and their riding; but now, if I am not mistaken, they are equally famous for their wisdom, especially at Larisa, which is the native city of your friend Aristippus.`;
+
+const MENO_LAMB = `Can you tell me, Socrates, whether virtue can be taught, or is acquired by practice, not teaching? Or if neither by practice nor by learning, whether it comes to mankind by nature or in some other way?
+
+Meno, of old the Thessalians were famous and admired among the Greeks for their riding and their riches; but now they have a name, I believe, for wisdom also, especially your friend Aristippus's people, the Larisaeans.`;
+
 export const DEMOS: Demo[] = [
   {
     id: "spacewar-macros",
@@ -153,6 +165,27 @@ export const DEMOS: Demo[] = [
       date: "1623",
       provenance: "Illustrative reading",
       text: OTHELLO_F,
+    },
+  },
+  {
+    id: "meno-translations",
+    name: "Plato, Meno (Jowett / Lamb)",
+    mode: "text",
+    blurb: "The opening of Plato's Meno in two public-domain translations",
+    shows: "Translation variants, word-order transposition, substitutions",
+    witnessA: {
+      siglum: "J",
+      title: "Plato, Meno — trans. Benjamin Jowett",
+      date: "1892",
+      provenance: "Jowett translation (public domain; via MIT Classics Archive)",
+      text: MENO_JOWETT,
+    },
+    witnessB: {
+      siglum: "L",
+      title: "Plato, Meno — trans. W. R. M. Lamb",
+      date: "1924",
+      provenance: "Lamb translation, Loeb (public domain; via Perseus)",
+      text: MENO_LAMB,
     },
   },
 ];

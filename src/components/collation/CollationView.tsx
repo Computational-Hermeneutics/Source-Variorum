@@ -1,35 +1,32 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CollationMode, Variant, VariantType, Witness } from "@/types/collation";
+import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from "@/types/collation";
-import { collate } from "@/lib/collate/collate";
-import { computeCollationMetrics } from "@/lib/collate/metrics";
 import { WitnessPanel } from "./WitnessPanel";
 import { BraidGutter, type Ribbon } from "./BraidGutter";
 
 type Side = "a" | "b";
 
+type ApparatusEdit = Pick<ApparatusEntry, "note" | "category">;
+
 export function CollationView({
   witnessA,
   witnessB,
   mode,
-  moveThreshold = 0.7,
+  variants,
+  metrics,
+  apparatusEdits,
+  onEditNote,
 }: {
   witnessA: Witness;
   witnessB: Witness;
   mode: CollationMode;
-  moveThreshold?: number;
+  variants: Variant[];
+  metrics: CollationMetrics;
+  apparatusEdits: Record<string, ApparatusEdit>;
+  onEditNote: (variantId: string, note: string) => void;
 }) {
-  const variants = useMemo(
-    () => collate(witnessA, witnessB, { mode, moveThreshold }),
-    [witnessA, witnessB, mode, moveThreshold]
-  );
-  const metrics = useMemo(
-    () => computeCollationMetrics(variants, witnessA, witnessB),
-    [variants, witnessA, witnessB]
-  );
-
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(
@@ -207,6 +204,8 @@ export function CollationView({
         witnessB={witnessB}
         mode={mode}
         selectedId={selectedId}
+        apparatusEdits={apparatusEdits}
+        onEditNote={onEditNote}
         onSelect={onSelect}
         onHover={setHoveredId}
       />
@@ -242,6 +241,8 @@ function ApparatusList({
   witnessB,
   mode,
   selectedId,
+  apparatusEdits,
+  onEditNote,
   onSelect,
   onHover,
 }: {
@@ -250,6 +251,8 @@ function ApparatusList({
   witnessB: Witness;
   mode: CollationMode;
   selectedId: string | null;
+  apparatusEdits: Record<string, ApparatusEdit>;
+  onEditNote: (variantId: string, note: string) => void;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
 }) {
@@ -262,47 +265,71 @@ function ApparatusList({
     const w = s.trim().split(/\s+/).filter(Boolean);
     return w.slice(0, 7).join(" ") + (w.length > 7 ? " …" : "");
   };
+  const noted = entries.filter((v) => apparatusEdits[v.id]?.note?.trim()).length;
   return (
     <div className="border-t border-border">
-      <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border">
-        Critical apparatus · {entries.length} {entries.length === 1 ? "entry" : "entries"}
+      <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border flex items-center gap-2">
+        <span>Critical apparatus · {entries.length} {entries.length === 1 ? "entry" : "entries"}</span>
+        {noted > 0 && <span className="text-[10px] font-normal text-muted-foreground">· {noted} noted</span>}
+        <span className="ml-auto text-[10px] font-normal text-muted-foreground">click an entry to add a note</span>
       </div>
-      <div className="divide-y divide-border/60 max-h-[40vh] overflow-y-auto">
+      <div className="divide-y divide-border/60 max-h-[44vh] overflow-y-auto">
         {entries.length === 0 && (
           <div className="px-4 py-3 text-[12px] text-muted-foreground">No variants — the witnesses are identical.</div>
         )}
-        {entries.map((v) => (
-          <button
-            key={v.id}
-            onClick={() => onSelect(v.id === selectedId ? null : v.id)}
-            onMouseEnter={() => onHover(v.id)}
-            onMouseLeave={() => onHover(null)}
-            className="w-full text-left px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline"
-            style={{ background: v.id === selectedId ? "color-mix(in srgb, var(--sv-sel) 12%, transparent)" : undefined }}
-          >
-            <span
-              className="shrink-0 w-2 h-2 rounded-full mt-1.5"
-              style={{ background: VARIANT_TYPE_COLORS[v.type] }}
-              title={VARIANT_TYPE_LABELS[v.type]}
-            />
-            <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || VARIANT_TYPE_LABELS[v.type]}</span>
-            <span className="text-[12.5px] leading-snug">
-              {v.textA.trim() && (
-                <span>
-                  <span className="font-mono text-[10px] text-primary mr-1">{witnessA.siglum}</span>
-                  {lead(v.textA)}
+        {entries.map((v) => {
+          const selected = v.id === selectedId;
+          const note = apparatusEdits[v.id]?.note ?? "";
+          return (
+            <div
+              key={v.id}
+              onMouseEnter={() => onHover(v.id)}
+              onMouseLeave={() => onHover(null)}
+              style={{ background: selected ? "color-mix(in srgb, var(--sv-sel) 12%, transparent)" : undefined }}
+            >
+              <button
+                onClick={() => onSelect(selected ? null : v.id)}
+                className="w-full text-left px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline"
+              >
+                <span
+                  className="shrink-0 w-2 h-2 rounded-full mt-1.5"
+                  style={{ background: VARIANT_TYPE_COLORS[v.type] }}
+                  title={VARIANT_TYPE_LABELS[v.type]}
+                />
+                <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || VARIANT_TYPE_LABELS[v.type]}</span>
+                <span className="text-[12.5px] leading-snug flex-1">
+                  {v.textA.trim() && (
+                    <span>
+                      <span className="font-mono text-[10px] text-primary mr-1">{witnessA.siglum}</span>
+                      {lead(v.textA)}
+                    </span>
+                  )}
+                  {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
+                  {v.textB.trim() && (
+                    <span>
+                      <span className="font-mono text-[10px] text-primary mr-1">{witnessB.siglum}</span>
+                      {lead(v.textB)}
+                    </span>
+                  )}
                 </span>
+                {note.trim() && !selected && (
+                  <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[30%] truncate">“{note.trim()}”</span>
+                )}
+              </button>
+              {selected && (
+                <div className="px-4 pb-3 pl-[4.5rem]">
+                  <textarea
+                    value={note}
+                    onChange={(e) => onEditNote(v.id, e.target.value)}
+                    placeholder="Editor's note for this locus…"
+                    className="w-full bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y min-h-[3rem]"
+                    autoFocus
+                  />
+                </div>
               )}
-              {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
-              {v.textB.trim() && (
-                <span>
-                  <span className="font-mono text-[10px] text-primary mr-1">{witnessB.siglum}</span>
-                  {lead(v.textB)}
-                </span>
-              )}
-            </span>
-          </button>
-        ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -315,7 +342,7 @@ function DeepDivePanel({
   witnessA,
   witnessB,
 }: {
-  metrics: ReturnType<typeof computeCollationMetrics>;
+  metrics: CollationMetrics;
   open: boolean;
   onToggle: () => void;
   witnessA: Witness;
