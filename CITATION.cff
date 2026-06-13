@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use Source Variorum in your research, please cite it as below."
+type: software
+title: "Source Variorum: A Braided Collation Workbench for Code and Text"
+abstract: >
+  Source Variorum is a local-first textual collation workbench that renders two
+  or more witnesses of a text side by side with a central braid of ribbons
+  showing matches, additions, deletions, substitutions, and transpositions. It
+  operates in two modes, source code and prose, bringing the apparatus of textual
+  criticism to computational close reading. An instrument in the Computational
+  Hermeneutics family.
+authors:
+  - family-names: Berry
+    given-names: David M.
+    orcid: "https://orcid.org/0000-0002-2147-1366"
+    affiliation: "University of Sussex"
+repository-code: "https://github.com/Computational-Hermeneutics/Source-Variorum"
+license: MIT
+version: "0.1.0"
+date-released: "2026-06-13"
+keywords:
+  - textual criticism
+  - variorum
+  - collation
+  - critical code studies
+  - computational hermeneutics
+  - digital humanities
+  - close reading
