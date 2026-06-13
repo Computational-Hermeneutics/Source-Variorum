@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
@@ -431,7 +431,7 @@ function ApparatusList({
               </button>
               {selected && (
                 <div className="px-4 pb-3 pl-[4.5rem]">
-                  <textarea value={note} onChange={(e) => onEditNote(v.id, e.target.value)} placeholder="Editor's note for this locus…" className="w-full bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y min-h-[3rem]" autoFocus />
+                  <NoteEditor value={note} onChange={(val) => onEditNote(v.id, val)} />
                 </div>
               )}
             </div>
@@ -439,6 +439,24 @@ function ApparatusList({
         })}
       </div>
     </div>
+  );
+}
+
+/** Apparatus note box. Focuses on mount WITHOUT scrolling, so selecting a
+ *  variant from the text never whisks the page down to the apparatus. */
+function NoteEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    ref.current?.focus({ preventScroll: true });
+  }, []);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Editor's note for this locus…"
+      className="w-full bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y min-h-[3rem]"
+    />
   );
 }
 

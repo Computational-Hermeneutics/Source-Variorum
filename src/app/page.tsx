@@ -102,6 +102,8 @@ export default function Home() {
   const [editMode, setEditMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const scrollTop = () => mainRef.current?.scrollTo({ top: 0 });
 
   // Hydrate working collation + font size on mount; otherwise load a default
   // sample (all sample texts are fetched from /public, so there is no inline one).
@@ -195,9 +197,11 @@ export default function Home() {
         <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2.5 mr-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
+            <button onClick={scrollTop} title="Scroll to top" className="shrink-0">
+              <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
+            </button>
             <div className="leading-tight">
-              <div className="text-[15px] font-semibold tracking-tight">Source Variorum</div>
+              <button onClick={scrollTop} title="Scroll to top" className="text-[15px] font-semibold tracking-tight hover:text-primary text-left">Source Variorum</button>
               <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/ch-mark.svg" alt="" width={11} height={11} className="w-[11px] h-[11px] opacity-70" />
@@ -265,7 +269,7 @@ export default function Home() {
 
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
-        <main className="flex-1 min-w-0 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
           <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
         </main>
       </div>
