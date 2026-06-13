@@ -64,8 +64,23 @@ function inlineCollation(demo: Demo): Collation {
 
 async function collationFromDemo(demoId: string): Promise<Collation> {
   const demo = DEMOS.find((d) => d.id === demoId) ?? DEMOS[0];
+  if (demo.witnesses && demo.witnesses.length >= 2) {
+    const texts = await Promise.all(demo.witnesses.map(resolveWitnessText));
+    const witnesses = demo.witnesses.map((w, i) => witnessFrom(w, `w${i}`, texts[i]));
+    const c = makeCollation(demo.name, demo.mode, witnesses);
+    const li = Math.max(0, demo.witnesses.indexOf(demo.witnessA));
+    const ri = demo.witnesses.indexOf(demo.witnessB);
+    return { ...c, leftId: witnesses[li].id, rightId: witnesses[ri >= 0 ? ri : Math.min(1, witnesses.length - 1)].id };
+  }
   const [textA, textB] = await Promise.all([resolveWitnessText(demo.witnessA), resolveWitnessText(demo.witnessB)]);
   return makeCollation(demo.name, demo.mode, [witnessFrom(demo.witnessA, "a", textA), witnessFrom(demo.witnessB, "b", textB)]);
+}
+
+/** Short siglum derived from a filename stem (for multi-file import). */
+function siglumFromName(name: string): string {
+  const stem = name.replace(/\.[^.]+$/, "").replace(/^.*[/\\]/, "");
+  const m = stem.match(/(\d+(?:\.\d+)?[a-z]?)/i);
+  return (m?.[1] ?? stem).slice(0, 8);
 }
 
 function blankCollation(mode: CollationMode): Collation {
@@ -242,6 +257,10 @@ export default function Home() {
           mode={collation.mode}
           onClose={() => setShowAdd(false)}
           onAdd={(w) => { project.addWitness(w); setShowAdd(false); }}
+          onAddMany={(sources) => {
+            project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text) })));
+            setShowAdd(false);
+          }}
         />
       )}
 
@@ -311,7 +330,17 @@ function Sidebar({ project }: { project: ReturnType<typeof useProject> }) {
   );
 }
 
-function AddSourcePanel({ mode, onClose, onAdd }: { mode: CollationMode; onClose: () => void; onAdd: (w: Witness) => void }) {
+function AddSourcePanel({
+  mode,
+  onClose,
+  onAdd,
+  onAddMany,
+}: {
+  mode: CollationMode;
+  onClose: () => void;
+  onAdd: (w: Witness) => void;
+  onAddMany: (sources: { siglum: string; title: string; text: string }[]) => void;
+}) {
   const [sig, setSig] = useState("");
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -319,10 +348,21 @@ function AddSourcePanel({ mode, onClose, onAdd }: { mode: CollationMode; onClose
   const [busy, setBusy] = useState(false);
 
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setText(normalizeNewlines(await file.text()));
-    if (!title) setTitle(file.name);
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    // Multiple files → import each as a witness directly (siglum from filename).
+    if (files.length > 1) {
+      const sources = await Promise.all(
+        files.map(async (f) => ({ siglum: siglumFromName(f.name), title: f.name, text: await f.text() }))
+      );
+      onAddMany(sources);
+      return;
+    }
+    const f = files[0];
+    setText(normalizeNewlines(await f.text()));
+    if (!title) setTitle(f.name);
+    if (!sig) setSig(siglumFromName(f.name));
   };
   const fetchUrl = async () => {
     if (!url) return;
@@ -351,8 +391,9 @@ function AddSourcePanel({ mode, onClose, onAdd }: { mode: CollationMode; onClose
         <input value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[12px]" placeholder="Title" />
         <input value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[11px]" placeholder="Fetch from URL…" />
         <button onClick={fetchUrl} disabled={busy} className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] disabled:opacity-50">{busy ? "…" : "Fetch"}</button>
-        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer">File<input type="file" className="hidden" onChange={onFile} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" /></label>
+        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer whitespace-nowrap" title="Choose one file to edit before adding, or several to import them all at once">File(s)<input type="file" multiple className="hidden" onChange={onFile} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" /></label>
       </div>
+      <div className="text-[10px] text-muted-foreground mb-1">Tip: select multiple files to import them all as separate sources at once.</div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} className="w-full h-32 bg-background border border-border rounded px-2 py-1.5 text-[12px] font-mono resize-y" placeholder="Paste source text…" />
       <div className="flex justify-end mt-2">
         <button onClick={add} disabled={!text.trim()} className="px-4 py-1.5 rounded bg-primary text-primary-foreground text-[12px] font-medium disabled:opacity-50">Add to project</button>

@@ -66,7 +66,8 @@ export function BraidGutter({
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
         // When a variant is selected, fade everything else right back so the one
-        // being worked on stands alone; otherwise matches stay faint, changes mid.
+        // being worked on stands alone. When nothing is selected, show ALL braids
+        // (matches a touch lighter than changes so the eye still reads the changes).
         const opacity = anySelected
           ? active
             ? 0.95
@@ -74,8 +75,8 @@ export function BraidGutter({
           : active
             ? 0.95
             : r.type === "match"
-              ? 0.16
-              : 0.6;
+              ? 0.34
+              : 0.72;
         return (
           <path
             key={r.id}

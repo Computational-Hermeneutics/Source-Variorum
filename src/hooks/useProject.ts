@@ -114,6 +114,19 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
+  const addWitnesses = useCallback(
+    (ws: Witness[]) => {
+      if (ws.length === 0) return;
+      commit((c) => ({
+        ...c,
+        witnesses: [...c.witnesses, ...ws],
+        // Show the first newly added source on the right so the import is visible.
+        rightId: ws[0].id,
+      }));
+    },
+    [commit]
+  );
+
   const removeWitness = useCallback(
     (id: string) =>
       commit((c) => {
@@ -195,6 +208,7 @@ export function useProject(initial: Collation) {
     setRight,
     setBase,
     addWitness,
+    addWitnesses,
     removeWitness,
     updateWitness,
     editNote,
