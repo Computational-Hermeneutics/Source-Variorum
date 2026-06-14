@@ -59,6 +59,13 @@ export const VARIANT_TYPE_LABELS: Record<VariantType, string> = {
   variant: "Variant",
 };
 
+/** Display label for a variant type, mode-aware: in Text mode left-only text is
+ *  an "Omission" (apparatus term); in Source mode it's a "Deletion" (version diff). */
+export function variantLabel(type: VariantType, mode: CollationMode): string {
+  if (mode === "text" && type === "deletion") return "Omission";
+  return VARIANT_TYPE_LABELS[type];
+}
+
 /** Colours for tinting passages and ribbons. Editorial palette, not Vector Lab. */
 export const VARIANT_TYPE_COLORS: Record<VariantType, string> = {
   match: "#9fb8c4", // muted blue (the braid's resting colour)
@@ -100,6 +107,8 @@ export interface Variant {
   length: number;
   /** 0–1 similarity between the two readings (1 = verbatim; <1 = fuzzy/substitution). */
   similarity: number;
+  /** True for editor-made links (Advanced mode), false/absent for auto variants. */
+  manual?: boolean;
 }
 
 /**
@@ -137,6 +146,21 @@ export interface CollationMetrics {
   cosine: number;
 }
 
+/** A character range within one witness's text (for hand-made links). */
+export interface ManualSpan {
+  start: number;
+  end: number;
+}
+
+/** An editor-made link between passages, created in Advanced mode. It overrides
+ *  the auto-collation wherever it overlaps. Addition has no `a`; omission no `b`. */
+export interface ManualLink {
+  id: string;
+  type: VariantType;
+  a?: ManualSpan;
+  b?: ManualSpan;
+}
+
 /** A full collation, the unit of persistence and JSON export/import. */
 export interface Collation {
   id: string;
@@ -155,6 +179,9 @@ export interface Collation {
   links: CrossPanelLink[];
   /** Editor-edited apparatus entries, keyed by variant id (auto-entries merged at runtime). */
   apparatusEdits: Record<string, Pick<ApparatusEntry, "note" | "category">>;
+  /** Editor-made manual links, keyed by the witness pair `${leftId}|${rightId}`.
+   *  They override the auto-collation for that specific pairing. */
+  manualLinks?: Record<string, ManualLink[]>;
   /** Explicit folder names in the Sources organiser (incl. ones with no witness yet). */
   folders?: string[];
   /** Soft-deleted witnesses, recoverable from the organiser's trash. */

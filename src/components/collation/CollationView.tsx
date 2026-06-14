@@ -4,7 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { X, ChevronDown, ChevronRight } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
-import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from "@/types/collation";
+import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS, variantLabel } from "@/types/collation";
+import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
@@ -28,11 +29,13 @@ export function CollationView({
   view,
   fontSize,
   editMode,
+  advancedMode,
 }: {
   project: Project;
   view: View;
   fontSize: number;
   editMode: boolean;
+  advancedMode: boolean;
 }) {
   const { collation } = project;
   const { a: witnessA, b: witnessB, variants, metrics } = view;
@@ -44,6 +47,9 @@ export function CollationView({
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
+  // Advanced-mode hand-linking: a picked character range per side.
+  const [leftPick, setLeftPick] = useState<{ start: number; end: number } | null>(null);
+  const [rightPick, setRightPick] = useState<{ start: number; end: number } | null>(null);
 
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -117,6 +123,47 @@ export function CollationView({
     }
   }, []);
 
+  // ----- Advanced-mode hand-linking -----
+  const variantById = useMemo(() => {
+    const m = new Map<string, Variant>();
+    for (const v of variants) m.set(v.id, v);
+    return m;
+  }, [variants]);
+
+  const onPick = useCallback(
+    (side: Side, vid: string, shift: boolean) => {
+      const v = variantById.get(vid);
+      const sp = v && (side === "a" ? v.a : v.b);
+      if (!sp) return;
+      const setter = side === "a" ? setLeftPick : setRightPick;
+      setter((prev) =>
+        shift && prev
+          ? { start: Math.min(prev.start, sp.start), end: Math.max(prev.end, sp.end) }
+          : { start: sp.start, end: sp.end }
+      );
+    },
+    [variantById]
+  );
+
+  const clearPicks = useCallback(() => {
+    setLeftPick(null);
+    setRightPick(null);
+  }, []);
+
+  const createLink = useCallback(
+    (type: VariantType) => {
+      if (!leftPick && !rightPick) return;
+      project.addManualLink({
+        id: uid(),
+        type,
+        a: leftPick ? { ...leftPick } : undefined,
+        b: rightPick ? { ...rightPick } : undefined,
+      });
+      clearPicks();
+    },
+    [leftPick, rightPick, project, clearPicks]
+  );
+
   const maxLength = useMemo(
     () => variants.reduce((m, v) => (v.type !== "match" ? Math.max(m, v.length) : m), 1),
     [variants]
@@ -165,7 +212,7 @@ export function CollationView({
                 }}
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
-                {VARIANT_TYPE_LABELS[t]} ({count})
+                {variantLabel(t, mode)} ({count})
               </button>
             );
           })}
@@ -179,7 +226,7 @@ export function CollationView({
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
           clears the current selection. */}
-      <div ref={wrapperRef} onClick={() => onSelect(null)} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
+      <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
         <div className="border-r border-border min-w-0">
           <WitnessHeader witness={witnessA} side="A" project={project} which="left" annCount={annotationsFor(witnessA.id).length} />
           <WitnessPanel
@@ -196,6 +243,9 @@ export function CollationView({
             onEditText={(text) => project.updateWitness(witnessA.id, { text })}
             onAnnotate={requestAnnotate(witnessA.id)}
             registerAnchor={registerAnchor}
+            advancedMode={advancedMode}
+            pick={leftPick}
+            onPick={onPick}
           />
         </div>
 
@@ -233,6 +283,9 @@ export function CollationView({
             onEditText={(text) => project.updateWitness(witnessB.id, { text })}
             onAnnotate={requestAnnotate(witnessB.id)}
             registerAnchor={registerAnchor}
+            advancedMode={advancedMode}
+            pick={rightPick}
+            onPick={onPick}
           />
         </div>
       </div>
@@ -254,6 +307,10 @@ export function CollationView({
         onEditNote={project.editNote}
         onSelect={onSelect}
         onHover={setHoveredId}
+        onUnlink={(vid) => {
+          const lid = linkIdOf(vid);
+          if (lid) project.removeManualLink(lid);
+        }}
       />
 
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={() => setShowDeepDive((v) => !v)} witnessA={witnessA} witnessB={witnessB} />
@@ -276,6 +333,63 @@ export function CollationView({
             setPendingAnn(null);
           }}
         />
+      )}
+
+      {advancedMode && (
+        <LinkBar
+          mode={mode}
+          leftPick={!!leftPick}
+          rightPick={!!rightPick}
+          onLink={createLink}
+          onCancel={clearPicks}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Floating action bar for Advanced-mode hand-linking. */
+function LinkBar({
+  mode,
+  leftPick,
+  rightPick,
+  onLink,
+  onCancel,
+}: {
+  mode: CollationMode;
+  leftPick: boolean;
+  rightPick: boolean;
+  onLink: (t: VariantType) => void;
+  onCancel: () => void;
+}) {
+  const both = leftPick && rightPick;
+  const btn = (t: VariantType, label: string) => (
+    <button
+      onClick={() => onLink(t)}
+      className="inline-flex items-center gap-1 px-2 py-1 rounded border text-[12px] hover:bg-muted"
+      style={{ borderColor: VARIANT_TYPE_COLORS[t] }}
+    >
+      <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
+      {label}
+    </button>
+  );
+  return (
+    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg shadow-xl px-3 py-2 flex items-center gap-2">
+      {!leftPick && !rightPick ? (
+        <span className="text-[12px] text-muted-foreground">Advanced: click a passage on the left and one on the right, then choose the link.</span>
+      ) : (
+        <>
+          <span className="text-[12px] text-muted-foreground mr-0.5">
+            {both ? "Link as" : leftPick ? "Left only" : "Right only"}:
+          </span>
+          {both && btn("substitution", "Substitution")}
+          {both && btn("transposition", "Transposition")}
+          {both && btn("variant", "Variant")}
+          {both && btn("match", "Match")}
+          {rightPick && !leftPick && btn("addition", "Addition")}
+          {leftPick && !rightPick && btn("deletion", mode === "text" ? "Omission" : "Deletion")}
+          <button onClick={onCancel} className="ml-1 px-2 py-1 rounded text-[12px] text-muted-foreground hover:bg-muted">Cancel</button>
+        </>
       )}
     </div>
   );
@@ -393,6 +507,7 @@ function ApparatusList({
   onEditNote,
   onSelect,
   onHover,
+  onUnlink,
 }: {
   entries: Variant[];
   mode: CollationMode;
@@ -401,6 +516,7 @@ function ApparatusList({
   onEditNote: (variantId: string, note: string) => void;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
+  onUnlink: (variantId: string) => void;
 }) {
   const locus = (v: Variant) => {
     const sp = v.a ?? v.b;
@@ -426,16 +542,24 @@ function ApparatusList({
           const note = apparatusEdits[v.id]?.note ?? "";
           return (
             <div key={v.id} onMouseEnter={() => onHover(v.id)} onMouseLeave={() => onHover(null)} style={{ background: selected ? "color-mix(in srgb, var(--sv-sel) 12%, transparent)" : undefined }}>
-              <button onClick={() => onSelect(selected ? null : v.id)} className="w-full text-left px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline">
-                <span className="shrink-0 w-2 h-2 rounded-full mt-1.5" style={{ background: VARIANT_TYPE_COLORS[v.type] }} title={VARIANT_TYPE_LABELS[v.type]} />
-                <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || VARIANT_TYPE_LABELS[v.type]}</span>
-                <span className="text-[12.5px] leading-snug flex-1">
-                  {v.textA.trim() && <span>{lead(v.textA)}</span>}
-                  {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
-                  {v.textB.trim() && <span className="text-foreground/70">{lead(v.textB)}</span>}
-                </span>
-                {note.trim() && !selected && <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[30%] truncate">“{note.trim()}”</span>}
-              </button>
+              <div className="group w-full px-4 py-2 hover:bg-muted/40 flex gap-3 items-baseline">
+                <button onClick={() => onSelect(selected ? null : v.id)} className="flex gap-3 items-baseline flex-1 text-left min-w-0">
+                  <span className="shrink-0 w-2 h-2 rounded-full mt-1.5" style={{ background: VARIANT_TYPE_COLORS[v.type] }} title={variantLabel(v.type, mode)} />
+                  <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || variantLabel(v.type, mode)}</span>
+                  <span className="text-[12.5px] leading-snug flex-1 min-w-0">
+                    {v.textA.trim() && <span>{lead(v.textA)}</span>}
+                    {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
+                    {v.textB.trim() && <span className="text-foreground/70">{lead(v.textB)}</span>}
+                  </span>
+                </button>
+                {v.manual && <span className="shrink-0 text-[9px] uppercase tracking-wide text-primary border border-primary/40 rounded px-1" title="Editor-made link">hand</span>}
+                {note.trim() && !selected && <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[24%] truncate">“{note.trim()}”</span>}
+                {v.manual && (
+                  <button onClick={() => onUnlink(v.id)} className="shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Unlink (remove this hand-made link)">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
               {selected && (
                 <div className="px-4 pb-3 pl-[4.5rem]">
                   <NoteEditor value={note} onChange={(val) => onEditNote(v.id, val)} />

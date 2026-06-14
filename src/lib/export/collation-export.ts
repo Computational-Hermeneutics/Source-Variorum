@@ -13,6 +13,7 @@ import { VARIANT_TYPE_LABELS } from "@/types/collation";
 import { collate } from "@/lib/collate/collate";
 import { buildApparatus } from "@/lib/collate/apparatus";
 import { computeCollationMetrics } from "@/lib/collate/metrics";
+import { applyManualLinks, pairKey } from "@/lib/collate/manual";
 
 /** The two witnesses the braid currently compares (the panel selections). */
 export function pairOf(c: Collation): [Witness, Witness] {
@@ -28,7 +29,9 @@ export function pairOf(c: Collation): [Witness, Witness] {
 /** Recompute the full derived view (variants + apparatus + metrics) from a collation. */
 export function deriveView(c: Collation) {
   const [a, b] = pairOf(c);
-  const variants = collate(a, b, { mode: c.mode });
+  let variants = collate(a, b, { mode: c.mode });
+  const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
+  if (links.length) variants = applyManualLinks(variants, links, a, b);
   const apparatus = buildApparatus(variants, a, b, c);
   const metrics = computeCollationMetrics(variants, a, b);
   return { a, b, variants, apparatus, metrics };
@@ -91,6 +94,7 @@ export function parseProjectFile(text: string): SavedCollation | null {
         annotations: data.annotations ?? {},
         links: data.links ?? [],
         apparatusEdits: data.apparatusEdits ?? {},
+        manualLinks: data.manualLinks ?? {},
         folders: Array.isArray(data.folders) ? data.folders : [],
         trash: Array.isArray(data.trash) ? data.trash : [],
         createdAt: data.createdAt ?? new Date().toISOString(),

@@ -20,6 +20,8 @@ export type {
   CollationMetrics,
   Collation,
   SavedCollation,
+  ManualLink,
+  ManualSpan,
 } from "./collation";
 
 export {

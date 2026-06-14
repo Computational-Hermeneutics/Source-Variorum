@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Moon, Sun, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
-  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Type,
+  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Type, Spline,
 } from "lucide-react";
 import type { Collation, CollationMode, Witness } from "@/types/collation";
 import { CollationView } from "@/components/collation/CollationView";
@@ -100,6 +100,7 @@ export default function Home() {
   const [showAdd, setShowAdd] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [advancedMode, setAdvancedMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -233,8 +234,12 @@ export default function Home() {
           )}
 
           <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <button onClick={() => setEditMode((v) => !v)} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (editMode ? "bg-amber-500/20 border-amber-500 text-amber-800 dark:text-amber-300" : "border-border bg-card hover:bg-muted")} title="Edit witness text">
+            <button onClick={() => { setEditMode((v) => !v); setAdvancedMode(false); }} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (editMode ? "bg-amber-500/20 border-amber-500 text-amber-800 dark:text-amber-300" : "border-border bg-card hover:bg-muted")} title="Edit witness text">
               <Pencil className="w-3.5 h-3.5" /> {editMode ? "Editing" : "Edit"}
+            </button>
+
+            <button onClick={() => { setAdvancedMode((v) => !v); setEditMode(false); }} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (advancedMode ? "bg-primary/15 border-primary text-primary" : "border-border bg-card hover:bg-muted")} title="Advanced: hand-edit the braid links">
+              <Spline className="w-3.5 h-3.5" /> {advancedMode ? "Advanced" : "Auto"}
             </button>
 
             {/* Font size */}
@@ -270,7 +275,7 @@ export default function Home() {
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
         <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
-          <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} />
+          <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} advancedMode={advancedMode} />
         </main>
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import type { Collation, CollationMode, LineAnnotation, Witness } from "@/types";
+import type { Collation, CollationMode, LineAnnotation, ManualLink, Witness } from "@/types";
 
 const HISTORY_CAP = 60;
 
@@ -232,6 +232,27 @@ export function useProject(initial: Collation) {
 
   const emptyTrash = useCallback(() => commit((c) => ({ ...c, trash: [] })), [commit]);
 
+  // ----- manual (Advanced-mode) links, keyed by the current witness pair -----
+  const addManualLink = useCallback(
+    (link: ManualLink) =>
+      commit((c) => {
+        const key = `${c.leftId}|${c.rightId}`;
+        const existing = c.manualLinks?.[key] ?? [];
+        return { ...c, manualLinks: { ...c.manualLinks, [key]: [...existing, link] } };
+      }),
+    [commit]
+  );
+
+  const removeManualLink = useCallback(
+    (id: string) =>
+      commit((c) => {
+        const key = `${c.leftId}|${c.rightId}`;
+        const existing = c.manualLinks?.[key] ?? [];
+        return { ...c, manualLinks: { ...c.manualLinks, [key]: existing.filter((l) => l.id !== id) } };
+      }),
+    [commit]
+  );
+
   const editNote = useCallback(
     (variantId: string, note: string) =>
       commit((c) => ({
@@ -293,6 +314,8 @@ export function useProject(initial: Collation) {
     restoreWitness,
     deleteForever,
     emptyTrash,
+    addManualLink,
+    removeManualLink,
     editNote,
     addAnnotation,
     removeAnnotation,

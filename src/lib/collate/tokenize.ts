@@ -131,3 +131,12 @@ function segmentBySentence(text: string): Segment[] {
 export function segment(text: string, mode: CollationMode): Segment[] {
   return mode === "source" ? segmentByLine(text) : segmentBySentence(text);
 }
+
+/** Build a Span (with line numbers) for an arbitrary character range — used for
+ *  editor-made manual links, which aren't tied to segment boundaries. */
+export function spanAt(text: string, start: number, end: number): import("@/types/collation").Span {
+  const lineOf = lineAt(text);
+  const s = Math.max(0, Math.min(start, text.length));
+  const e = Math.max(s, Math.min(end, text.length));
+  return { start: s, end: e, startLine: lineOf(s), endLine: lineOf(Math.max(s, e - 1)) };
+}

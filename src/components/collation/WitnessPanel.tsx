@@ -94,6 +94,9 @@ export function WitnessPanel({
   onEditText,
   onAnnotate,
   registerAnchor,
+  advancedMode,
+  pick,
+  onPick,
 }: {
   side: Side;
   witness: Witness;
@@ -108,6 +111,9 @@ export function WitnessPanel({
   onEditText: (text: string) => void;
   onAnnotate: (line: number) => void;
   registerAnchor: (id: string, side: Side, el: HTMLElement | null) => void;
+  advancedMode: boolean;
+  pick: { start: number; end: number } | null;
+  onPick: (side: Side, vid: string, shift: boolean) => void;
 }) {
   const isMono = mode === "source";
   const anySelected = selectedId !== null;
@@ -115,6 +121,17 @@ export function WitnessPanel({
 
   const [draft, setDraft] = useState(witness.text);
   useEffect(() => setDraft(witness.text), [witness.text, witness.id]);
+
+  // Variants whose span on this side falls within the current advanced-mode pick.
+  const pickedVids = useMemo(() => {
+    const set = new Set<string>();
+    if (!pick) return set;
+    for (const v of variants) {
+      const sp = side === "a" ? v.a : v.b;
+      if (sp && sp.start < pick.end && pick.start < sp.end) set.add(v.id);
+    }
+    return set;
+  }, [variants, pick, side]);
 
   const rows = useMemo(() => buildRows(witness.text, variants, side), [witness.text, variants, side]);
   const gutterCh = String(rows.length).length + 1;
@@ -163,6 +180,12 @@ export function WitnessPanel({
               row.segs.map((seg, k) => {
                 const selected = seg.vid === selectedId;
                 const hovered = seg.vid === hoveredId;
+                const picked = pickedVids.has(seg.vid);
+                const style = advancedMode
+                  ? picked
+                    ? { background: "color-mix(in srgb, var(--sv-sel) 30%, transparent)", boxShadow: "inset 0 0 0 1.5px var(--sv-sel)" }
+                    : tintStyle(seg.type, false, hovered, false)
+                  : tintStyle(seg.type, selected, hovered, anySelected);
                 return (
                   <span
                     key={k}
@@ -171,8 +194,13 @@ export function WitnessPanel({
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
                     onClick={(e) => {
-                      // Don't let the click reach the background (which deselects).
+                      // Don't let the click reach the background.
                       e.stopPropagation();
+                      // Advanced mode: clicking picks the passage for hand-linking.
+                      if (advancedMode) {
+                        onPick(side, seg.vid, e.shiftKey);
+                        return;
+                      }
                       // Annotate only on modifier-click; a plain click just
                       // highlights the variant in place (no scroll/jump).
                       if (e.metaKey || e.ctrlKey) {
@@ -183,7 +211,7 @@ export function WitnessPanel({
                       onSelect(selected ? null : seg.vid, false);
                     }}
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
-                    style={tintStyle(seg.type, selected, hovered, anySelected)}
+                    style={style}
                   >
                     {seg.text}
                   </span>
