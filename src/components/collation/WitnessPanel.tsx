@@ -152,6 +152,7 @@ export function WitnessPanel({
   onPickRange,
   lang,
   isDark,
+  search,
 }: {
   side: Side;
   witness: Witness;
@@ -176,6 +177,8 @@ export function WitnessPanel({
   /** Syntax-highlighting language id for code mode; undefined / "none" = off. */
   lang?: string;
   isDark: boolean;
+  /** Active search query — matching substrings are marked. */
+  search?: string;
 }) {
   const isMono = mode === "source";
   const anySelected = selectedId !== null;
@@ -238,6 +241,40 @@ export function WitnessPanel({
   const PICK_STYLE: React.CSSProperties = { background: "color-mix(in srgb, var(--sv-sel) 32%, transparent)", boxShadow: "inset 0 0 0 1px var(--sv-sel)" };
   const segPicked = (seg: LineSeg): boolean => !!pick && pick.start < seg.start + seg.text.length && seg.start < pick.end;
   const pickBody = (seg: LineSeg): ReactNode => (pick ? tintRuns(seg, [{ start: pick.start, end: pick.end, style: PICK_STYLE }]) : hl(seg.start, seg.text));
+
+  // Search match ranges over this witness's text (case-insensitive).
+  const searchRanges = useMemo(() => {
+    const q = (search ?? "").trim().toLowerCase();
+    if (q.length < 2) return [] as { start: number; end: number }[];
+    const out: { start: number; end: number }[] = [];
+    const hay = witness.text.toLowerCase();
+    let i = hay.indexOf(q);
+    while (i >= 0) {
+      out.push({ start: i, end: i + q.length });
+      i = hay.indexOf(q, i + q.length);
+    }
+    return out;
+  }, [search, witness.text]);
+  const segHasMatch = (seg: LineSeg): boolean => searchRanges.some((r) => r.start < seg.start + seg.text.length && seg.start < r.end);
+  // Wrap matching substrings in <mark> with a data attr so the toolbar can scroll
+  // between hits. Uses a distinct orange so it doesn't read as the yellow selection.
+  const searchBody = (seg: LineSeg): ReactNode => {
+    const out: ReactNode[] = [];
+    const end = seg.start + seg.text.length;
+    let cursor = seg.start;
+    let key = 0;
+    const sliceHl = (from: number, to: number) => hl(from, seg.text.slice(from - seg.start, to - seg.start));
+    for (const r of searchRanges) {
+      if (r.end <= cursor || r.start >= end) continue;
+      const s = Math.max(r.start, cursor);
+      const e = Math.min(r.end, end);
+      if (s > cursor) out.push(<span key={key++}>{sliceHl(cursor, s)}</span>);
+      out.push(<mark key={key++} data-sv-match="1" className="rounded-[2px]" style={{ background: "color-mix(in srgb, #ff8a00 45%, transparent)", color: "inherit", boxShadow: "inset 0 0 0 1px #ff8a00" }}>{sliceHl(s, e)}</mark>);
+      cursor = e;
+    }
+    if (cursor < end) out.push(<span key={key++}>{sliceHl(cursor, end)}</span>);
+    return out;
+  };
 
   // Read a native text selection inside this panel and turn it into a precise
   // character range (CollateX-style boundary setting). Each rendered segment span
@@ -330,7 +367,7 @@ export function WitnessPanel({
                 if (!seg.vid)
                   return (
                     <span key={k} data-seg-start={seg.start}>
-                      {advancedMode && segPicked(seg) ? pickBody(seg) : hl(seg.start, seg.text)}
+                      {segHasMatch(seg) ? searchBody(seg) : advancedMode && segPicked(seg) ? pickBody(seg) : hl(seg.start, seg.text)}
                     </span>
                   );
                 const selected = seg.vid === selectedId;
@@ -382,11 +419,13 @@ export function WitnessPanel({
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
                     style={style}
                   >
-                    {advancedMode && segPicked(seg)
-                      ? pickBody(seg)
-                      : useWordTint && runs
-                        ? wordBody(seg, runs, VARIANT_TYPE_COLORS[seg.type])
-                        : hl(seg.start, seg.text)}
+                    {segHasMatch(seg)
+                      ? searchBody(seg)
+                      : advancedMode && segPicked(seg)
+                        ? pickBody(seg)
+                        : useWordTint && runs
+                          ? wordBody(seg, runs, VARIANT_TYPE_COLORS[seg.type])
+                          : hl(seg.start, seg.text)}
                   </span>
                 );
               })

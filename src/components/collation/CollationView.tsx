@@ -45,6 +45,7 @@ export function CollationView({
   onLangB,
   showOverview,
   onCloseOverview,
+  search,
   isDark,
 }: {
   project: Project;
@@ -65,6 +66,7 @@ export function CollationView({
   onLangB: (id: string) => void;
   showOverview: boolean;
   onCloseOverview: () => void;
+  search?: string;
   isDark: boolean;
 }) {
   const editMode = editSide !== null;
@@ -277,6 +279,7 @@ export function CollationView({
               onPickRange={onPickRange}
               lang={langA}
               isDark={isDark}
+              search={search}
             />
           </div>
         )}
@@ -332,6 +335,7 @@ export function CollationView({
               onPickRange={onPickRange}
               lang={langB}
               isDark={isDark}
+              search={search}
             />
           </div>
         )}

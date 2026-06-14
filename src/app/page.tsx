@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3 } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -122,6 +122,7 @@ export default function Home() {
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const scrollTop = () => mainRef.current?.scrollTo({ top: 0 });
@@ -216,6 +217,23 @@ export default function Home() {
   const langB = langFor(view.b);
   const chooseLangA = (id: string) => { if (view.a) setLangOverrides((o) => ({ ...o, [view.a!.id]: id })); };
   const chooseLangB = (id: string) => { if (view.b) setLangOverrides((o) => ({ ...o, [view.b!.id]: id })); };
+
+  // Status-bar search: count matches across both panels and step between the
+  // rendered <mark> hits.
+  const matchCount = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (q.length < 2) return 0;
+    const count = (s: string) => { let n = 0, i = s.toLowerCase().indexOf(q); while (i >= 0) { n++; i = s.toLowerCase().indexOf(q, i + q.length); } return n; };
+    return count(view.a?.text ?? "") + count(view.b?.text ?? "");
+  }, [search, view.a, view.b]);
+  const matchIdxRef = useRef(0);
+  useEffect(() => { matchIdxRef.current = -1; }, [search]);
+  const gotoMatch = (dir: number) => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-sv-match]"));
+    if (!els.length) return;
+    matchIdxRef.current = (matchIdxRef.current + dir + els.length) % els.length;
+    els[matchIdxRef.current]?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
 
   const loadDemo = (id: string) => {
     collationFromDemo(id).then(project.load).catch(() => alert("Could not load that demo's source files."));
@@ -395,6 +413,7 @@ export default function Home() {
             onLangB={chooseLangB}
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
+            search={search}
             isDark={isDark}
           />
         </main>
@@ -420,6 +439,26 @@ export default function Home() {
           })}
         </div>
         <span className="ml-auto inline-flex items-center gap-2 shrink-0">
+          {/* Find in both panels */}
+          <span className="inline-flex items-center gap-1 rounded border border-border bg-card px-1.5 py-0.5">
+            <Search className="w-3 h-3 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") gotoMatch(e.shiftKey ? -1 : 1); if (e.key === "Escape") setSearch(""); }}
+              placeholder="Find…"
+              className="w-28 bg-transparent outline-none text-[10px] placeholder:text-muted-foreground/60"
+            />
+            {search.trim().length >= 2 && (
+              <>
+                <span className="tabular-nums text-muted-foreground">{matchCount}</span>
+                <button onClick={() => gotoMatch(-1)} disabled={!matchCount} title="Previous match (⇧Enter)" className="rounded hover:bg-muted disabled:opacity-30"><ChevronUp className="w-3 h-3" /></button>
+                <button onClick={() => gotoMatch(1)} disabled={!matchCount} title="Next match (Enter)" className="rounded hover:bg-muted disabled:opacity-30"><ChevronDown className="w-3 h-3" /></button>
+                <button onClick={() => setSearch("")} title="Clear" className="rounded hover:bg-muted"><X className="w-3 h-3" /></button>
+              </>
+            )}
+          </span>
+          <span className="opacity-50">·</span>
           <span>v{APP_VERSION}</span>
           <span className="opacity-50">·</span>
           <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
