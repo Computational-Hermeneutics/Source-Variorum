@@ -194,14 +194,14 @@ export function CollationView({
     }
   }, []);
 
-  // A click in the text body highlights the locus. When the panels are LOCKED it
-  // also scrolls the other panel so the linked passage lines up with the clicked
-  // one (the sync is suppressed so the clicked panel itself stays put). When
-  // UNLOCKED the panels are independent, so a click never moves the other panel.
+  // A click in the text body highlights the locus and scrolls the other panel so
+  // the linked passage lines up with the clicked one (a navigation peek; the sync
+  // is suppressed so the clicked panel itself stays put). Available in every lock
+  // mode — the reader can then hit "Lock here" to keep that alignment.
   const onTextSelect = useCallback(
     (side: Side) => (id: string | null) => {
       setSelectedId(id);
-      if (!id || lockMode === "off") return;
+      if (!id) return;
       const other: Side = side === "a" ? "b" : "a";
       const se = anchorsRef.current.get(`${id}:${side}`);
       const de = anchorsRef.current.get(`${id}:${other}`);
@@ -215,7 +215,7 @@ export function CollationView({
         requestAnimationFrame(() => { syncingRef.current = false; });
       }
     },
-    [lockMode]
+    []
   );
 
   // ----- Advanced-mode hand-linking -----

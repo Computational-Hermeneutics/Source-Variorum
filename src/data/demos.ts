@@ -53,8 +53,7 @@ const SPACEWAR_CORPUS: DemoWitness[] = [
   { siglum: "4.3", title: "Spacewar! 4.3 (Twin Star)", date: "17 May 1963", author: "Monty Preonas (“ddp”)", provenance: "spacewar_4.3f.txt", file: SW("spacewar_4.3f.txt") },
   { siglum: "4.4", title: "Spacewar! 4.4 (dual console)", date: "21 May 1963", author: "Preonas (“ddp”) & Morris", provenance: "spacewar_4.4.txt", file: SW("spacewar_4.4.txt") },
   { siglum: "4.4f", title: "Spacewar! 4.4f", date: "1963", author: "Preonas (“ddp”) & Morris", provenance: "spacewar_4.4f.txt", file: SW("spacewar_4.4f.txt") },
-  { siglum: "4.8a", title: "Spacewar! 4.8 (part 1)", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8_pt1.txt", file: SW("spacewar_4.8_pt1.txt") },
-  { siglum: "4.8b", title: "Spacewar! 4.8 (part 2)", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8_pt2.txt", file: SW("spacewar_4.8_pt2.txt") },
+  { siglum: "4.8", title: "Spacewar! 4.8", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8.txt (parts 1 + 2 combined)", file: SW("spacewar_4.8.txt") },
   { siglum: "4.8s", title: "Spacewar! 4.8 (scorer)", date: "24 Jul 1963", author: "Preonas score routine, reworked by Peter Samson", provenance: "spacewar_4.8_scorer.txt", file: SW("spacewar_4.8_scorer.txt") },
   { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", author: "“dfw”", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
   // Modern reconstructions / re-typings
@@ -87,7 +86,7 @@ export const DEMOS: Demo[] = [
     name: "Spacewar! corpus (1962–63, full)",
     mode: "source",
     blurb: "The full CCS Spacewar! PDP-1 corpus — versions, disassemblies, related programs",
-    shows: "Whole-genealogy collation — pick any two of 25 sources from the sidebar",
+    shows: "Whole-genealogy collation — pick any two of 24 sources from the sidebar",
     witnessA: SPACEWAR_CORPUS[1], // 2b (25 Mar 1962)
     witnessB: SPACEWAR_CORPUS[3], // 3.1 (canonical)
     witnesses: SPACEWAR_CORPUS,

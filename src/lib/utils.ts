@@ -9,5 +9,7 @@ export function cn(...inputs: ClassValue[]) {
  *  CR (classic Mac / PDP-era listings such as bitsavers dumps); the collation
  *  engine counts lines by LF, so every witness text is normalised on ingestion. */
 export function normalizeNewlines(text: string): string {
-  return text.replace(/\r\n?/g, "\n");
+  // CRLF/CR → LF, then strip any leading blank or whitespace-only lines so a
+  // witness starts at its first real line (no empty rows pushing line 1 down).
+  return text.replace(/\r\n?/g, "\n").replace(/^(?:[ \t]*\n)+/, "");
 }
