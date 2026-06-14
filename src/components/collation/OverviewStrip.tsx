@@ -201,10 +201,10 @@ export function OverviewStrip({
           {colMinimap && mini.blocks.map((b, i) => (
             <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.h} rx={0.15} className="fill-foreground" opacity={colVariants ? 0.2 : 0.32} />
           ))}
-          {/* Variant map — thin coloured ticks growing from the right edge, so the
-              change signal reads as its own histogram beside the faint minimap. */}
+          {/* Variant map — very subtle coloured ticks at the right edge, a faded
+              hint of where the change is, not a loud signal. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.8} rx={0.15} />
+            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.4} rx={0.15} />
           ))}
           {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
           {/* Version hotspots — a thin heat line on the left, before the minimap. */}

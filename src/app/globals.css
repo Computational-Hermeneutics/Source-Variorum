@@ -200,3 +200,6 @@
 .sv-markdown pre { background: var(--muted); padding: 0.6em 0.8em; border-radius: 6px; overflow-x: auto; margin: 0.5em 0; }
 .sv-markdown pre code { background: none; padding: 0; }
 .sv-markdown blockquote { border-left: 3px solid var(--border); padding-left: 0.8em; margin: 0.5em 0; color: var(--muted-foreground); }
+.sv-markdown table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.95em; display: block; overflow-x: auto; }
+.sv-markdown th, .sv-markdown td { border: 1px solid var(--border); padding: 0.3em 0.6em; text-align: left; vertical-align: top; }
+.sv-markdown th { background: var(--muted); font-weight: 600; }
