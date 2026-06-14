@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen } from "lucide-react";
+import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
@@ -144,16 +144,13 @@ export function CollationView({
   const [lockMode, setLockMode] = useState<LockMode>("one");
   const userOffsetRef = useRef(0); // B.scrollTop − A.scrollTop, captured for "user"
   useEffect(() => { try { const m = localStorage.getItem("source-variorum-lock-mode"); if (m === "one" || m === "off") setLockMode(m); } catch { /* ignore */ } }, []);
-  const cycleLock = () => setLockMode((m) => {
+  const setLock = (mode: LockMode) => {
     const a = panelARef.current, b = panelBRef.current;
-    let next: LockMode;
-    if (m === "one") next = "off";
-    else if (m === "off") { userOffsetRef.current = a && b ? b.scrollTop - a.scrollTop : 0; next = "user"; }
-    else next = "one";
-    if (next === "one" && a && b) { syncingRef.current = true; b.scrollTop = a.scrollTop; requestAnimationFrame(() => { syncingRef.current = false; }); }
-    try { localStorage.setItem("source-variorum-lock-mode", next === "user" ? "off" : next); } catch { /* ignore */ }
-    return next;
-  });
+    if (mode === "user") userOffsetRef.current = a && b ? b.scrollTop - a.scrollTop : 0; // capture the current hand-set alignment
+    if (mode === "one" && a && b) { syncingRef.current = true; b.scrollTop = a.scrollTop; requestAnimationFrame(() => { syncingRef.current = false; }); }
+    try { localStorage.setItem("source-variorum-lock-mode", mode === "user" ? "off" : mode); } catch { /* ignore */ }
+    setLockMode(mode);
+  };
 
   const syncCounterpart = useCallback((from: Side) => {
     const a = panelARef.current, b = panelBRef.current;
@@ -197,13 +194,14 @@ export function CollationView({
     }
   }, []);
 
-  // A click in the text body highlights the locus AND scrolls the other panel so
-  // its linked passage lines up with the clicked one (works in any lock mode;
-  // the sync is suppressed so the clicked panel itself stays put).
+  // A click in the text body highlights the locus. When the panels are LOCKED it
+  // also scrolls the other panel so the linked passage lines up with the clicked
+  // one (the sync is suppressed so the clicked panel itself stays put). When
+  // UNLOCKED the panels are independent, so a click never moves the other panel.
   const onTextSelect = useCallback(
     (side: Side) => (id: string | null) => {
       setSelectedId(id);
-      if (!id) return;
+      if (!id || lockMode === "off") return;
       const other: Side = side === "a" ? "b" : "a";
       const se = anchorsRef.current.get(`${id}:${side}`);
       const de = anchorsRef.current.get(`${id}:${other}`);
@@ -217,7 +215,7 @@ export function CollationView({
         requestAnimationFrame(() => { syncingRef.current = false; });
       }
     },
-    []
+    [lockMode]
   );
 
   // ----- Advanced-mode hand-linking -----
@@ -400,48 +398,56 @@ export function CollationView({
 
         {!focusSide && (
           <div ref={gutterRef} className="relative bg-muted/10">
-            {braidOpen ? (
+            {braidOpen && !editMode && (
+              <div className="absolute inset-0">
+                <BraidLayer
+                  variants={variants}
+                  anchorsRef={anchorsRef}
+                  panelARef={panelARef}
+                  panelBRef={panelBRef}
+                  wrapperRef={wrapperRef}
+                  gutterRef={gutterRef}
+                  visibleTypes={visibleTypes}
+                  selectedId={selectedId}
+                  hoveredId={hoveredId}
+                  maxLength={maxLength}
+                  onSelect={onSelect}
+                  onHover={setHoveredId}
+                  fontSize={fontSize}
+                />
+              </div>
+            )}
+            {braidOpen && (
               <>
-                {!editMode && (
-                  <div className="absolute inset-0">
-                    <BraidLayer
-                      variants={variants}
-                      anchorsRef={anchorsRef}
-                      panelARef={panelARef}
-                      panelBRef={panelBRef}
-                      wrapperRef={wrapperRef}
-                      gutterRef={gutterRef}
-                      visibleTypes={visibleTypes}
-                      selectedId={selectedId}
-                      hoveredId={hoveredId}
-                      maxLength={maxLength}
-                      onSelect={onSelect}
-                      onHover={setHoveredId}
-                      fontSize={fontSize}
-                    />
-                  </div>
-                )}
-                {/* Resize handles on either side + collapse & lock buttons. */}
                 <div onPointerDown={onBraidResize("left")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 left-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
                 <div onPointerDown={onBraidResize("right")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
-                <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1">
-                  <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Hide the braid" className="p-0.5 rounded bg-card/80 border border-border text-muted-foreground hover:text-foreground">
-                    <ChevronsRightLeft className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); cycleLock(); }}
-                    title={lockMode === "one" ? "Scroll lock: 1:1 — both panels at line 1. Click to unlock." : lockMode === "off" ? "Scroll: unlocked — scroll each panel freely, then click to lock at this alignment." : "Scroll lock: your alignment. Click for 1:1."}
-                    className={"p-0.5 rounded bg-card/80 border hover:bg-muted " + (lockMode === "off" ? "border-border text-muted-foreground" : lockMode === "user" ? "border-[var(--sv-variation)]/50 text-[var(--sv-variation)]" : "border-primary/50 text-primary")}
-                  >
-                    {lockMode === "off" ? <LockOpen className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                  </button>
-                </div>
               </>
-            ) : (
-              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Show the braid" className="absolute inset-0 flex items-center justify-center text-muted-foreground hover:bg-muted/40">
-                <ChevronsLeftRight className="w-3 h-3" />
-              </button>
             )}
+            {!braidOpen && (
+              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Show the braid" className="absolute inset-0 hover:bg-muted/40" aria-label="Show the braid" />
+            )}
+            {/* Always visible: collapse/expand + the three-way scroll lock. */}
+            <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5">
+              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title={braidOpen ? "Hide the braid" : "Show the braid"} className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
+                {braidOpen ? <ChevronsRightLeft className="w-3 h-3" /> : <ChevronsLeftRight className="w-3 h-3" />}
+              </button>
+              <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
+                {([
+                  ["one", <Lock className="w-3 h-3" key="l" />, "Lock 1:1 — both panels start at line 1"],
+                  ["user", <Crosshair className="w-3 h-3" key="c" />, "Lock here — keep the panels at their current alignment"],
+                  ["off", <LockOpen className="w-3 h-3" key="o" />, "Unlock — scroll the panels independently"],
+                ] as [LockMode, React.ReactNode, string][]).map(([mode, icon, title]) => (
+                  <button
+                    key={mode}
+                    onClick={(e) => { e.stopPropagation(); setLock(mode); }}
+                    title={title}
+                    className={"p-0.5 flex items-center justify-center transition-colors " + (lockMode === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted")}
+                  >
+                    {icon}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
