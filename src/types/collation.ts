@@ -92,6 +92,17 @@ export interface Span {
 }
 
 /**
+ * A word-level run inside a substitution/variant locus. `changed` words differ
+ * between the two readings and are tinted; unchanged words are shared and render
+ * untinted at rest, so the eye lands on the actual divergence within a sentence.
+ */
+export interface WordRun {
+  start: number;
+  end: number;
+  changed: boolean;
+}
+
+/**
  * One aligned unit between witness A (left) and witness B (right).
  * Additions have no `a`; deletions have no `b`. Everything else has both.
  */
@@ -112,6 +123,10 @@ export interface Variant {
   similarity: number;
   /** True for editor-made links (Advanced mode), false/absent for auto variants. */
   manual?: boolean;
+  /** Word-level runs within the A-side span (substitution/variant only). */
+  aWords?: WordRun[];
+  /** Word-level runs within the B-side span (substitution/variant only). */
+  bWords?: WordRun[];
 }
 
 /**

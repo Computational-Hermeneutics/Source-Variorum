@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.4 |
+| **Version** | 0.5.5 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -39,6 +39,10 @@ glance, where text has been added, deleted, substituted, or transposed.
   ribbons whose thickness scales with the length of the matched block.
 - Variant typing: **match**, **substitution**, **addition**, **deletion**,
   **transposition** (moved text), and near-identical **variant** (fuzzy match).
+- **Word-level refinement** inside a differing sentence or line: only the words
+  that actually change are tinted (a CollateX-style token alignment), so the eye
+  lands on the divergence rather than the whole locus. Selecting a locus shows
+  its full reading; the connecting ribbon stays at the sentence/line level.
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum.
 - A **deep-dive** panel of quantitative summary statistics (verbatim overlap,

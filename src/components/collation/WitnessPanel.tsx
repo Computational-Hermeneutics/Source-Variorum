@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import type { CollationMode, Variant, Witness } from "@/types/collation";
+import type { CollationMode, Variant, Witness, WordRun } from "@/types/collation";
 import { VARIANT_TYPE_COLORS } from "@/types/collation";
 import { highlightRanges, tokenStyle, type HToken } from "@/lib/highlight";
 
@@ -184,12 +184,53 @@ export function WitnessPanel({
   const rows = useMemo(() => buildRows(witness.text, variants, side), [witness.text, variants, side]);
   const gutterCh = String(rows.length).length + 1;
 
+  // Word-level runs per variant for this side (substitution/variant only): lets
+  // us tint just the words that differ within a sentence/line locus, while the
+  // braid ribbon still spans the whole locus.
+  const wordRunsByVid = useMemo(() => {
+    const m = new Map<string, WordRun[]>();
+    for (const v of variants) {
+      const runs = side === "a" ? v.aWords : v.bWords;
+      if (runs && runs.length) m.set(v.id, runs);
+    }
+    return m;
+  }, [variants, side]);
+
   // Syntax tokens (foreground colour), only in code mode with a language chosen.
   const htokens = useMemo(
     () => (isMono && lang && lang !== "none" ? highlightRanges(witness.text, lang) : []),
     [isMono, lang, witness.text]
   );
   const hl = (start: number, str: string): ReactNode => (htokens.length ? colorize(start, str, htokens, isDark) : str);
+
+  // Render a variant segment with word-level tinting: only the words that differ
+  // carry the variant background; shared words stay clean (syntax colour still
+  // applies via hl). Used at rest; a selected locus tints its whole span instead.
+  const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode => {
+    const out: ReactNode[] = [];
+    const end = seg.start + seg.text.length;
+    let cursor = seg.start;
+    let key = 0;
+    const sliceHl = (from: number, to: number) => hl(from, seg.text.slice(from - seg.start, to - seg.start));
+    for (const r of runs) {
+      if (r.end <= cursor || r.start >= end) continue;
+      const s = Math.max(r.start, cursor);
+      const e = Math.min(r.end, end);
+      if (s > cursor) out.push(<span key={key++}>{sliceHl(cursor, s)}</span>);
+      out.push(
+        r.changed ? (
+          <span key={key++} className="rounded-[2px]" style={{ background: `color-mix(in srgb, ${color} 30%, transparent)` }}>
+            {sliceHl(s, e)}
+          </span>
+        ) : (
+          <span key={key++}>{sliceHl(s, e)}</span>
+        )
+      );
+      cursor = e;
+    }
+    if (cursor < end) out.push(<span key={key++}>{sliceHl(cursor, end)}</span>);
+    return out;
+  };
 
   if (editMode) {
     return (
@@ -238,11 +279,19 @@ export function WitnessPanel({
                 const selected = seg.vid === selectedId;
                 const hovered = seg.vid === hoveredId;
                 const picked = pickedVids.has(seg.vid);
+                const runs = wordRunsByVid.get(seg.vid);
+                // Word-level tinting applies at rest (auto mode, not selected); a
+                // selected locus reverts to whole-span tint to show the full reading.
+                const useWordTint = !advancedMode && !selected && !!runs;
                 const style = advancedMode
                   ? picked
                     ? { background: "color-mix(in srgb, var(--sv-sel) 30%, transparent)", boxShadow: "inset 0 0 0 1.5px var(--sv-sel)" }
                     : tintStyle(seg.type, false, hovered, false)
-                  : tintStyle(seg.type, selected, hovered, anySelected);
+                  : useWordTint
+                    ? hovered
+                      ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
+                      : { opacity: anySelected ? 0.55 : 1 }
+                    : tintStyle(seg.type, selected, hovered, anySelected);
                 return (
                   <span
                     key={k}
@@ -270,7 +319,7 @@ export function WitnessPanel({
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
                     style={style}
                   >
-                    {hl(seg.start, seg.text)}
+                    {useWordTint && runs ? wordBody(seg, runs, VARIANT_TYPE_COLORS[seg.type]) : hl(seg.start, seg.text)}
                   </span>
                 );
               })

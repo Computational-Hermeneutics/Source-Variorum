@@ -13,8 +13,8 @@
  * metrics identically and be snapshotted in saved collations.
  */
 
-import { diffArrays } from "diff";
-import type { Span, Variant, VariantType, Witness } from "@/types/collation";
+import { diffArrays, diffWords } from "diff";
+import type { Span, Variant, VariantType, WordRun, Witness } from "@/types/collation";
 import { segment, type Segment } from "./tokenize";
 import { isMatch, similarity, normalize } from "./similarity";
 import type { CollationMode } from "@/types/collation";
@@ -381,7 +381,7 @@ export function collate(
     // having equated two visibly different strings (keep the verbatim check honest).
     let type = v.type;
     if (type === "match" && !isMatch(textA, textB)) type = "substitution";
-    return {
+    const variant: Variant = {
       id: `v${i}`,
       type,
       a,
@@ -391,5 +391,50 @@ export function collate(
       length: Math.max(textA.length, textB.length),
       similarity: v.similarity,
     };
+    // Word-level refinement: inside a substitution/variant locus, mark which
+    // words actually differ so the renderer tints only those (the braid ribbon
+    // still spans the whole locus). Only worth attaching when both sides exist
+    // and there is at least one shared word to leave untinted.
+    if ((type === "substitution" || type === "variant") && a && b) {
+      const { aWords, bWords } = wordRuns(textA, textB, a.start, b.start);
+      if (aWords.some((w) => !w.changed) || bWords.some((w) => !w.changed)) {
+        variant.aWords = aWords;
+        variant.bWords = bWords;
+      }
+    }
+    return variant;
   });
+}
+
+/**
+ * Word-level diff of a substitution/variant locus. Walks the jsdiff word changes
+ * and emits absolute-offset runs for each side, flagging which words differ.
+ * Removed words exist only in A, added only in B, common in both.
+ */
+function wordRuns(
+  textA: string,
+  textB: string,
+  aStart: number,
+  bStart: number
+): { aWords: WordRun[]; bWords: WordRun[] } {
+  const aWords: WordRun[] = [];
+  const bWords: WordRun[] = [];
+  let ca = aStart;
+  let cb = bStart;
+  for (const ch of diffWords(textA, textB)) {
+    const len = ch.value.length;
+    if (ch.added) {
+      bWords.push({ start: cb, end: cb + len, changed: true });
+      cb += len;
+    } else if (ch.removed) {
+      aWords.push({ start: ca, end: ca + len, changed: true });
+      ca += len;
+    } else {
+      aWords.push({ start: ca, end: ca + len, changed: false });
+      bWords.push({ start: cb, end: cb + len, changed: false });
+      ca += len;
+      cb += len;
+    }
+  }
+  return { aWords, bWords };
 }
