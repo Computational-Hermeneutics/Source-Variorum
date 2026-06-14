@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.11 |
+| **Version** | 0.5.12 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |

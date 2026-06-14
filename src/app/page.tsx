@@ -13,7 +13,7 @@ import { APP_VERSION } from "@/lib/version";
 import { LANGS, detectLang } from "@/lib/highlight";
 import { DEFAULT_NORMALIZE, type NormalizeOptions } from "@/lib/collate/similarity";
 import { normalizeNewlines } from "@/lib/utils";
-import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF } from "@/lib/export/collation-export";
+import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toTEI } from "@/lib/export/collation-export";
 
 const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
@@ -256,6 +256,7 @@ export default function Home() {
         { kind: "separator" },
         { kind: "header", label: "Export" },
         { kind: "action", label: "Markdown (.md)", onClick: () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown") },
+        { kind: "action", label: "TEI P5 (.xml)", shortcut: "app/rdg", onClick: () => download(`${slugify(collation.name)}.xml`, toTEI(collation), "application/tei+xml") },
         { kind: "action", label: "PDF (.pdf)", onClick: () => toPDF(collation).save(`${slugify(collation.name)}.pdf`) },
         { kind: "action", label: "JSON (.json)", onClick: () => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json") },
       ],
