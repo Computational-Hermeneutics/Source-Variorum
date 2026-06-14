@@ -70,6 +70,7 @@ const SPACEWAR_CORPUS: DemoWitness[] = [
 ];
 
 const OTHELLO_EDITIONS: DemoWitness[] = [
+  { siglum: "F", title: "Othello — First Folio (1623, old spelling)", date: "1623", provenance: "Shakespeare's First Folio, original spelling (public domain; via Project Gutenberg #2270, normalised)", file: "demos/othello_folio1623.txt" },
   { siglum: "G", title: "Othello — Globe edition", date: "1866", provenance: "Clark & Wright, Globe edition (public domain; via the MIT Shakespeare / Moby text)", file: "demos/othello_globe.txt" },
   { siglum: "C", title: "Othello — Oxford (Craig)", date: "1914", provenance: "W. J. Craig, Oxford Shakespeare (public domain; via Bartleby)", file: "demos/othello_craig.txt" },
   { siglum: "W", title: "Othello — World Library", date: "1990–93", provenance: "World Library Complete Works (public domain; via Project Gutenberg #1793, normalised)", file: "demos/othello_pg1793.txt" },
@@ -88,12 +89,12 @@ export const DEMOS: Demo[] = [
   },
   {
     id: "othello-editions",
-    name: "Othello — three editions (1866 / 1914 / World Library)",
+    name: "Othello — four editions (Folio 1623 → World Library)",
     mode: "text",
-    blurb: "Three public-domain editions of Othello — pick any two to collate",
-    shows: "Editorial variation: punctuation, capitalisation, lineation, readings",
-    witnessA: OTHELLO_EDITIONS[0],
-    witnessB: OTHELLO_EDITIONS[1],
+    blurb: "Four public-domain Othellos incl. the original-spelling First Folio",
+    shows: "Editorial + textual variation: old vs modern spelling, punctuation, lineation, Q/F readings",
+    witnessA: OTHELLO_EDITIONS[1], // Globe (modern base)
+    witnessB: OTHELLO_EDITIONS[0], // First Folio (old spelling)
     witnesses: OTHELLO_EDITIONS,
   },
   {
