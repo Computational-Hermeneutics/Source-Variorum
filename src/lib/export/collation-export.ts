@@ -122,6 +122,33 @@ function reading(v: Variant, a: Witness, b: Witness): string {
   return parts.join(" ] ");
 }
 
+/** The project's notebook + line annotations + apparatus notes as one Markdown
+ *  document — the human-readable annotation layer, kept beside the project. */
+export function toAnnotationsMarkdown(c: Collation): string {
+  const { variants } = deriveView(c);
+  const out: string[] = [`# ${c.name || "Untitled collation"} — annotations`, ""];
+  if (c.notes?.trim()) out.push("## Notebook", "", c.notes.trim(), "");
+  for (const w of c.witnesses) {
+    const anns = (c.annotations[w.id] ?? []).slice().sort((x, y) => x.lineNumber - y.lineNumber);
+    if (!anns.length) continue;
+    out.push(`## ${w.siglum} — ${w.title}`, "");
+    for (const a of anns) out.push(`- **l. ${a.lineNumber}** ${a.content.replace(/\n/g, " ")}`);
+    out.push("");
+  }
+  const noted = variants.filter((v) => c.apparatusEdits[v.id]?.note?.trim());
+  if (noted.length) {
+    out.push("## Apparatus notes", "");
+    for (const v of noted) {
+      const sp = v.a ?? v.b;
+      const locus = sp && c.mode === "source" ? (sp.startLine === sp.endLine ? `l. ${sp.startLine}` : `ll. ${sp.startLine}–${sp.endLine}`) : "";
+      out.push(`- **${locus || v.type}** ${c.apparatusEdits[v.id]!.note!.trim().replace(/\n/g, " ")}`);
+    }
+    out.push("");
+  }
+  if (out.length <= 2) out.push("_No annotations yet — add line notes with ⌘/Ctrl-click, or write in the Notebook tab._");
+  return out.join("\n");
+}
+
 export function toMarkdown(c: Collation): string {
   const { a, b, variants, metrics } = deriveView(c);
   const out: string[] = [];

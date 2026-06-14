@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Collation, CollationMode, LineAnnotation, ManualLink, Witness } from "@/types";
+import { WITNESS_FOLDER, comparableWitnesses } from "@/types/collation";
 
 const HISTORY_CAP = 60;
 
@@ -166,16 +167,17 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
-  // Mark a witness reference-only (or back). When it becomes reference and is
-  // currently shown in a panel, swap that panel to the first comparable witness.
+  // Move a witness in/out of the Witnesses (comparable) folder. Leaving the set
+  // while shown in a panel swaps that panel to the first comparable witness.
   const toggleReference = useCallback(
     (id: string) =>
       commit((c) => {
-        const witnesses = c.witnesses.map((w) => (w.id === id ? { ...w, reference: !w.reference } : w));
-        const nowRef = witnesses.find((w) => w.id === id)?.reference;
-        if (!nowRef) return { ...c, witnesses };
-        const comparable = witnesses.filter((w) => !w.reference);
-        const pick = (cur: string) => (cur === id ? (comparable[0]?.id ?? cur) : cur);
+        const cur = c.witnesses.find((w) => w.id === id);
+        const intoWorking = cur?.folder !== WITNESS_FOLDER;
+        const witnesses = c.witnesses.map((w) => (w.id === id ? { ...w, folder: intoWorking ? WITNESS_FOLDER : undefined, reference: !intoWorking } : w));
+        if (intoWorking) return { ...c, witnesses };
+        const comparable = comparableWitnesses(witnesses);
+        const pick = (cur2: string) => (cur2 === id ? (comparable[0]?.id ?? cur2) : cur2);
         return { ...c, witnesses, leftId: pick(c.leftId), rightId: pick(c.rightId) };
       }),
     [commit]

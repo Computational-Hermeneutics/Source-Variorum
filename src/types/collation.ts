@@ -16,6 +16,11 @@ import type { CrossPanelLink } from "./links";
 export type CollationMode = "source" | "text";
 
 /** A single version of the text under collation (a "witness" in textual-criticism terms). */
+/** The reserved folder whose witnesses are the comparable working set: only
+ *  these appear in the panel dropdowns. Everything else (root, other folders) is
+ *  reference material, read in the viewer modal but never loaded into a panel. */
+export const WITNESS_FOLDER = "Witnesses";
+
 export interface Witness {
   id: string;
   /** Short label used throughout the apparatus, e.g. "Q1" / "F1" or "v1.0". */
@@ -41,6 +46,19 @@ export interface Witness {
   /** Immutable original text, snapshotted on creation/import. Editing changes
    *  `text` but never this, so the source can always be reverted to clean. */
   original?: string;
+}
+
+/** The comparable witnesses (the working set that feeds the panel dropdowns). If
+ *  the project has a Witnesses folder, that folder IS the working set; otherwise
+ *  (a simple/legacy project) every non-reference witness is comparable. */
+export function comparableWitnesses(ws: Witness[]): Witness[] {
+  const inFolder = ws.filter((w) => w.folder === WITNESS_FOLDER);
+  return inFolder.length ? inFolder : ws.filter((w) => !w.reference);
+}
+
+/** Whether a single witness may be loaded into a compare panel. */
+export function isComparable(w: Witness, ws: Witness[]): boolean {
+  return ws.some((x) => x.folder === WITNESS_FOLDER) ? w.folder === WITNESS_FOLDER : !w.reference;
 }
 
 /** What kind of difference a variant records, relative to the base/left witness. */

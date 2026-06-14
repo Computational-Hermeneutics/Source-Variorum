@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
-import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
+import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
 import { CollationView } from "@/components/collation/CollationView";
 import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
@@ -16,7 +16,7 @@ import { computeHotspots } from "@/lib/collate/hotspots";
 import { computeEddy } from "@/lib/collate/eddy";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
-import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toBraidPDF, toTEI } from "@/lib/export/collation-export";
+import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toAnnotationsMarkdown, toPDF, toBraidPDF, toTEI } from "@/lib/export/collation-export";
 
 const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
@@ -33,7 +33,7 @@ function uid(): string {
 }
 
 function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
-  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, author: w.author, folder: w.folder, text, original: text };
+  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, author: w.author, folder: w.folder, reference: w.reference, text, original: text };
 }
 
 async function resolveWitnessText(w: DemoWitness): Promise<string> {
@@ -86,8 +86,8 @@ function siglumFromName(name: string): string {
 
 function blankCollation(mode: CollationMode): Collation {
   return makeCollation("Untitled collation", mode, [
-    { id: uid(), siglum: "A", title: "Witness A", text: "" },
-    { id: uid(), siglum: "B", title: "Witness B", text: "" },
+    { id: uid(), siglum: "A", title: "Witness A", text: "", folder: WITNESS_FOLDER },
+    { id: uid(), siglum: "B", title: "Witness B", text: "", folder: WITNESS_FOLDER },
   ]);
 }
 
@@ -307,6 +307,7 @@ export default function Home() {
         { kind: "separator" },
         { kind: "header", label: "Export" },
         { kind: "action", label: "Markdown (.md)", onClick: () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown") },
+        { kind: "action", label: "Annotations (.md)", onClick: () => download(`${slugify(collation.name)}-annotations.md`, toAnnotationsMarkdown(collation), "text/markdown") },
         { kind: "action", label: "TEI P5 (.xml)", shortcut: "app/rdg", onClick: () => download(`${slugify(collation.name)}.xml`, toTEI(collation), "application/tei+xml") },
         { kind: "action", label: "PDF — apparatus (.pdf)", onClick: () => toPDF(collation).save(`${slugify(collation.name)}.pdf`) },
         { kind: "action", label: "PDF — side-by-side braid (.pdf)", onClick: () => toBraidPDF(collation).save(`${slugify(collation.name)}-braid.pdf`) },
@@ -372,7 +373,7 @@ export default function Home() {
 
   const importSources = useCallback(
     (sources: { siglum: string; title: string; text: string }[]) => {
-      project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text) })));
+      project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text), folder: WITNESS_FOLDER })));
     },
     [project]
   );
@@ -597,7 +598,7 @@ function AddSourcePanel({
     }
   };
   const add = () => {
-    onAdd({ id: uid(), siglum: sig || "?", title: title || "Untitled witness", text: normalizeNewlines(text) });
+    onAdd({ id: uid(), siglum: sig || "?", title: title || "Untitled witness", text: normalizeNewlines(text), folder: WITNESS_FOLDER });
   };
 
   return (

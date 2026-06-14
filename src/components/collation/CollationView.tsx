@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
-import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
+import { VARIANT_TYPE_COLORS, variantLabel, comparableWitnesses } from "@/types/collation";
 import { LANGS, highlightRanges, tokenStyle } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
@@ -102,10 +102,18 @@ export function CollationView({
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
-  // Braid-analysis = the ribbons + the variant tints. Toggle off for plain reading.
+  // Braid-analysis = the ribbons + the variant tints. One control: turning it off
+  // also collapses the braid gutter (plain reading); turning it on re-opens it.
   const [showAnalysis, setShowAnalysis] = useState(true);
   useEffect(() => { try { if (localStorage.getItem("source-variorum-analysis") === "0") setShowAnalysis(false); } catch { /* ignore */ } }, []);
-  const toggleAnalysis = () => setShowAnalysis((v) => { const n = !v; try { localStorage.setItem("source-variorum-analysis", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  const setBraidAnalysis = (on: boolean) => {
+    setShowAnalysis(on);
+    try { localStorage.setItem("source-variorum-analysis", on ? "1" : "0"); } catch { /* ignore */ }
+    setBraidWidth((w) => {
+      if (!on) { if (w > 12) prevBraidRef.current = w; persistBraid(8); return 8; }
+      const n = prevBraidRef.current > 12 ? prevBraidRef.current : 120; persistBraid(n); return n;
+    });
+  };
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
@@ -131,10 +139,6 @@ export function CollationView({
     };
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
   };
-  const toggleBraid = () => setBraidWidth((w) => {
-    if (w > 12) { prevBraidRef.current = w; persistBraid(8); return 8; }
-    const n = prevBraidRef.current > 12 ? prevBraidRef.current : 120; persistBraid(n); return n;
-  });
   const braidOpen = braidWidth >= 40;
 
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
@@ -292,8 +296,13 @@ export function CollationView({
     const existing = annotationsFor(witnessId).find((a) => a.lineNumber === line);
     setPendingAnn({ witnessId, line, editId: existing?.id, initial: existing?.content });
   };
-  const annLinesA = useMemo(() => new Set(annotationsFor(witnessA.id).map((a) => a.lineNumber)), [collation.annotations, witnessA.id]);
-  const annLinesB = useMemo(() => new Set(annotationsFor(witnessB.id).map((a) => a.lineNumber)), [collation.annotations, witnessB.id]);
+  const notesMap = (id: string) => {
+    const m = new Map<number, string>();
+    for (const a of annotationsFor(id)) m.set(a.lineNumber, m.has(a.lineNumber) ? `${m.get(a.lineNumber)}\n${a.content}` : a.content);
+    return m;
+  };
+  const annNotesA = useMemo(() => notesMap(witnessA.id), [collation.annotations, witnessA.id]);
+  const annNotesB = useMemo(() => notesMap(witnessB.id), [collation.annotations, witnessB.id]);
 
   return (
     <div className="flex flex-1 min-h-0">
@@ -406,7 +415,7 @@ export function CollationView({
               isDark={isDark}
               search={search}
               analysis={showAnalysis}
-              annotatedLines={annLinesA}
+              annotatedNotes={annNotesA}
               onOpenAnnotation={requestAnnotate(witnessA.id)}
             />
           </div>
@@ -440,12 +449,13 @@ export function CollationView({
               </>
             )}
             {!braidOpen && (
-              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Show the braid" className="absolute inset-0 hover:bg-muted/40" aria-label="Show the braid" />
+              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(true); }} title="Show the braid analysis" className="absolute inset-0 hover:bg-muted/40" aria-label="Show the braid analysis" />
             )}
-            {/* Always visible: collapse/expand + the three-way scroll lock. */}
-            <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5">
-              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title={braidOpen ? "Hide the braid" : "Show the braid"} className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
-                {braidOpen ? <ChevronsRightLeft className="w-3 h-3" /> : <ChevronsLeftRight className="w-3 h-3" />}
+            {/* Always visible: braid-analysis toggle (also collapses/opens) + lock.
+                Sits on a translucent panel so it reads as a floating toolbar. */}
+            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 p-1 rounded-lg bg-card/70 backdrop-blur border border-border/60 shadow-sm">
+              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Hide braid analysis (ribbons + tints) and collapse the panel" : "Show braid analysis and open the panel"} className={"p-0.5 rounded border hover:bg-muted shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary" : "bg-card/90 border-border text-muted-foreground")}>
+                <Spline className="w-3 h-3" />
               </button>
               <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
                 {([
@@ -465,9 +475,6 @@ export function CollationView({
               </div>
               <button onClick={(e) => { e.stopPropagation(); project.swapSides(); }} title="Swap the two panels (A ⇄ B)" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
                 <ArrowLeftRight className="w-3 h-3" />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); toggleAnalysis(); }} title={showAnalysis ? "Hide braid analysis (ribbons + variant tints) for plain reading" : "Show braid analysis (ribbons + variant tints)"} className={"p-0.5 rounded bg-card/90 border hover:bg-muted shadow-sm " + (showAnalysis ? "border-primary/50 text-primary" : "border-border text-muted-foreground")}>
-                <Spline className="w-3 h-3" />
               </button>
               <button onClick={(e) => { e.stopPropagation(); setShowDiff(true); }} title="Standard diff — unified +/− line view of the two witnesses" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
                 <DiffIcon className="w-3 h-3" />
@@ -509,7 +516,7 @@ export function CollationView({
               isDark={isDark}
               search={search}
               analysis={showAnalysis}
-              annotatedLines={annLinesB}
+              annotatedNotes={annNotesB}
               onOpenAnnotation={requestAnnotate(witnessB.id)}
             />
           </div>
@@ -906,19 +913,23 @@ function WitnessHeader({
     }).catch(() => {});
   };
   return (
-    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10 px-1.5 py-1 flex items-center gap-1 flex-wrap">
-      {/* Single-level: witness selector + per-panel toolbar + side label */}
+    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10 px-1.5 py-1 flex items-center gap-1 min-w-0">
+      {/* Single row: witness selector + per-panel toolbar. */}
       <select
         value={witness.id}
         onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
         className="text-[10px] bg-transparent border border-border rounded px-1 py-0.5 min-w-[5rem] max-w-[42%] truncate"
         title={witness.title}
       >
-        {witnesses.filter((w) => !w.reference || w.id === witness.id).map((w) => (
-          <option key={w.id} value={w.id}>
-            {w.title}
-          </option>
-        ))}
+        {(() => {
+          const comparable = comparableWitnesses(witnesses);
+          const list = comparable.some((w) => w.id === witness.id) ? comparable : [witness, ...comparable];
+          return list.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.title}
+            </option>
+          ));
+        })()}
       </select>
       <PanelToolbar
         panel={panel}
@@ -935,8 +946,6 @@ function WitnessHeader({
         onCopy={copy}
         project={project}
       />
-      {annCount > 0 && <span className="text-[9px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
-      <span className="ml-auto text-[9px] text-muted-foreground uppercase tracking-wide shrink-0" title={which === "left" ? "Base / copy-text" : undefined}>{side}</span>
     </div>
   );
 }

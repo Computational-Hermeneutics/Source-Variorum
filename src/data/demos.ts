@@ -6,6 +6,7 @@
  */
 
 import type { CollationMode } from "@/types/collation";
+import { WITNESS_FOLDER } from "@/types/collation";
 
 export interface DemoWitness {
   siglum: string;
@@ -14,12 +15,20 @@ export interface DemoWitness {
   provenance?: string;
   /** Optional author / editor / translator. */
   author?: string;
-  /** Optional subfolder to file this witness under in the Sources organiser. */
+  /** Subfolder in the Sources organiser. Comparable sources go in WITNESS_FOLDER
+   *  ("Witnesses"); supplementary/read-me sources go elsewhere (reference). */
   folder?: string;
+  /** Reference-only: read in the viewer, never loaded into a compare panel. */
+  reference?: boolean;
   /** Inline witness text (for short demos). */
   text?: string;
   /** Path under /public to fetch the witness text from (for large real sources). */
   file?: string;
+}
+
+/** A read-me reference witness for a sample (opens in the reader modal). */
+function readme(title: string, file: string): DemoWitness {
+  return { siglum: "ℹ", title, folder: "Read me", reference: true, file };
 }
 
 export interface Demo {
@@ -41,9 +50,10 @@ export interface Demo {
 // set (bitsavers / Computer History Museum reconstructions). Loaded as a single
 // project so any two versions can be braided from the Sources sidebar.
 const SW = (file: string): string => `demos/spacewar-1962/${file}`;
-const SPACEWAR_CORPUS: DemoWitness[] = [
-  // Core versions (the development genealogy). Authorship per the
-  // spacewar1962.github.io version table.
+
+// Comparable versions — the working set. Each sits in the "Witnesses" folder, so
+// these (and only these) appear in the panel dropdowns.
+const SPACEWAR_VERSIONS: DemoWitness[] = [
   { siglum: "1", title: "Spacewar! 1 (reconstructed)", date: "early 1962", author: "Russell & the Hingham Institute group", provenance: "spacewar_1_early1962_reconstructed.txt", file: SW("spacewar_1_early1962_reconstructed.txt") },
   { siglum: "2b", title: "Spacewar! 2b (25 Mar 1962)", date: "25 Mar 1962", author: "Russell, Samson, Graetz, et al.", provenance: "spacewar_2b_25mar62.txt", file: SW("spacewar_2b_25mar62.txt") },
   { siglum: "2b′", title: "Spacewar! 2b (2 Apr 1962)", date: "2 Apr 1962", author: "Russell, Samson, Graetz, et al.", provenance: "spacewar_2b_2apr62.txt", file: SW("spacewar_2b_2apr62.txt") },
@@ -56,29 +66,38 @@ const SPACEWAR_CORPUS: DemoWitness[] = [
   { siglum: "4.8", title: "Spacewar! 4.8", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8.txt (parts 1 + 2 combined)", file: SW("spacewar_4.8.txt") },
   { siglum: "4.8s", title: "Spacewar! 4.8 (scorer)", date: "24 Jul 1963", author: "Preonas score routine, reworked by Peter Samson", provenance: "spacewar_4.8_scorer.txt", file: SW("spacewar_4.8_scorer.txt") },
   { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", author: "“dfw”", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
-  // Modern reconstructions / re-typings
   { siglum: "2bм", title: "Spacewar! 2b (2016 retype)", date: "2016", author: "retype (Norbert Landsteiner)", provenance: "spacewar_2b_m_2016.txt", file: SW("spacewar_2b_m_2016.txt") },
   { siglum: "sw15", title: "Spacewar! (2015 retype)", date: "2015", author: "Norbert Landsteiner", provenance: "spacewar2015.txt", file: SW("spacewar2015.txt") },
-  // Disassemblies, patches, and supporting listings → filed in a subfolder.
+].map((w) => ({ ...w, folder: WITNESS_FOLDER }));
+
+// Supplementary listings + related programs — reference (their own folders).
+const SPACEWAR_EXTRAS: DemoWitness[] = [
   { siglum: "2b·d", title: "Spacewar! 2b — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spacewar_2b_disassembly.txt", file: SW("spacewar_2b_disassembly.txt") },
   { siglum: "rst·d", title: "Spacewar! restart — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spaceWarRstrt_disassembly.txt", file: SW("spaceWarRstrt_disassembly.txt") },
   { siglum: "rst", title: "Spacewar! auto-restart patch", date: "—", folder: "Disassemblies & listings", provenance: "spacewAutoRestartPatch.txt", file: SW("spacewAutoRestartPatch.txt") },
   { siglum: "ssw", title: "Spacewar! sense-switch settings", date: "—", folder: "Disassemblies & listings", provenance: "spacewar-senseswitches.txt", file: SW("spacewar-senseswitches.txt") },
   { siglum: "fio", title: "MACRO / FIO-DEC character set", date: "—", author: "DEC / MIT", folder: "Disassemblies & listings", provenance: "macro_fiodec.txt", file: SW("macro_fiodec.txt") },
-  // Related PDP-1 display programs (same milieu) → their own subfolder.
   { siglum: "hs85", title: "Minskytron Hyperspace (85)", date: "1962", author: "Marvin Minsky / Martin Graetz", folder: "Related PDP-1 programs", provenance: "hyperspace85.txt", file: SW("hyperspace85.txt") },
   { siglum: "hs·d", title: "Hyperspace 85 — disassembly", date: "—", folder: "Related PDP-1 programs", provenance: "hyperspace85_disassembly.txt", file: SW("hyperspace85_disassembly.txt") },
   { siglum: "hs·doc", title: "Minskytron Hyperspace — how-to", date: "—", folder: "Related PDP-1 programs", provenance: "minskytron-hyperspace-howto.txt", file: SW("minskytron-hyperspace-howto.txt") },
   { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", folder: "Related PDP-1 programs", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
   { siglum: "stars", title: "Expensive Planetarium (stars)", date: "13 Mar 1962", author: "Peter Samson", folder: "Related PDP-1 programs", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
 ];
+const SPACEWAR_CORPUS: DemoWitness[] = [...SPACEWAR_VERSIONS, ...SPACEWAR_EXTRAS, readme("Spacewar! corpus — read me", SW("README.md"))];
 
 const OTHELLO_EDITIONS: DemoWitness[] = [
   { siglum: "F", title: "Othello — First Folio (1623, old spelling)", date: "1623", provenance: "Shakespeare's First Folio, original spelling (public domain; via Project Gutenberg #2270, normalised)", file: "demos/othello_folio1623.txt" },
   { siglum: "G", title: "Othello — Globe edition", date: "1866", provenance: "Clark & Wright, Globe edition (public domain; via the MIT Shakespeare / Moby text)", file: "demos/othello_globe.txt" },
   { siglum: "C", title: "Othello — Oxford (Craig)", date: "1914", provenance: "W. J. Craig, Oxford Shakespeare (public domain; via Bartleby)", file: "demos/othello_craig.txt" },
   { siglum: "W", title: "Othello — World Library", date: "1990–93", provenance: "World Library Complete Works (public domain; via Project Gutenberg #1793, normalised)", file: "demos/othello_pg1793.txt" },
-];
+].map((w) => ({ ...w, folder: WITNESS_FOLDER }));
+const OTHELLO_PROJECT: DemoWitness[] = [...OTHELLO_EDITIONS, readme("Othello — read me", "demos/othello.README.md")];
+
+const PHAEDRUS: DemoWitness[] = [
+  { siglum: "J", title: "Plato, Phaedrus — trans. Benjamin Jowett", date: "1892", provenance: "Jowett translation, full dialogue (public domain; via Project Gutenberg)", file: "demos/phaedrus_jowett.txt" },
+  { siglum: "F", title: "Plato, Phaedrus — trans. Harold N. Fowler", date: "1925", provenance: "Fowler translation, Loeb, full dialogue (public domain; via Perseus / PerseusDL)", file: "demos/phaedrus_fowler.txt" },
+].map((w) => ({ ...w, folder: WITNESS_FOLDER }));
+const PHAEDRUS_PROJECT: DemoWitness[] = [...PHAEDRUS, readme("Phaedrus — read me", "demos/phaedrus.README.md")];
 
 export const DEMOS: Demo[] = [
   {
@@ -99,7 +118,7 @@ export const DEMOS: Demo[] = [
     shows: "Editorial + textual variation: old vs modern spelling, punctuation, lineation, Q/F readings",
     witnessA: OTHELLO_EDITIONS[1], // Globe (modern base)
     witnessB: OTHELLO_EDITIONS[0], // First Folio (old spelling)
-    witnesses: OTHELLO_EDITIONS,
+    witnesses: OTHELLO_PROJECT,
   },
   {
     id: "phaedrus",
@@ -107,19 +126,8 @@ export const DEMOS: Demo[] = [
     mode: "text",
     blurb: "The dialogue on writing, in a free and a literal translation",
     shows: "Strong translation divergence — free literary vs literal renderings",
-    witnessA: {
-      siglum: "J",
-      title: "Plato, Phaedrus — trans. Benjamin Jowett",
-      date: "1892",
-      provenance: "Jowett translation, full dialogue (public domain; via Project Gutenberg)",
-      file: "demos/phaedrus_jowett.txt",
-    },
-    witnessB: {
-      siglum: "F",
-      title: "Plato, Phaedrus — trans. Harold N. Fowler",
-      date: "1925",
-      provenance: "Fowler translation, Loeb, full dialogue (public domain; via Perseus / PerseusDL)",
-      file: "demos/phaedrus_fowler.txt",
-    },
+    witnessA: PHAEDRUS[0],
+    witnessB: PHAEDRUS[1],
+    witnesses: PHAEDRUS_PROJECT,
   },
 ];

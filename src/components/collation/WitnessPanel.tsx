@@ -160,7 +160,7 @@ export function WitnessPanel({
   isDark,
   search,
   analysis = true,
-  annotatedLines,
+  annotatedNotes,
   onOpenAnnotation,
 }: {
   side: Side;
@@ -190,8 +190,8 @@ export function WitnessPanel({
   search?: string;
   /** When false, drop variant tints + word-runs for plain reading. */
   analysis?: boolean;
-  /** 1-based line numbers carrying an annotation (for the margin marker). */
-  annotatedLines?: Set<number>;
+  /** 1-based line number → annotation text, for the margin marker + hover. */
+  annotatedNotes?: Map<number, string>;
   /** Open the annotation(s) on a line (click the margin marker). */
   onOpenAnnotation?: (line: number) => void;
 }) {
@@ -448,10 +448,10 @@ export function WitnessPanel({
               })
             )}
           </span>
-          {annotatedLines?.has(row.n) ? (
+          {annotatedNotes?.has(row.n) ? (
             <button
               onClick={(e) => { e.stopPropagation(); onOpenAnnotation?.(row.n); }}
-              title="Annotation on this line — click to view/edit"
+              title={`${annotatedNotes.get(row.n)}\n\n(click to edit)`}
               className="shrink-0 self-start mt-[1px] mr-1 text-amber-600 dark:text-amber-400 hover:text-amber-700"
             >
               <StickyNote className="w-3 h-3" />

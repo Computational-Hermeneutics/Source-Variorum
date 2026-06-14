@@ -1,7 +1,30 @@
 "use client";
 
-import { useState } from "react";
-import { Eye, Pencil } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { Eye, Pencil, Code2 } from "lucide-react";
+import { highlightRanges, tokenStyle, LANGS } from "@/lib/highlight";
+
+function isDarkMode(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
+
+/** Whole-text syntax highlight (read-only) for the Code view. */
+function highlightAll(text: string, lang: string, dark: boolean): ReactNode {
+  if (!lang || lang === "none" || !text) return text;
+  const tokens = highlightRanges(text, lang);
+  if (!tokens.length) return text;
+  const out: ReactNode[] = [];
+  let cursor = 0, key = 0;
+  for (const tk of tokens) {
+    if (tk.from >= text.length) break;
+    const s = Math.max(0, tk.from), e = Math.min(text.length, tk.to);
+    if (s > cursor) out.push(text.slice(cursor, s));
+    if (e > s) { const st = tokenStyle(tk.tag, dark); out.push(st ? <span key={key++} style={st}>{text.slice(s, e)}</span> : text.slice(s, e)); cursor = e; }
+  }
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out;
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -49,31 +72,44 @@ export function renderMarkdown(md: string): string {
   return out.join("\n");
 }
 
-/** A notepad with a Markdown ⇄ Rich-text toggle. Edits flow up via onChange. */
-export function MarkdownPad({ value, onChange, placeholder, autoFocus, readOnly }: {
+/** A notepad with Markdown / Rich-text and (optionally) a syntax-highlighted
+ *  Code view. Edits flow up via onChange. */
+export function MarkdownPad({ value, onChange, placeholder, autoFocus, readOnly, codeMode, defaultLang }: {
   value: string;
   onChange?: (v: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
   readOnly?: boolean;
+  /** Enable the syntax-highlighted Code view (with a language picker). */
+  codeMode?: boolean;
+  defaultLang?: string;
 }) {
-  const [preview, setPreview] = useState(false);
+  const [view, setView] = useState<"edit" | "rich" | "code">("edit");
+  const [lang, setLang] = useState(defaultLang ?? "none");
   const box = "min-h-[44vh] max-h-[62vh] overflow-auto";
+  const tab = (v: "edit" | "rich" | "code", icon: ReactNode, label: string) => (
+    <button onClick={() => setView(v)} className={"inline-flex items-center gap-1 px-2 py-0.5 " + (view === v ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>{icon} {label}</button>
+  );
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex rounded border border-border overflow-hidden text-[11px] self-end">
-        <button onClick={() => setPreview(false)} className={"inline-flex items-center gap-1 px-2 py-0.5 " + (!preview ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>
-          <Pencil className="w-3 h-3" /> {readOnly ? "Source" : "Markdown"}
-        </button>
-        <button onClick={() => setPreview(true)} className={"inline-flex items-center gap-1 px-2 py-0.5 " + (preview ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>
-          <Eye className="w-3 h-3" /> Rich text
-        </button>
+      <div className="flex items-center gap-2 self-end">
+        {view === "code" && (
+          <select value={lang} onChange={(e) => setLang(e.target.value)} className="text-[11px] rounded border border-border bg-card px-1 py-0.5">
+            <option value="none">No highlighting</option>
+            <optgroup label="Modern">{LANGS.filter((l) => l.group === "modern").map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</optgroup>
+            <optgroup label="Historical">{LANGS.filter((l) => l.group === "historical").map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</optgroup>
+          </select>
+        )}
+        <div className="flex rounded border border-border overflow-hidden text-[11px]">
+          {tab("edit", <Pencil className="w-3 h-3" />, readOnly ? "Source" : "Markdown")}
+          {tab("rich", <Eye className="w-3 h-3" />, "Rich text")}
+          {codeMode && tab("code", <Code2 className="w-3 h-3" />, "Code")}
+        </div>
       </div>
-      {preview ? (
-        <div
-          className={"sv-markdown px-1 text-[13px] leading-relaxed " + box}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(value) || '<p class="opacity-40">Nothing to preview.</p>' }}
-        />
+      {view === "rich" ? (
+        <div className={"sv-markdown px-1 text-[13px] leading-relaxed " + box} dangerouslySetInnerHTML={{ __html: renderMarkdown(value) || '<p class="opacity-40">Nothing to preview.</p>' }} />
+      ) : view === "code" ? (
+        <pre className={"bg-background border border-border rounded px-3 py-2 text-[12px] whitespace-pre-wrap break-words " + box} style={{ fontFamily: "var(--code-font-family)" }}><code>{highlightAll(value, lang, isDarkMode())}</code></pre>
       ) : (
         <textarea
           autoFocus={autoFocus}
