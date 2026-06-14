@@ -52,8 +52,8 @@ export function CollationView({
   hotspots,
   eddy,
   baseId,
-  stripHotspots,
-  showStrip,
+  stripCols,
+  stripVisible,
   onHideStrip,
   scrollRef,
   search,
@@ -80,8 +80,8 @@ export function CollationView({
   hotspots: Hotspots | null;
   eddy: EddyRow[];
   baseId: string;
-  stripHotspots: boolean;
-  showStrip: boolean;
+  stripCols: { minimap: boolean; variants: boolean; hotspots: boolean };
+  stripVisible: boolean;
   onHideStrip: () => void;
   scrollRef: React.RefObject<HTMLElement | null>;
   search?: string;
@@ -239,9 +239,10 @@ export function CollationView({
 
   return (
     <div className="flex">
-      {showStrip && !editMode && (
+      {stripVisible && !editMode && (
         <OverviewStrip
           variants={variants}
+          baseText={witnessA.text}
           baseLength={witnessA.text.length}
           lengthB={witnessB.text.length}
           visibleTypes={visibleTypes}
@@ -250,7 +251,9 @@ export function CollationView({
           scrollRef={scrollRef}
           onHide={onHideStrip}
           hotspots={hotspots}
-          hotspotMode={stripHotspots}
+          colMinimap={stripCols.minimap}
+          colVariants={stripCols.variants}
+          colHotspots={stripCols.hotspots}
         />
       )}
       <div className="flex-1 min-w-0 flex flex-col">
@@ -577,25 +580,20 @@ function WitnessHeader({
     }).catch(() => {});
   };
   return (
-    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10">
-      {/* Row 1: witness selector + badges */}
-      <div className="px-2 pt-1 pb-0.5 flex items-center gap-1.5">
-        <select
-          value={witness.id}
-          onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
-          className="text-[11px] bg-transparent border border-border rounded px-1 py-0.5 max-w-[58%] truncate font-medium"
-          title={witness.title}
-        >
-          {witnesses.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.title}
-            </option>
-          ))}
-        </select>
-        {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
-        <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0" title={which === "left" ? "Base / copy-text" : undefined}>{side}</span>
-      </div>
-      {/* Row 2: per-panel toolbar */}
+    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10 px-1.5 py-1 flex items-center gap-1 flex-wrap">
+      {/* Single-level: witness selector + per-panel toolbar + side label */}
+      <select
+        value={witness.id}
+        onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
+        className="text-[10px] bg-transparent border border-border rounded px-1 py-0.5 min-w-[5rem] max-w-[42%] truncate font-medium"
+        title={witness.title}
+      >
+        {witnesses.map((w) => (
+          <option key={w.id} value={w.id}>
+            {w.title}
+          </option>
+        ))}
+      </select>
       <PanelToolbar
         panel={panel}
         mode={mode}
@@ -611,6 +609,8 @@ function WitnessHeader({
         onCopy={copy}
         project={project}
       />
+      {annCount > 0 && <span className="text-[9px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
+      <span className="ml-auto text-[9px] text-muted-foreground uppercase tracking-wide shrink-0" title={which === "left" ? "Base / copy-text" : undefined}>{side}</span>
     </div>
   );
 }
@@ -658,7 +658,7 @@ function PanelToolbar({
   );
   const Sep = () => <span className="w-px h-4 bg-border mx-0.5 shrink-0" />;
   return (
-    <div className="px-2 pb-1 flex items-center gap-0.5" data-panel={panel}>
+    <div className="flex items-center gap-0.5" data-panel={panel}>
       <Tb on={editing} onClick={onToggleEdit} title="Edit this witness text"><Pencil className="w-3 h-3" /></Tb>
       <Tb on={annotating} onClick={onToggleAnnotate} title="Annotate: click a line to add a note"><Highlighter className="w-3 h-3" /></Tb>
       {mode === "source" && (

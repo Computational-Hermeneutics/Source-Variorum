@@ -122,10 +122,15 @@ export default function Home() {
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
-  const [showStrip, setShowStrip] = useState(true);
-  const setShowStripP = (v: boolean) => { setShowStrip(v); try { localStorage.setItem("source-variorum-strip", v ? "1" : "0"); } catch { /* ignore */ } };
-  const [stripHotspots, setStripHotspots] = useState(false);
-  const setStripHotspotsP = (v: boolean) => { setStripHotspots(v); try { localStorage.setItem("source-variorum-strip-hotspots", v ? "1" : "0"); } catch { /* ignore */ } };
+  // The overview strip can show any combination of three columns (or none).
+  const [stripCols, setStripCols] = useState({ minimap: false, variants: true, hotspots: false });
+  const setStripCol = (k: "minimap" | "variants" | "hotspots", v: boolean) =>
+    setStripCols((prev) => {
+      const next = { ...prev, [k]: v };
+      try { localStorage.setItem("source-variorum-strip-cols", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  const stripVisible = stripCols.minimap || stripCols.variants || stripCols.hotspots;
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const setSidebarHiddenP = (v: boolean) => { setSidebarHidden(v); try { localStorage.setItem("source-variorum-sidebar-hidden", v ? "1" : "0"); } catch { /* ignore */ } };
   const [search, setSearch] = useState("");
@@ -154,8 +159,8 @@ export default function Home() {
       if (un) setUserName(un);
       const tk = localStorage.getItem(TOKENIZER_KEY);
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
-      if (localStorage.getItem("source-variorum-strip") === "0") setShowStrip(false);
-      if (localStorage.getItem("source-variorum-strip-hotspots") === "1") setStripHotspots(true);
+      const sc = localStorage.getItem("source-variorum-strip-cols");
+      if (sc) setStripCols((prev) => ({ ...prev, ...JSON.parse(sc) }));
       if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
     } catch {
       /* ignore */
@@ -214,7 +219,7 @@ export default function Home() {
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
   // don't pay for N collations on every project.
-  const needHotspots = showOverview || (showStrip && stripHotspots);
+  const needHotspots = showOverview || stripCols.hotspots;
   const hotspots = useMemo(
     () => (needHotspots ? computeHotspots(collation, tokenizer) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -326,8 +331,11 @@ export default function Home() {
         { kind: "checkbox", label: "Text", checked: collation.mode === "text", onToggle: () => project.setMode("text") },
         { kind: "separator" },
         { kind: "checkbox", label: "Sources panel", checked: !sidebarHidden, onToggle: () => setSidebarHiddenP(sidebarHidden ? false : true) },
-        { kind: "checkbox", label: "Overview strip", checked: showStrip, onToggle: () => setShowStripP(!showStrip) },
-        { kind: "checkbox", label: "Strip: version hotspots", checked: stripHotspots, onToggle: () => setStripHotspotsP(!stripHotspots) },
+        { kind: "header", label: "Overview strip" },
+        { kind: "checkbox", label: "Code minimap", checked: stripCols.minimap, onToggle: () => setStripCol("minimap", !stripCols.minimap) },
+        { kind: "checkbox", label: "Variant map", checked: stripCols.variants, onToggle: () => setStripCol("variants", !stripCols.variants) },
+        { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
+        { kind: "separator" },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
         { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
@@ -436,9 +444,9 @@ export default function Home() {
             hotspots={hotspots}
             eddy={eddy}
             baseId={collation.leftId}
-            stripHotspots={stripHotspots}
-            showStrip={showStrip}
-            onHideStrip={() => setShowStripP(false)}
+            stripCols={stripCols}
+            stripVisible={stripVisible}
+            onHideStrip={() => setStripCols((p) => { const next = { minimap: false, variants: false, hotspots: false }; try { localStorage.setItem("source-variorum-strip-cols", JSON.stringify(next)); } catch {} return next; })}
             scrollRef={mainRef}
             search={search}
             isDark={isDark}
