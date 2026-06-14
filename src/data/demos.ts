@@ -69,6 +69,12 @@ const SPACEWAR_CORPUS: DemoWitness[] = [
   { siglum: "stars", title: "Expensive Planetarium (stars)", date: "1962", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
 ];
 
+const OTHELLO_EDITIONS: DemoWitness[] = [
+  { siglum: "G", title: "Othello — Globe edition", date: "1866", provenance: "Clark & Wright, Globe edition (public domain; via the MIT Shakespeare / Moby text)", file: "demos/othello_globe.txt" },
+  { siglum: "C", title: "Othello — Oxford (Craig)", date: "1914", provenance: "W. J. Craig, Oxford Shakespeare (public domain; via Bartleby)", file: "demos/othello_craig.txt" },
+  { siglum: "W", title: "Othello — World Library", date: "1990–93", provenance: "World Library Complete Works (public domain; via Project Gutenberg #1793, normalised)", file: "demos/othello_pg1793.txt" },
+];
+
 export const DEMOS: Demo[] = [
   {
     id: "spacewar-corpus",
@@ -82,24 +88,13 @@ export const DEMOS: Demo[] = [
   },
   {
     id: "othello-editions",
-    name: "Othello — Globe 1866 / Craig 1914",
+    name: "Othello — three editions (1866 / 1914 / World Library)",
     mode: "text",
-    blurb: "Two modern editions of Othello, fifty years apart",
+    blurb: "Three public-domain editions of Othello — pick any two to collate",
     shows: "Editorial variation: punctuation, capitalisation, lineation, readings",
-    witnessA: {
-      siglum: "G",
-      title: "Othello — Globe edition",
-      date: "1866",
-      provenance: "Clark & Wright, Globe edition (public domain; via the MIT Shakespeare / Moby text)",
-      file: "demos/othello_globe.txt",
-    },
-    witnessB: {
-      siglum: "C",
-      title: "Othello — Oxford edition (Craig)",
-      date: "1914",
-      provenance: "W. J. Craig, Oxford Shakespeare (public domain; via Bartleby)",
-      file: "demos/othello_craig.txt",
-    },
+    witnessA: OTHELLO_EDITIONS[0],
+    witnessB: OTHELLO_EDITIONS[1],
+    witnesses: OTHELLO_EDITIONS,
   },
   {
     id: "phaedrus",
