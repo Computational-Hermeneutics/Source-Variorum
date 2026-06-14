@@ -1,6 +1,6 @@
 {
   "name": "source-variorum",
-  "version": "0.5.31",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

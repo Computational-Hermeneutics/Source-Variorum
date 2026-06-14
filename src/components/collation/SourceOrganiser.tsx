@@ -58,14 +58,16 @@ export function SourceOrganiser({
       return next;
     });
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Folders default to CLOSED: we track which ones the user has explicitly
+  // expanded, so an untouched folder always starts collapsed.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [width, setWidth] = useState(240);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [folderDraft, setFolderDraft] = useState("");
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSE_KEY);
-      if (raw) setCollapsed(new Set(JSON.parse(raw)));
+      if (raw) setExpanded(new Set(JSON.parse(raw)));
       const f = localStorage.getItem(FZ_KEY);
       if (f) setFz(Math.min(16, Math.max(9, parseInt(f, 10) || 11)));
       const w = localStorage.getItem(SIDEBAR_W_KEY);
@@ -96,7 +98,7 @@ export function SourceOrganiser({
     setEditingFolder(null);
   };
   const toggleCollapse = (f: string) =>
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(f)) next.delete(f);
       else next.add(f);
@@ -199,7 +201,7 @@ export function SourceOrganiser({
 
         {folders.map((f) => {
           const items = inFolder(f);
-          const isCollapsed = collapsed.has(f);
+          const isCollapsed = !expanded.has(f);
           return (
             <div key={f}>
               <div className="group flex items-center gap-1 px-2 py-1">
@@ -291,7 +293,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
       <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
       <div className="flex-1 min-w-0">
         <div className={"truncate " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</div>
-        {(w.author || w.date) && <div className="truncate text-[8px] leading-tight text-muted-foreground">{[w.author, w.date].filter(Boolean).join(" · ")}</div>}
+        {(w.author || w.date) && <div className="truncate text-[8px] leading-tight text-muted-foreground">{[w.date, w.author && (w.author.length > 18 ? w.author.slice(0, 18) + "…" : w.author)].filter(Boolean).join(" · ")}</div>}
       </div>
       {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
       {edited && <span className="text-[8px] uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Edited — differs from the original; revert via ⋮">edited</span>}

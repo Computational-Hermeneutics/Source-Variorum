@@ -94,6 +94,12 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // Clicking a passage in one panel temporarily slides the OTHER panel so its
+  // linked locus lines up — a peek at where the reading maps. Cleared on
+  // deselect. `previewFrom` = the side that was clicked; `previewShift` = px to
+  // translate the counterpart body by.
+  const [previewFrom, setPreviewFrom] = useState<Side | null>(null);
+  const [previewShift, setPreviewShift] = useState(0);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
@@ -167,11 +173,35 @@ export function CollationView({
   // highlights it in place — no jump.
   const onSelect = useCallback((id: string | null, scroll = true) => {
     setSelectedId(id);
+    setPreviewFrom(null); // selections from the gutter/apparatus jump the shared scroll instead
     if (id && scroll) {
       const el = anchorsRef.current.get(`${id}:a`) ?? anchorsRef.current.get(`${id}:b`);
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }, []);
+
+  // A click in the text body: highlight in place and slide the counterpart panel
+  // to its linked locus (no shared-scroll jump).
+  const onTextSelect = useCallback(
+    (side: Side) => (id: string | null) => {
+      setSelectedId(id);
+      setPreviewFrom(id ? side : null);
+    },
+    []
+  );
+
+  // Measure how far to slide the counterpart body so its locus aligns with the
+  // clicked one. Both panels share the page scroll, so the viewport delta is the
+  // wrapper delta.
+  useLayoutEffect(() => {
+    if (!previewFrom || !selectedId) { setPreviewShift(0); return; }
+    const a = anchorsRef.current.get(`${selectedId}:a`);
+    const b = anchorsRef.current.get(`${selectedId}:b`);
+    if (!a || !b) { setPreviewShift(0); return; }
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    setPreviewShift(previewFrom === "a" ? ra.top - rb.top : rb.top - ra.top);
+  }, [previewFrom, selectedId]);
 
   // ----- Advanced-mode hand-linking -----
   const variantById = useMemo(() => {
@@ -325,6 +355,7 @@ export function CollationView({
               focused={focusSide === "a"} onToggleFocus={() => setFocusSide(focusSide === "a" ? null : "a")}
               lang={langA} onLang={onLangA}
             />
+            <div className="will-change-transform" style={{ transform: previewFrom === "b" ? `translateY(${previewShift}px)` : undefined, transition: "transform 300ms ease" }}>
             <WitnessPanel
               side="a"
               witness={witnessA}
@@ -335,7 +366,7 @@ export function CollationView({
               annotateMode={annotateSide === "a"}
               selectedId={selectedId}
               hoveredId={hoveredId}
-              onSelect={onSelect}
+              onSelect={onTextSelect("a")}
               onHover={setHoveredId}
               onEditText={(text) => project.updateWitness(witnessA.id, { text })}
               onAnnotate={requestAnnotate(witnessA.id)}
@@ -348,13 +379,14 @@ export function CollationView({
               isDark={isDark}
               search={search}
             />
+            </div>
           </div>
         )}
 
         {!focusSide && (
           <div ref={gutterRef} className="relative bg-muted/10">
             {!editMode && (
-              <div className="absolute inset-0">
+              <div className="absolute inset-0 transition-opacity duration-300" style={{ opacity: previewFrom ? 0.12 : 1 }}>
                 <BraidGutter
                   width={gutterSize.width}
                   height={gutterSize.height}
@@ -381,6 +413,7 @@ export function CollationView({
               focused={focusSide === "b"} onToggleFocus={() => setFocusSide(focusSide === "b" ? null : "b")}
               lang={langB} onLang={onLangB}
             />
+            <div className="will-change-transform" style={{ transform: previewFrom === "a" ? `translateY(${previewShift}px)` : undefined, transition: "transform 300ms ease" }}>
             <WitnessPanel
               side="b"
               witness={witnessB}
@@ -391,7 +424,7 @@ export function CollationView({
               annotateMode={annotateSide === "b"}
               selectedId={selectedId}
               hoveredId={hoveredId}
-              onSelect={onSelect}
+              onSelect={onTextSelect("b")}
               onHover={setHoveredId}
               onEditText={(text) => project.updateWitness(witnessB.id, { text })}
               onAnnotate={requestAnnotate(witnessB.id)}
@@ -404,6 +437,7 @@ export function CollationView({
               isDark={isDark}
               search={search}
             />
+            </div>
           </div>
         )}
       </div>

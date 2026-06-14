@@ -9,11 +9,13 @@ import { heat } from "./HotspotBar";
 
 /**
  * Vertical overview strip: a map / orientation aid down the left of the
- * collation. It can show up to three independent columns, each toggled from the
- * View menu:
- *   • Code minimap   — a tiny IDE-style shape of the base text (where am I).
- *   • Variant map    — where the two open witnesses differ (dominant type).
- *   • Version hotspots — where ALL witnesses diverge (Viv heat), 3+ witnesses.
+ * collation. Three independent layers, each toggled from the View menu:
+ *   • Panel minimap   — a tiny IDE-style shape of the base text (where am I);
+ *                       the darker, dominant background.
+ *   • Variant map     — where the two open witnesses differ (dominant type),
+ *                       drawn faintly over the minimap.
+ *   • Version hotspots — where ALL witnesses diverge (Viv heat), 3+ witnesses;
+ *                       a thin heat line alongside, on the far right.
  * Bars are drawn sparse (length ∝ amount of change) so the strip reads as a map
  * rather than a solid block. A viewport box tracks scroll; click jumps to the
  * nearest variant.
@@ -152,15 +154,15 @@ export function OverviewStrip({
     return out;
   }, [showHeat, hotspots]);
 
-  // ----- Layout: a "main" zone (panel minimap + variant map share it, the
-  // minimap underneath as a faint background) and an optional hotspot column. -----
+  // ----- Layout: a "main" zone holds the panel minimap (a darker, dominant
+  // background) with the variant map drawn faintly over it; version hotspots run
+  // as a thin heat line alongside, on the far right. -----
   const hasMain = colMinimap || colVariants;
-  const zones = (hasMain ? 1 : 0) + (showHeat ? 1 : 0);
-  if (zones === 0) return null;
-  const colW = (10 - GAP * (zones - 1)) / zones;
-  const mainW = colW;
-  const heatX = hasMain ? colW + GAP : 0;
-  const heatW = colW;
+  if (!hasMain && !showHeat) return null;
+  const HEAT_W = 1.3; // thin hotspot line on the right
+  const mainW = hasMain ? (showHeat ? 10 - HEAT_W - GAP : 10) : 0;
+  const heatW = HEAT_W;
+  const heatX = 10 - HEAT_W;
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -179,19 +181,19 @@ export function OverviewStrip({
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           {hasMain && <rect x={0} y={0} width={mainW} height={VH} className="fill-card/40" />}
-          {/* Panel minimap — a faint background under the variant map. */}
+          {/* Panel minimap — the dominant, darker background. */}
           {colMinimap && mini.rows.map((r, i) => (
-            <rect key={`m${i}`} x={r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.13 : 0.28} />
+            <rect key={`m${i}`} x={r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.5 : 0.32} />
           ))}
-          {/* Variant map — bars over the minimap. */}
+          {/* Variant map — faint coloured bars over the darker minimap. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={0} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.82} />
+            <rect key={`v${i}`} x={0} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.5} />
           ))}
           {colVariants && selectedY != null && <rect x={0} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
-          {/* Hotspot column on the right. */}
+          {/* Version hotspots — a thin heat line alongside, on the far right. */}
           {showHeat && <rect x={heatX} y={0} width={heatW} height={VH} className="fill-card/30" />}
           {showHeat && heatBuckets.map((b, i) => (
-            <rect key={`h${i}`} x={heatX} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={0.9} />
+            <rect key={`h${i}`} x={heatX + (1 - b.w) * heatW} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={0.95} />
           ))}
           {/* Viewport indicator across the whole strip */}
           <rect x={0.4} y={vp.top} width={9.2} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />

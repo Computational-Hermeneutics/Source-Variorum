@@ -468,7 +468,7 @@ export default function Home() {
                 className="inline-flex items-center gap-1 hover:text-foreground"
               >
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
-                {variantLabel(t, collation.mode)} {view.metrics.counts[t]}
+                {variantLabel(t, collation.mode)} <span className="font-light text-muted-foreground tabular-nums">[{view.metrics.counts[t]}]</span>
               </button>
             );
           })}
