@@ -60,13 +60,6 @@ function makeCollation(name: string, mode: CollationMode, witnesses: Witness[]):
   };
 }
 
-function inlineCollation(demo: Demo): Collation {
-  return makeCollation(demo.name, demo.mode, [
-    witnessFrom(demo.witnessA, "a", normalizeNewlines(demo.witnessA.text ?? "")),
-    witnessFrom(demo.witnessB, "b", normalizeNewlines(demo.witnessB.text ?? "")),
-  ]);
-}
-
 async function collationFromDemo(demoId: string): Promise<Collation> {
   const demo = DEMOS.find((d) => d.id === demoId) ?? DEMOS[0];
   if (demo.witnesses && demo.witnesses.length >= 2) {
@@ -95,10 +88,14 @@ function blankCollation(mode: CollationMode): Collation {
   ]);
 }
 
-const DEFAULT_DEMO = DEMOS.find((d) => d.witnessA.text != null && d.witnessB.text != null) ?? DEMOS[0];
+// First-load sample when nothing is saved. A light two-witness text demo, not
+// the 25-file Spacewar corpus.
+const DEFAULT_DEMO = DEMOS.find((d) => d.id === "phaedrus") ?? DEMOS[0];
 
 export default function Home() {
-  const project = useProject(useMemo(() => inlineCollation(DEFAULT_DEMO), []));
+  // Start from a neutral empty collation so nothing misleading (e.g. a stale
+  // sample name) flashes before the saved project / default sample hydrates.
+  const project = useProject(useMemo(() => blankCollation("text"), []));
   const { collation } = project;
   const [isDark, setIsDark] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -124,6 +121,8 @@ export default function Home() {
   const [showOverview, setShowOverview] = useState(false);
   const [showStrip, setShowStrip] = useState(true);
   const setShowStripP = (v: boolean) => { setShowStrip(v); try { localStorage.setItem("source-variorum-strip", v ? "1" : "0"); } catch { /* ignore */ } };
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+  const setSidebarHiddenP = (v: boolean) => { setSidebarHidden(v); try { localStorage.setItem("source-variorum-sidebar-hidden", v ? "1" : "0"); } catch { /* ignore */ } };
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -151,6 +150,7 @@ export default function Home() {
       const tk = localStorage.getItem(TOKENIZER_KEY);
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
       if (localStorage.getItem("source-variorum-strip") === "0") setShowStrip(false);
+      if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
     } catch {
       /* ignore */
     }
@@ -302,9 +302,10 @@ export default function Home() {
         { kind: "checkbox", label: "Code", checked: collation.mode === "source", onToggle: () => project.setMode("source") },
         { kind: "checkbox", label: "Text", checked: collation.mode === "text", onToggle: () => project.setMode("text") },
         { kind: "separator" },
+        { kind: "checkbox", label: "Sources panel", checked: !sidebarHidden, onToggle: () => setSidebarHiddenP(sidebarHidden ? false : true) },
         { kind: "checkbox", label: "Overview strip", checked: showStrip, onToggle: () => setShowStripP(!showStrip) },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
-        { kind: "checkbox", label: "Deep-dive panel", checked: showDeepDive, onToggle: () => setShowDeepDive((v) => !v) },
+        { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
         { kind: "header", label: "Text size" },
         { kind: "action", label: "Larger", shortcut: "A+", onClick: () => setFont(1) },
@@ -387,7 +388,7 @@ export default function Home() {
       )}
 
       <div className="flex-1 flex min-h-0">
-        <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
+        <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} hidden={sidebarHidden} onHidden={setSidebarHiddenP} />
         <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
           <CollationView
             project={project}

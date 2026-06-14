@@ -21,7 +21,6 @@ type Project = ReturnType<typeof useProject>;
 const COLLAPSE_KEY = "source-variorum-collapsed-folders";
 const FZ_KEY = "source-variorum-sidebar-fontsize";
 const SIDEBAR_W_KEY = "source-variorum-sidebar-width";
-const SIDEBAR_HIDDEN_KEY = "source-variorum-sidebar-hidden";
 
 export function SourceOrganiser({
   project,
@@ -29,12 +28,16 @@ export function SourceOrganiser({
   onLoadDemo,
   onAddSource,
   onImport,
+  hidden,
+  onHidden,
 }: {
   project: Project;
   demos: Demo[];
   onLoadDemo: (id: string) => void;
   onAddSource: () => void;
   onImport: (sources: { siglum: string; title: string; text: string }[]) => void;
+  hidden: boolean;
+  onHidden: (v: boolean) => void;
 }) {
   const c = project.collation;
   const trash = c.trash ?? [];
@@ -56,7 +59,6 @@ export function SourceOrganiser({
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [width, setWidth] = useState(240);
-  const [hidden, setHidden] = useState(false);
   const [editingFolder, setEditingFolder] = useState<string | null>(null);
   const [folderDraft, setFolderDraft] = useState("");
   useEffect(() => {
@@ -67,13 +69,10 @@ export function SourceOrganiser({
       if (f) setFz(Math.min(16, Math.max(9, parseInt(f, 10) || 11)));
       const w = localStorage.getItem(SIDEBAR_W_KEY);
       if (w) setWidth(Math.min(480, Math.max(170, parseInt(w, 10) || 240)));
-      if (localStorage.getItem(SIDEBAR_HIDDEN_KEY) === "1") setHidden(true);
     } catch {
       /* ignore */
     }
   }, []);
-
-  const setHiddenP = (v: boolean) => { setHidden(v); try { localStorage.setItem(SIDEBAR_HIDDEN_KEY, v ? "1" : "0"); } catch { /* ignore */ } };
 
   // Drag the right edge to resize; persist the final width.
   const onResizeDown = (e: React.PointerEvent) => {
@@ -143,7 +142,7 @@ export function SourceOrganiser({
   if (hidden) {
     return (
       <aside className="w-7 shrink-0 border-r border-border bg-muted/20 flex flex-col items-center pt-2">
-        <button onClick={() => setHiddenP(false)} title="Show sources" className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+        <button onClick={() => onHidden(false)} title="Show sources" className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
           <ChevronRight className="w-4 h-4" />
         </button>
       </aside>
@@ -183,7 +182,7 @@ export function SourceOrganiser({
         <div className="ml-auto flex items-center">
           <button onClick={() => stepFz(-1)} title="Smaller file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[10px]">A−</button>
           <button onClick={() => stepFz(1)} title="Larger file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[13px]">A+</button>
-          <button onClick={() => setHiddenP(true)} title="Hide sources panel" className="ml-0.5 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="w-3.5 h-3.5 rotate-180" /></button>
+          <button onClick={() => onHidden(true)} title="Hide sources panel" className="ml-0.5 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="w-3.5 h-3.5 rotate-180" /></button>
         </div>
         <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
       </div>

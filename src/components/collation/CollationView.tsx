@@ -232,6 +232,7 @@ export function CollationView({
         <OverviewStrip
           variants={variants}
           baseLength={witnessA.text.length}
+          lengthB={witnessB.text.length}
           visibleTypes={visibleTypes}
           selectedId={selectedId}
           onSelect={onSelect}
@@ -824,28 +825,23 @@ function DeepDivePanel({
       <span className="text-[14px] font-medium tabular-nums">{value}</span>
     </div>
   );
+  if (!open) return null;
   return (
-    <div className="border-t border-border">
-      <button onClick={onToggle} className="w-full px-4 py-2 text-left text-[12px] font-semibold text-foreground/80 bg-muted/30 hover:bg-muted/50 flex items-center gap-2">
-        <span className="text-muted-foreground">{open ? "▾" : "▸"}</span>
-        Deep dive · quantitative summary
-      </button>
-      {open && (
-        <div className="px-4 py-4 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-          {stat("Verbatim", `${metrics.verbatimPercent.toFixed(1)}%`)}
-          {stat("Moved blocks", String(metrics.movedBlocks))}
-          {stat("Moved length", `${metrics.movedLength} ch`)}
-          {stat("Longest move", `${metrics.longestMove} ch`)}
-          {stat("Jaccard", metrics.jaccard.toFixed(3))}
-          {stat("Dice", metrics.dice.toFixed(3))}
-          {stat("Cosine", metrics.cosine.toFixed(3))}
-          {stat("Substitutions", String(metrics.counts.substitution))}
-          {stat("Variants", String(metrics.counts.variant))}
-          {stat("Additions", String(metrics.counts.addition))}
-          {stat("Deletions", String(metrics.counts.deletion))}
-          {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`)}
-        </div>
-      )}
-    </div>
+    <ModalCard title="Deep dive" subtitle="Quantitative summary of the collation" onClose={onToggle}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
+        {stat("Verbatim", `${metrics.verbatimPercent.toFixed(1)}%`)}
+        {stat("Moved blocks", String(metrics.movedBlocks))}
+        {stat("Moved length", `${metrics.movedLength} ch`)}
+        {stat("Longest move", `${metrics.longestMove} ch`)}
+        {stat("Jaccard", metrics.jaccard.toFixed(3))}
+        {stat("Dice", metrics.dice.toFixed(3))}
+        {stat("Cosine", metrics.cosine.toFixed(3))}
+        {stat("Substitutions", String(metrics.counts.substitution))}
+        {stat("Variants", String(metrics.counts.variant))}
+        {stat("Additions", String(metrics.counts.addition))}
+        {stat("Deletions", String(metrics.counts.deletion))}
+        {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`)}
+      </div>
+    </ModalCard>
   );
 }

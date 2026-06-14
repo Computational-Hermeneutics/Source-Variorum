@@ -23,6 +23,7 @@ export function OverviewStrip({
   onSelect,
   scrollRef,
   onHide,
+  lengthB,
 }: {
   variants: Variant[];
   baseLength: number;
@@ -31,8 +32,28 @@ export function OverviewStrip({
   onSelect: (id: string, scroll?: boolean) => void;
   scrollRef: RefObject<HTMLElement | null>;
   onHide: () => void;
+  /** Length of witness B, to place additions (which have no base position) at
+   *  their proportional point in the base coordinate space. */
+  lengthB: number;
 }) {
   const [vp, setVp] = useState({ top: 0, h: 1 });
+  const [width, setWidth] = useState(30);
+  useEffect(() => {
+    try { const w = localStorage.getItem("source-variorum-strip-width"); if (w) setWidth(Math.min(160, Math.max(18, parseInt(w, 10) || 30))); } catch { /* ignore */ }
+  }, []);
+  const onResizeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const move = (ev: PointerEvent) => setWidth(Math.min(160, Math.max(18, startW + (ev.clientX - startX))));
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      try { localStorage.setItem("source-variorum-strip-width", String(Math.min(160, Math.max(18, startW + (ev.clientX - startX))))); } catch { /* ignore */ }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -48,10 +69,13 @@ export function OverviewStrip({
   }, [scrollRef, variants]);
 
   const len = Math.max(1, baseLength);
+  const lenB = Math.max(1, lengthB);
   const bands = variants
     .filter((v) => v.type !== "match" && visibleTypes.has(v.type))
     .map((v) => {
-      const pos = v.a ? v.a.start : 0;
+      // Position by base offset; additions (no base span) sit at their
+      // proportional point in the base via the witness-B fraction.
+      const pos = v.a ? v.a.start : v.b ? (v.b.start / lenB) * len : 0;
       const span = v.a ? v.a.end - v.a.start : 1;
       return {
         id: v.id,
@@ -77,7 +101,7 @@ export function OverviewStrip({
   };
 
   return (
-    <div className="shrink-0 w-7 border-r border-border bg-muted/20 flex flex-col items-stretch sticky top-0 self-start" style={{ height: "calc(100dvh - 84px)" }}>
+    <div className="shrink-0 border-r border-border bg-muted/20 flex flex-col items-stretch sticky top-0 self-start relative" style={{ height: "calc(100dvh - 84px)", width: `${width}px` }}>
       <button onClick={onHide} title="Hide overview strip" className="h-5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted">
         <PanelLeftClose className="w-3 h-3" />
       </button>
@@ -101,6 +125,8 @@ export function OverviewStrip({
           <rect x={0.5} y={vp.top} width={9} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />
         </svg>
       </div>
+      {/* Drag handle (right edge) to widen the strip. */}
+      <div onPointerDown={onResizeDown} title="Drag to resize" className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/30 z-20" />
     </div>
   );
 }
