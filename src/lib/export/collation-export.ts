@@ -81,7 +81,10 @@ export function parseProjectFile(text: string): SavedCollation | null {
       (data.mode === "source" || data.mode === "text")
     ) {
       // Backfill optional fields older files may lack.
-      const witnesses: Witness[] = data.witnesses;
+      const witnesses: Witness[] = (data.witnesses as Witness[]).map((w) => ({
+        ...w,
+        original: w.original ?? w.text,
+      }));
       return {
         schemaVersion: 1,
         id: data.id ?? "loaded",

@@ -109,7 +109,7 @@ export function useProject(initial: Collation) {
     (w: Witness) =>
       commit((c) => ({
         ...c,
-        witnesses: [...c.witnesses, w],
+        witnesses: [...c.witnesses, { ...w, original: w.original ?? w.text }],
         // Bring the new witness into the right panel so it is immediately visible.
         rightId: w.id,
       })),
@@ -121,7 +121,7 @@ export function useProject(initial: Collation) {
       if (ws.length === 0) return;
       commit((c) => ({
         ...c,
-        witnesses: [...c.witnesses, ...ws],
+        witnesses: [...c.witnesses, ...ws.map((w) => ({ ...w, original: w.original ?? w.text }))],
         // Show the first newly added source on the right so the import is visible.
         rightId: ws[0].id,
       }));
@@ -154,8 +154,33 @@ export function useProject(initial: Collation) {
     (id: string, patch: Partial<Witness>) =>
       commit((c) => ({
         ...c,
-        witnesses: c.witnesses.map((w) => (w.id === id ? { ...w, ...patch } : w)),
+        witnesses: c.witnesses.map((w) => {
+          if (w.id !== id) return w;
+          // First text edit snapshots the pristine original so it can be reverted.
+          const original = patch.text !== undefined && w.original === undefined ? w.text : w.original;
+          return { ...w, ...patch, original };
+        }),
       })),
+    [commit]
+  );
+
+  const revertWitness = useCallback(
+    (id: string) =>
+      commit((c) => ({
+        ...c,
+        witnesses: c.witnesses.map((w) => (w.id === id && w.original !== undefined ? { ...w, text: w.original } : w)),
+      })),
+    [commit]
+  );
+
+  const duplicateWitness = useCallback(
+    (id: string, newId: string) =>
+      commit((c) => {
+        const w = c.witnesses.find((x) => x.id === id);
+        if (!w) return c;
+        const copy: Witness = { ...w, id: newId, siglum: `${w.siglum}′`, title: `${w.title} (copy)`, original: w.text };
+        return { ...c, witnesses: [...c.witnesses, copy], rightId: newId };
+      }),
     [commit]
   );
 
@@ -307,6 +332,8 @@ export function useProject(initial: Collation) {
     addWitnesses,
     removeWitness,
     updateWitness,
+    revertWitness,
+    duplicateWitness,
     createFolder,
     moveToFolder,
     deleteFolder,

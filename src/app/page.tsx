@@ -26,7 +26,7 @@ function uid(): string {
 }
 
 function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
-  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text };
+  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text, original: text };
 }
 
 async function resolveWitnessText(w: DemoWitness): Promise<string> {

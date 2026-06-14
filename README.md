@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.1 |
+| **Version** | 0.5.2 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -55,8 +55,13 @@ A project holds many sources, organised in a small file organiser:
 - **Click a source** to open it in the right (comparison) panel against the
   left, which acts as the **base** / copy-text; the per-panel dropdowns and each
   source's actions menu place either side explicitly.
-- **Edit** witness text in place to correct or normalise it, with **undo/redo**
-  and **revert to the last saved project**.
+- **Edit** witness text in place to correct or normalise it, with **undo/redo**.
+  Every source keeps its pristine **original**, so an edited source is flagged
+  and can be **reverted to original** (or **duplicated** as a working copy);
+  the whole project can also be reverted to the last saved state.
+- **Auto / Advanced** modes: auto-collate, then in Advanced mode **hand-link**
+  passages (pick left + pick right → choose substitution / transposition /
+  addition / omission / match); hand-made links override the auto braid.
 - **⌘/Ctrl-click** any passage to attach a marginal annotation.
 - **New / Open / Save** projects as `.svar` files; **export** to Markdown, PDF,
   or JSON. The working project autosaves to the browser.

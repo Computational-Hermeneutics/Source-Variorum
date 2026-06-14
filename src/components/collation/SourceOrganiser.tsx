@@ -3,8 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
-  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, ArrowLeftToLine, ArrowRightToLine,
+  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, ArrowLeftToLine, ArrowRightToLine, Copy,
 } from "lucide-react";
+
+function uid(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `w${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+  }
+}
 import type { Witness } from "@/types/collation";
 import type { Demo } from "@/data/demos";
 import type { useProject } from "@/hooks/useProject";
@@ -172,6 +180,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
   const isRight = c.rightId === w.id;
   const shown = isLeft || isRight;
   const annCount = (c.annotations[w.id] ?? []).length;
+  const edited = w.original !== undefined && w.text !== w.original;
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [sig, setSig] = useState(w.siglum);
@@ -208,6 +217,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
       <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
       <span className={"truncate flex-1 " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</span>
       {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
+      {edited && <span className="text-[8px] uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Edited — differs from the original; revert via ⋮">edited</span>}
       {annCount > 0 && <span className="text-[9px] px-1 rounded bg-secondary/30 text-secondary-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
       <div className="relative" onClick={(e) => e.stopPropagation()}>
         <button onClick={() => setMenu((v) => !v)} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Actions">
@@ -227,6 +237,14 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
                 <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
               </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.duplicateWitness(w.id, uid()); setMenu(false); }}>
+                <Copy className="w-3 h-3 text-muted-foreground" /> Duplicate (working copy)
+              </button>
+              {edited && (
+                <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2 text-amber-700 dark:text-amber-400" onClick={() => { if (confirm(`Revert "${w.title}" to its original text? Edits will be lost.`)) project.revertWitness(w.id); setMenu(false); }}>
+                  <RotateCcw className="w-3 h-3" /> Revert to original
+                </button>
+              )}
               <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Move to</div>
               {w.folder && (
                 <button className="w-full text-left px-3 py-1 hover:bg-muted flex items-center gap-2" onClick={() => { project.moveToFolder(w.id, ""); setMenu(false); }}>

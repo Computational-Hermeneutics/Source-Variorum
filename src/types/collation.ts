@@ -30,6 +30,9 @@ export interface Witness {
   folder?: string;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */
   text: string;
+  /** Immutable original text, snapshotted on creation/import. Editing changes
+   *  `text` but never this, so the source can always be reverted to clean. */
+  original?: string;
 }
 
 /** What kind of difference a variant records, relative to the base/left witness. */
