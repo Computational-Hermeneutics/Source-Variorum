@@ -6,7 +6,7 @@ import { diffLines } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
-import { LANGS } from "@/lib/highlight";
+import { LANGS, highlightRanges, tokenStyle } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
@@ -15,6 +15,7 @@ import { BraidGutter, type Ribbon } from "./BraidGutter";
 import { Histogram } from "./Histogram";
 import { OverviewStrip } from "./OverviewStrip";
 import { HotspotBar } from "./HotspotBar";
+import { MarkdownPad } from "./MarkdownPad";
 import type { Hotspots } from "@/lib/collate/hotspots";
 import type { EddyRow } from "@/lib/collate/eddy";
 
@@ -100,6 +101,7 @@ export function CollationView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
+  const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
@@ -496,34 +498,47 @@ export function CollationView({
       {/* Apparatus + annotations live in a modal (View ▸ Critical apparatus, or
           the toolbar) so the two text panels keep the full height. */}
       {showApparatus && (
-        <ModalCard title="Critical apparatus & notes" subtitle={`${apparatus.length} ${apparatus.length === 1 ? "entry" : "entries"} — click one to add a note`} onClose={onCloseApparatus}>
-          <div className="-mx-4 -mb-4 max-h-[70vh] overflow-y-auto">
-            <AnnotationsPanel
-              witnessA={witnessA}
-              witnessB={witnessB}
-              annotationsA={annotationsFor(witnessA.id)}
-              annotationsB={annotationsFor(witnessB.id)}
-              onRemove={project.removeAnnotation}
-              onJump={scrollToLine}
-            />
-            <ApparatusList
-              entries={apparatus}
-              mode={mode}
-              selectedId={selectedId}
-              apparatusEdits={collation.apparatusEdits}
-              onEditNote={project.editNote}
-              onSelect={onSelect}
-              onHover={setHoveredId}
-              onUnlink={(vid) => {
-                const lid = linkIdOf(vid);
-                if (lid) project.removeManualLink(lid);
-              }}
-            />
+        <ModalCard title="Critical apparatus & notes" subtitle={`${apparatus.length} ${apparatus.length === 1 ? "entry" : "entries"} · notebook in Markdown`} onClose={onCloseApparatus}>
+          <div className="flex rounded border border-border overflow-hidden text-[11px] w-max mb-3">
+            <button onClick={() => setApparatusTab("apparatus")} className={"px-2.5 py-1 " + (apparatusTab === "apparatus" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>Apparatus ({apparatus.length})</button>
+            <button onClick={() => setApparatusTab("notebook")} className={"px-2.5 py-1 " + (apparatusTab === "notebook" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>Notebook</button>
           </div>
+          {apparatusTab === "notebook" ? (
+            <MarkdownPad
+              value={collation.notes ?? ""}
+              onChange={project.setNotes}
+              autoFocus
+              placeholder={"# Notes on this collation\n\nFree-form Markdown — observations, editorial rationale, questions. Saved with the project (.svar) and toggled to rich text with the button above."}
+            />
+          ) : (
+            <div className="-mx-4 -mb-4 max-h-[70vh] overflow-y-auto">
+              <AnnotationsPanel
+                witnessA={witnessA}
+                witnessB={witnessB}
+                annotationsA={annotationsFor(witnessA.id)}
+                annotationsB={annotationsFor(witnessB.id)}
+                onRemove={project.removeAnnotation}
+                onJump={scrollToLine}
+              />
+              <ApparatusList
+                entries={apparatus}
+                mode={mode}
+                selectedId={selectedId}
+                apparatusEdits={collation.apparatusEdits}
+                onEditNote={project.editNote}
+                onSelect={onSelect}
+                onHover={setHoveredId}
+                onUnlink={(vid) => {
+                  const lid = linkIdOf(vid);
+                  if (lid) project.removeManualLink(lid);
+                }}
+              />
+            </div>
+          )}
         </ModalCard>
       )}
 
-      {showDiff && <DiffModal witnessA={witnessA} witnessB={witnessB} mode={mode} onClose={() => setShowDiff(false)} />}
+      {showDiff && <DiffModal witnessA={witnessA} witnessB={witnessB} mode={mode} lang={langA} isDark={isDark} onClose={() => setShowDiff(false)} />}
 
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
 
@@ -563,10 +578,27 @@ export function CollationView({
 
 type DiffRow = { kind: "add" | "del" | "ctx" | "skip"; aNo?: number; bNo?: number; text: string };
 
+/** Per-line syntax highlight for the diff (offset 0; one line at a time). */
+function hlLine(text: string, lang: string | undefined, isDark: boolean): React.ReactNode {
+  if (!lang || lang === "none" || !text) return text || "​";
+  const tokens = highlightRanges(text, lang);
+  if (!tokens.length) return text;
+  const out: React.ReactNode[] = [];
+  let cursor = 0, key = 0;
+  for (const tk of tokens) {
+    if (tk.from >= text.length) break;
+    const s = Math.max(0, tk.from), e = Math.min(text.length, tk.to);
+    if (s > cursor) out.push(text.slice(cursor, s));
+    if (e > s) { const st = tokenStyle(tk.tag, isDark); out.push(st ? <span key={key++} style={st}>{text.slice(s, e)}</span> : text.slice(s, e)); cursor = e; }
+  }
+  if (cursor < text.length) out.push(text.slice(cursor));
+  return out.length ? out : text;
+}
+
 /** Standard unified diff (git-style) of the two witnesses: +/− lines with line
  *  numbers, long unchanged runs collapsed to context. A familiar second reading
  *  of the same comparison the braid shows. */
-function DiffModal({ witnessA, witnessB, mode, onClose }: { witnessA: Witness; witnessB: Witness; mode: CollationMode; onClose: () => void }) {
+function DiffModal({ witnessA, witnessB, mode, lang, isDark, onClose }: { witnessA: Witness; witnessB: Witness; mode: CollationMode; lang?: string; isDark: boolean; onClose: () => void }) {
   const rows = useMemo<DiffRow[]>(() => {
     const parts = diffLines(witnessA.text, witnessB.text);
     const out: DiffRow[] = [];
@@ -608,7 +640,7 @@ function DiffModal({ witnessA, witnessB, mode, onClose }: { witnessA: Witness; w
                 <tr key={i} className={bg}>
                   <td className="w-9 px-1 text-right tabular-nums text-[9px] text-muted-foreground/50 select-none align-top">{r.aNo ?? ""}</td>
                   <td className="w-9 px-1 text-right tabular-nums text-[9px] text-muted-foreground/50 select-none align-top border-r border-border">{r.bNo ?? ""}</td>
-                  <td className="px-2 align-top whitespace-pre-wrap break-words"><span className={"select-none mr-1.5 " + signColor}>{sign}</span>{r.text || "​"}</td>
+                  <td className="px-2 align-top whitespace-pre-wrap break-words"><span className={"select-none mr-1.5 " + signColor}>{sign}</span>{mono ? hlLine(r.text, lang, isDark) : (r.text || "​")}</td>
                 </tr>
               );
             })}

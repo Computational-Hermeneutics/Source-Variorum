@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
-  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy, Info,
+  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy, Info, FileText,
 } from "lucide-react";
+import { MarkdownPad } from "./MarkdownPad";
 
 function uid(): string {
   try {
@@ -259,6 +260,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
   const [details, setDetails] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const [sig, setSig] = useState(w.siglum);
   const [title, setTitle] = useState(w.title);
 
@@ -309,6 +311,9 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
                 <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
               </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setViewing(true); setMenu(false); }}>
+                <FileText className="w-3 h-3 text-muted-foreground" /> Open in viewer…
+              </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setDetails(true); setMenu(false); }}>
                 <Info className="w-3 h-3 text-muted-foreground" /> Details &amp; metadata…
               </button>
@@ -343,6 +348,40 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
         )}
       </div>
       {details && <WitnessDetailsModal witness={w} onClose={() => setDetails(false)} onSave={(patch) => { project.updateWitness(w.id, patch); setDetails(false); }} />}
+      {viewing && <SourceViewerModal witness={w} onClose={() => setViewing(false)} onSave={(text) => project.updateWitness(w.id, { text })} />}
+    </div>
+  );
+}
+
+/** View / lightly edit any source's text in a modal WITHOUT loading it into a
+ *  compare panel — so reference material can live in the working folder and be
+ *  read or annotated independently of the braid. Markdown ⇄ rich-text toggle. */
+function SourceViewerModal({ witness, onClose, onSave }: { witness: Witness; onClose: () => void; onSave: (text: string) => void }) {
+  const [draft, setDraft] = useState(witness.text);
+  const dirty = draft !== witness.text;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-16" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-3xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold leading-tight truncate">{witness.title}</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{witness.siglum}{witness.author ? ` · ${witness.author}` : ""}{witness.date ? ` · ${witness.date}` : ""} · viewer (does not change the compare panels)</p>
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4">
+          <MarkdownPad value={draft} onChange={setDraft} />
+          <div className="flex justify-end gap-2 mt-3">
+            <button onClick={onClose} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Close</button>
+            <button onClick={() => { onSave(draft); onClose(); }} disabled={!dirty} className="px-3 py-1 rounded bg-primary text-primary-foreground text-[12px] disabled:opacity-50">Save changes</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -68,6 +68,10 @@ export function BraidGutter({
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
+        // The further apart the two ends sit, the more the reading has moved —
+        // boost opacity with vertical distance so long-range correspondences read
+        // through the busier short ones.
+        const distBoost = Math.min(0.26, (Math.abs(r.yA - r.yB) / Math.max(1, height)) * 0.5);
         // When a variant is selected, fade everything else right back so the one
         // being worked on stands alone. When nothing is selected, show ALL braids
         // (matches a touch lighter than changes so the eye still reads the changes).
@@ -77,9 +81,7 @@ export function BraidGutter({
             : 0.05
           : active
             ? 0.95
-            : r.type === "match"
-              ? 0.34
-              : 0.72;
+            : Math.min(0.95, (r.type === "match" ? 0.34 : 0.72) + distBoost);
         return (
           <path
             key={r.id}

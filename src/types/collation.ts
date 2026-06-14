@@ -208,6 +208,8 @@ export interface Collation {
   folders?: string[];
   /** Soft-deleted witnesses, recoverable from the organiser's trash. */
   trash?: Witness[];
+  /** Free-form editor notebook for the collation (Markdown). */
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

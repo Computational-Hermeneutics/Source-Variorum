@@ -95,6 +95,7 @@ export function useProject(initial: Collation) {
 
   // ----- mutators -----
   const rename = useCallback((name: string) => commit((c) => ({ ...c, name })), [commit]);
+  const setNotes = useCallback((notes: string) => commit((c) => ({ ...c, notes })), [commit]);
   const setMode = useCallback((mode: CollationMode) => commit((c) => ({ ...c, mode })), [commit]);
   // Either panel can show any witness — including the same one on both sides
   // (collating a text against itself yields all matches; handy for testing).
@@ -338,6 +339,7 @@ export function useProject(initial: Collation) {
     markSaved,
     revert,
     rename,
+    setNotes,
     setMode,
     setLeft,
     setRight,
