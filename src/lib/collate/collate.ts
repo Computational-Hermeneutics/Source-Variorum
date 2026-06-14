@@ -45,6 +45,20 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   normalize: DEFAULT_NORMALIZE,
 };
 
+/**
+ * Mode-aware matching profile. Code is "almost 1-to-1": lines correspond closely,
+ * so the braid should read LITERALLY — only pair leftover lines that are genuinely
+ * alike (a renamed label, a changed operand), and otherwise call a clean
+ * addition/deletion; require near-identical blocks to count as a move. Prose is
+ * discourse: the "same" sentence is routinely rephrased, so the TEXT profile pairs
+ * much more loosely (low subThreshold) and accepts fuzzier moves — the braid has
+ * to be smarter because correspondence is semantic, not positional.
+ */
+export const MODE_PROFILE: Record<CollationMode, Pick<CollateOptions, "moveThreshold" | "variantThreshold" | "minMoveLength" | "subThreshold">> = {
+  source: { moveThreshold: 0.82, variantThreshold: 0.82, minMoveLength: 8, subThreshold: 0.5 },
+  text: { moveThreshold: 0.7, variantThreshold: 0.85, minMoveLength: 12, subThreshold: 0.2 },
+};
+
 function spanOf(run: Segment[]): Span {
   const first = run[0];
   const last = run[run.length - 1];
@@ -287,7 +301,8 @@ export function collate(
   witnessB: Witness,
   options: Partial<CollateOptions> & { mode: CollationMode }
 ): Variant[] {
-  const opts: CollateOptions = { ...DEFAULT_OPTIONS, ...options };
+  // Base defaults < mode profile (literal for code, smart for prose) < explicit.
+  const opts: CollateOptions = { ...DEFAULT_OPTIONS, ...MODE_PROFILE[options.mode], ...options };
   const segsA = segment(witnessA.text, opts.mode);
   const segsB = segment(witnessB.text, opts.mode);
 
