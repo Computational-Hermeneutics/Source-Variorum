@@ -251,7 +251,7 @@ export default function Home() {
 
             <div className="flex rounded border border-border overflow-hidden text-[12px]">
               {(["source", "text"] as CollationMode[]).map((m) => (
-                <button key={m} onClick={() => project.setMode(m)} className={"px-2.5 py-1 capitalize transition-colors " + (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m}</button>
+                <button key={m} onClick={() => project.setMode(m)} className={"px-2.5 py-1 transition-colors " + (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m === "source" ? "Code" : "Text"}</button>
               ))}
             </div>
 

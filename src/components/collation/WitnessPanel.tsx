@@ -54,18 +54,24 @@ function buildRows(text: string, variants: Variant[], side: Side): Row[] {
     const segs: LineSeg[] = [];
     // advance pointer past spans that end at/before this line
     while (vi < spans.length && spans[vi].end <= ls) vi++;
+    let pos = ls; // cursor: every character from ls..le is emitted (tinted or plain)
     let j = vi;
     while (j < spans.length && spans[j].start < le) {
       const s = spans[j];
-      const from = Math.max(s.start, ls);
+      const from = Math.max(s.start, ls, pos);
       const to = Math.min(s.end, le);
+      if (from > pos) segs.push({ vid: "", type: "match", text: text.slice(pos, from), anchor: false });
       if (to > from) {
         const anchor = !seen.has(s.vid) && s.start >= ls && s.start < le;
         if (anchor) seen.add(s.vid);
         segs.push({ vid: s.vid, type: s.type, text: text.slice(from, to), anchor });
+        pos = to;
       }
       j++;
     }
+    // Trailing uncovered text on this line (e.g. when a manual link reassigned a
+    // partner): render it plain rather than dropping it.
+    if (pos < le) segs.push({ vid: "", type: "match", text: text.slice(pos, le), anchor: false });
     rows.push({ n, segs });
     n++;
   };
@@ -178,6 +184,8 @@ export function WitnessPanel({
               "​"
             ) : (
               row.segs.map((seg, k) => {
+                // Plain (uncollated) text: render statically, no tint/handlers.
+                if (!seg.vid) return <span key={k}>{seg.text}</span>;
                 const selected = seg.vid === selectedId;
                 const hovered = seg.vid === hoveredId;
                 const picked = pickedVids.has(seg.vid);

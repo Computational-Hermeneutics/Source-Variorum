@@ -28,6 +28,10 @@ export interface CollateOptions {
   variantThreshold: number;
   /** Normalised-character floor below which a block is too short to call a move. */
   minMoveLength: number;
+  /** Min similarity to pair two residual blocks as a substitution (Needleman–
+   *  Wunsch residue pass). Lower than moveThreshold: corresponding sentences in
+   *  two translations can read very differently yet still be the "same" locus. */
+  subThreshold: number;
 }
 
 export const DEFAULT_OPTIONS: CollateOptions = {
@@ -35,6 +39,7 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   moveThreshold: 0.7,
   variantThreshold: 0.85,
   minMoveLength: 12,
+  subThreshold: 0.2,
 };
 
 function spanOf(run: Segment[]): Span {
@@ -146,6 +151,85 @@ function detectMoves(
   const leftDels = dels.filter((_, i) => !usedDel.has(i));
   const leftAdds = adds.filter((_, j) => !usedAdd.has(j));
   return { moves, leftDels, leftAdds };
+}
+
+/**
+ * Needleman–Wunsch over the residual deletion/addition runs (those the exact
+ * backbone and move detection didn't pair). Monotonic — preserves order, so it
+ * can't cross-link wildly — but pairs corresponding-yet-differently-worded
+ * blocks as SUBSTITUTIONs above `subThreshold`. This is what catches cases like
+ * a translation's "O noble Lysias" against "O that is noble of him" that the
+ * exact diff leaves as a separate omission + addition.
+ */
+function pairResidue(
+  dels: Segment[][],
+  adds: Segment[][],
+  opts: CollateOptions
+): { subs: RawVariant[]; leftDels: Segment[][]; leftAdds: Segment[][] } {
+  const n = dels.length;
+  const m = adds.length;
+  if (n === 0 || m === 0) return { subs: [], leftDels: dels, leftAdds: adds };
+
+  const delText = dels.map(textOf);
+  const addText = adds.map(textOf);
+  const GAP = -0.1;
+  // Score for aligning del i with add j: similarity if it clears the bar, else
+  // a small penalty so the DP prefers a gap over a meaningless pairing.
+  const simCache = new Map<number, number>();
+  const score = (i: number, j: number): number => {
+    const key = i * m + j;
+    let s = simCache.get(key);
+    if (s === undefined) {
+      // Cheap length-ratio prune before the bigram work.
+      const la = delText[i].length || 1;
+      const lb = addText[j].length || 1;
+      s = Math.max(la, lb) / Math.min(la, lb) > 6 ? 0 : similarity(delText[i], addText[j]);
+      simCache.set(key, s);
+    }
+    return s >= opts.subThreshold ? s : -0.25;
+  };
+
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) dp[i][0] = dp[i - 1][0] + GAP;
+  for (let j = 1; j <= m; j++) dp[0][j] = dp[0][j - 1] + GAP;
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      dp[i][j] = Math.max(dp[i - 1][j - 1] + score(i - 1, j - 1), dp[i - 1][j] + GAP, dp[i][j - 1] + GAP);
+    }
+  }
+
+  const subs: RawVariant[] = [];
+  const usedDel = new Set<number>();
+  const usedAdd = new Set<number>();
+  let i = n;
+  let j = m;
+  while (i > 0 && j > 0) {
+    if (dp[i][j] === dp[i - 1][j - 1] + score(i - 1, j - 1)) {
+      const sim = simCache.get((i - 1) * m + (j - 1)) ?? 0;
+      if (sim >= opts.subThreshold) {
+        subs.push({
+          type: sim >= opts.variantThreshold ? "variant" : "substitution",
+          aRun: dels[i - 1],
+          bRun: adds[j - 1],
+          similarity: sim,
+        });
+        usedDel.add(i - 1);
+        usedAdd.add(j - 1);
+      }
+      i--;
+      j--;
+    } else if (dp[i][j] === dp[i - 1][j] + GAP) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+
+  return {
+    subs,
+    leftDels: dels.filter((_, k) => !usedDel.has(k)),
+    leftAdds: adds.filter((_, k) => !usedAdd.has(k)),
+  };
 }
 
 /** Merge contiguous same-type runs (match/addition/deletion) into block variants. */
@@ -268,8 +352,12 @@ export function collate(
   const addPool = coalesce(addSegs);
   const { moves, leftDels, leftAdds } = detectMoves(delPool, addPool, opts);
   raw.push(...moves);
-  leftDels.forEach((run) => raw.push({ type: "deletion", aRun: run, similarity: 0 }));
-  leftAdds.forEach((run) => raw.push({ type: "addition", bRun: run, similarity: 0 }));
+  // Similarity-aware residue alignment: pair what's left into substitutions
+  // before falling back to plain omission/addition.
+  const residue = pairResidue(leftDels, leftAdds, opts);
+  raw.push(...residue.subs);
+  residue.leftDels.forEach((run) => raw.push({ type: "deletion", aRun: run, similarity: 0 }));
+  residue.leftAdds.forEach((run) => raw.push({ type: "addition", bRun: run, similarity: 0 }));
 
   // Order by base (A) position, then by B position, so the braid and apparatus
   // read top-to-bottom down the base text. Additions (no A) sort by their B anchor.
