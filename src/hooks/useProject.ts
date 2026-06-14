@@ -96,16 +96,10 @@ export function useProject(initial: Collation) {
   // ----- mutators -----
   const rename = useCallback((name: string) => commit((c) => ({ ...c, name })), [commit]);
   const setMode = useCallback((mode: CollationMode) => commit((c) => ({ ...c, mode })), [commit]);
-  // Selecting a witness that's already on the other side swaps the two panels,
-  // so left and right are never the same witness.
-  const setLeft = useCallback(
-    (id: string) => commit((c) => (id === c.rightId ? { ...c, leftId: id, rightId: c.leftId } : { ...c, leftId: id })),
-    [commit]
-  );
-  const setRight = useCallback(
-    (id: string) => commit((c) => (id === c.leftId ? { ...c, rightId: id, leftId: c.rightId } : { ...c, rightId: id })),
-    [commit]
-  );
+  // Either panel can show any witness — including the same one on both sides
+  // (collating a text against itself yields all matches; handy for testing).
+  const setLeft = useCallback((id: string) => commit((c) => ({ ...c, leftId: id })), [commit]);
+  const setRight = useCallback((id: string) => commit((c) => ({ ...c, rightId: id })), [commit]);
   const setBase = useCallback(
     (id: string) => commit((c) => ({ ...c, baseIndex: Math.max(0, c.witnesses.findIndex((w) => w.id === id)) })),
     [commit]

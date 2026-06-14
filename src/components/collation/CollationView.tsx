@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, ChevronDown, ChevronRight } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from "@/types/collation";
@@ -42,6 +42,7 @@ export function CollationView({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
 
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
@@ -137,30 +138,43 @@ export function CollationView({
 
   return (
     <div className="flex flex-col">
-      {/* Filter chips */}
-      <div className="flex flex-wrap items-center gap-1.5 px-4 py-2 border-b border-border text-[11px] bg-muted/30 sticky top-0 z-20">
-        <span className="text-muted-foreground mr-1">Show:</span>
-        {VARIANT_TYPES.map((t) => {
-          const on = visibleTypes.has(t);
-          const count = metrics.counts[t];
-          return (
-            <button
-              key={t}
-              onClick={() => toggleType(t)}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border transition-colors"
-              style={{
-                borderColor: VARIANT_TYPE_COLORS[t],
-                background: on ? `color-mix(in srgb, ${VARIANT_TYPE_COLORS[t]} 18%, transparent)` : "transparent",
-                color: on ? "var(--foreground)" : "var(--muted-foreground)",
-                opacity: on ? 1 : 0.55,
-              }}
-            >
-              <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
-              {VARIANT_TYPE_LABELS[t]} ({count})
-            </button>
-          );
-        })}
-        {editMode && <span className="ml-auto text-[10px] text-amber-700 dark:text-amber-400">Editing text — braid paused; click away to recollate</span>}
+      {/* Filter chips (collapsible) */}
+      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-border text-[10px] bg-muted/30 sticky top-0 z-20">
+        <button
+          onClick={() => setFiltersOpen((v) => !v)}
+          className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground mr-0.5"
+          title={filtersOpen ? "Hide filters" : "Show filters"}
+        >
+          {filtersOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          Show
+        </button>
+        {filtersOpen &&
+          VARIANT_TYPES.map((t) => {
+            const on = visibleTypes.has(t);
+            const count = metrics.counts[t];
+            return (
+              <button
+                key={t}
+                onClick={() => toggleType(t)}
+                className="inline-flex items-center gap-1 px-1.5 py-px rounded-full border transition-colors"
+                style={{
+                  borderColor: VARIANT_TYPE_COLORS[t],
+                  background: on ? `color-mix(in srgb, ${VARIANT_TYPE_COLORS[t]} 18%, transparent)` : "transparent",
+                  color: on ? "var(--foreground)" : "var(--muted-foreground)",
+                  opacity: on ? 1 : 0.5,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
+                {VARIANT_TYPE_LABELS[t]} ({count})
+              </button>
+            );
+          })}
+        {!filtersOpen && (
+          <span className="text-muted-foreground">
+            {apparatus.length} {apparatus.length === 1 ? "variant" : "variants"}
+          </span>
+        )}
+        {editMode && <span className="ml-auto text-[10px] text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
       </div>
 
       {/* Three-column braid */}
@@ -233,8 +247,6 @@ export function CollationView({
 
       <ApparatusList
         entries={apparatus}
-        witnessA={witnessA}
-        witnessB={witnessB}
         mode={mode}
         selectedId={selectedId}
         apparatusEdits={collation.apparatusEdits}
@@ -283,19 +295,17 @@ function WitnessHeader({
 }) {
   const c = project.collation;
   const witnesses = c.witnesses;
-  const otherId = which === "left" ? c.rightId : c.leftId;
   return (
     <div className="px-3 py-2 border-b border-border bg-card/60 flex items-center gap-2 sticky top-[37px] z-10">
-      <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold shrink-0">{witness.siglum}</span>
       <select
         value={witness.id}
         onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
-        className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[60%] truncate"
+        className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[70%] truncate font-medium"
         title={witness.title}
       >
         {witnesses.map((w) => (
-          <option key={w.id} value={w.id} disabled={w.id === otherId}>
-            {w.siglum} — {w.title}
+          <option key={w.id} value={w.id}>
+            {w.title}
           </option>
         ))}
       </select>
@@ -376,8 +386,6 @@ function AnnotationsPanel({
 
 function ApparatusList({
   entries,
-  witnessA,
-  witnessB,
   mode,
   selectedId,
   apparatusEdits,
@@ -386,8 +394,6 @@ function ApparatusList({
   onHover,
 }: {
   entries: Variant[];
-  witnessA: Witness;
-  witnessB: Witness;
   mode: CollationMode;
   selectedId: string | null;
   apparatusEdits: Record<string, ApparatusEdit>;
@@ -423,9 +429,9 @@ function ApparatusList({
                 <span className="shrink-0 w-2 h-2 rounded-full mt-1.5" style={{ background: VARIANT_TYPE_COLORS[v.type] }} title={VARIANT_TYPE_LABELS[v.type]} />
                 <span className="shrink-0 text-[11px] text-muted-foreground font-mono w-20">{locus(v) || VARIANT_TYPE_LABELS[v.type]}</span>
                 <span className="text-[12.5px] leading-snug flex-1">
-                  {v.textA.trim() && (<span><span className="font-mono text-[10px] text-primary mr-1">{witnessA.siglum}</span>{lead(v.textA)}</span>)}
+                  {v.textA.trim() && <span>{lead(v.textA)}</span>}
                   {v.textA.trim() && v.textB.trim() && <span className="text-muted-foreground mx-1.5">]</span>}
-                  {v.textB.trim() && (<span><span className="font-mono text-[10px] text-primary mr-1">{witnessB.siglum}</span>{lead(v.textB)}</span>)}
+                  {v.textB.trim() && <span className="text-foreground/70">{lead(v.textB)}</span>}
                 </span>
                 {note.trim() && !selected && <span className="shrink-0 text-[10px] text-muted-foreground italic max-w-[30%] truncate">“{note.trim()}”</span>}
               </button>
@@ -498,7 +504,7 @@ function DeepDivePanel({
           {stat("Variants", String(metrics.counts.variant))}
           {stat("Additions", String(metrics.counts.addition))}
           {stat("Deletions", String(metrics.counts.deletion))}
-          {stat(`${witnessA.siglum} → ${witnessB.siglum}`, `${witnessA.text.length} → ${witnessB.text.length} ch`)}
+          {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`)}
         </div>
       )}
     </div>
