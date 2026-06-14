@@ -122,6 +122,8 @@ export default function Home() {
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [showStrip, setShowStrip] = useState(true);
+  const setShowStripP = (v: boolean) => { setShowStrip(v); try { localStorage.setItem("source-variorum-strip", v ? "1" : "0"); } catch { /* ignore */ } };
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -148,6 +150,7 @@ export default function Home() {
       if (un) setUserName(un);
       const tk = localStorage.getItem(TOKENIZER_KEY);
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
+      if (localStorage.getItem("source-variorum-strip") === "0") setShowStrip(false);
     } catch {
       /* ignore */
     }
@@ -299,6 +302,7 @@ export default function Home() {
         { kind: "checkbox", label: "Code", checked: collation.mode === "source", onToggle: () => project.setMode("source") },
         { kind: "checkbox", label: "Text", checked: collation.mode === "text", onToggle: () => project.setMode("text") },
         { kind: "separator" },
+        { kind: "checkbox", label: "Overview strip", checked: showStrip, onToggle: () => setShowStripP(!showStrip) },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
         { kind: "checkbox", label: "Deep-dive panel", checked: showDeepDive, onToggle: () => setShowDeepDive((v) => !v) },
         { kind: "separator" },
@@ -413,6 +417,9 @@ export default function Home() {
             onLangB={chooseLangB}
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
+            showStrip={showStrip}
+            onHideStrip={() => setShowStripP(false)}
+            scrollRef={mainRef}
             search={search}
             isDark={isDark}
           />

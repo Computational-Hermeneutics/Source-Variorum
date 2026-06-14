@@ -12,6 +12,7 @@ import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
 import { BraidGutter, type Ribbon } from "./BraidGutter";
 import { Histogram } from "./Histogram";
+import { OverviewStrip } from "./OverviewStrip";
 
 type Side = "a" | "b";
 type Project = ReturnType<typeof useProject>;
@@ -45,6 +46,9 @@ export function CollationView({
   onLangB,
   showOverview,
   onCloseOverview,
+  showStrip,
+  onHideStrip,
+  scrollRef,
   search,
   isDark,
 }: {
@@ -66,6 +70,9 @@ export function CollationView({
   onLangB: (id: string) => void;
   showOverview: boolean;
   onCloseOverview: () => void;
+  showStrip: boolean;
+  onHideStrip: () => void;
+  scrollRef: React.RefObject<HTMLElement | null>;
   search?: string;
   isDark: boolean;
 }) {
@@ -220,7 +227,19 @@ export function CollationView({
   const requestAnnotate = (witnessId: string) => (line: number) => setPendingAnn({ witnessId, line });
 
   return (
-    <div className="flex flex-col">
+    <div className="flex">
+      {showStrip && !editMode && (
+        <OverviewStrip
+          variants={variants}
+          baseLength={witnessA.text.length}
+          visibleTypes={visibleTypes}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          scrollRef={scrollRef}
+          onHide={onHideStrip}
+        />
+      )}
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* A slim hint bar, shown only in edit / advanced mode (the variant legend
           now lives in the status bar; the change-overview is a modal). */}
       {(editMode || advancedMode) && (
@@ -395,6 +414,7 @@ export function CollationView({
           onCancel={clearPicks}
         />
       )}
+      </div>
     </div>
   );
 }
