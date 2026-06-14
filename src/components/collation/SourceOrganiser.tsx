@@ -20,6 +20,8 @@ import type { useProject } from "@/hooks/useProject";
 type Project = ReturnType<typeof useProject>;
 const COLLAPSE_KEY = "source-variorum-collapsed-folders";
 const FZ_KEY = "source-variorum-sidebar-fontsize";
+const SIDEBAR_W_KEY = "source-variorum-sidebar-width";
+const SIDEBAR_HIDDEN_KEY = "source-variorum-sidebar-hidden";
 
 export function SourceOrganiser({
   project,
@@ -53,16 +55,46 @@ export function SourceOrganiser({
     });
 
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [width, setWidth] = useState(240);
+  const [hidden, setHidden] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<string | null>(null);
+  const [folderDraft, setFolderDraft] = useState("");
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COLLAPSE_KEY);
       if (raw) setCollapsed(new Set(JSON.parse(raw)));
       const f = localStorage.getItem(FZ_KEY);
       if (f) setFz(Math.min(16, Math.max(9, parseInt(f, 10) || 11)));
+      const w = localStorage.getItem(SIDEBAR_W_KEY);
+      if (w) setWidth(Math.min(480, Math.max(170, parseInt(w, 10) || 240)));
+      if (localStorage.getItem(SIDEBAR_HIDDEN_KEY) === "1") setHidden(true);
     } catch {
       /* ignore */
     }
   }, []);
+
+  const setHiddenP = (v: boolean) => { setHidden(v); try { localStorage.setItem(SIDEBAR_HIDDEN_KEY, v ? "1" : "0"); } catch { /* ignore */ } };
+
+  // Drag the right edge to resize; persist the final width.
+  const onResizeDown = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const move = (ev: PointerEvent) => setWidth(Math.min(480, Math.max(170, startW + (ev.clientX - startX))));
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      try { localStorage.setItem(SIDEBAR_W_KEY, String(Math.min(480, Math.max(170, startW + (ev.clientX - startX))))); } catch { /* ignore */ }
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  };
+
+  const startRenameFolder = (f: string) => { setEditingFolder(f); setFolderDraft(f); };
+  const commitRenameFolder = () => {
+    if (editingFolder && folderDraft.trim() && folderDraft.trim() !== editingFolder) project.renameFolder(editingFolder, folderDraft.trim());
+    setEditingFolder(null);
+  };
   const toggleCollapse = (f: string) =>
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -99,12 +131,33 @@ export function SourceOrganiser({
   );
 
   const newFolder = () => {
-    const name = prompt("Folder name:")?.trim();
-    if (name) project.createFolder(name);
+    // Create an "Untitled folder" straight away and drop into rename, no modal.
+    const existing = new Set(c.folders ?? []);
+    let name = "Untitled folder";
+    let i = 2;
+    while (existing.has(name)) name = `Untitled folder ${i++}`;
+    project.createFolder(name);
+    startRenameFolder(name);
   };
 
+  if (hidden) {
+    return (
+      <aside className="w-7 shrink-0 border-r border-border bg-muted/20 flex flex-col items-center pt-2">
+        <button onClick={() => setHiddenP(false)} title="Show sources" className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </aside>
+    );
+  }
+
   return (
-    <aside className="w-60 shrink-0 border-r border-border bg-muted/20 flex flex-col">
+    <aside className="shrink-0 border-r border-border bg-muted/20 flex flex-col relative" style={{ width: `${width}px` }}>
+      {/* Drag handle (right edge) to resize. */}
+      <div
+        onPointerDown={onResizeDown}
+        title="Drag to resize"
+        className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/30 z-20"
+      />
       {/* Toolbar */}
       <div className="px-2 py-1.5 border-b border-border flex items-center gap-0.5">
         <ToolBtn title="Add a source" onClick={onAddSource}><FilePlus className="w-4 h-4" /></ToolBtn>
@@ -130,6 +183,7 @@ export function SourceOrganiser({
         <div className="ml-auto flex items-center">
           <button onClick={() => stepFz(-1)} title="Smaller file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[10px]">A−</button>
           <button onClick={() => stepFz(1)} title="Larger file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[13px]">A+</button>
+          <button onClick={() => setHiddenP(true)} title="Hide sources panel" className="ml-0.5 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="w-3.5 h-3.5 rotate-180" /></button>
         </div>
         <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
       </div>
@@ -145,10 +199,25 @@ export function SourceOrganiser({
           return (
             <div key={f}>
               <div className="group flex items-center gap-1 px-2 py-1">
-                <button onClick={() => toggleCollapse(f)} className="flex items-center gap-1 flex-1 min-w-0 text-left text-muted-foreground hover:text-foreground">
-                  {isCollapsed ? <ChevronRight className="w-3 h-3 shrink-0" /> : <ChevronDown className="w-3 h-3 shrink-0" />}
-                  <Folder className="w-3.5 h-3.5 shrink-0" />
-                  <span className="uppercase tracking-wide truncate" style={{ fontSize: `${fz}px` }}>{f}</span>
+                <button onClick={() => toggleCollapse(f)} className="shrink-0 text-muted-foreground hover:text-foreground" title={isCollapsed ? "Expand" : "Collapse"}>
+                  {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+                <Folder className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                {editingFolder === f ? (
+                  <input
+                    autoFocus
+                    value={folderDraft}
+                    onChange={(e) => setFolderDraft(e.target.value)}
+                    onBlur={commitRenameFolder}
+                    onKeyDown={(e) => { if (e.key === "Enter") commitRenameFolder(); if (e.key === "Escape") setEditingFolder(null); }}
+                    className="flex-1 min-w-0 bg-background border border-primary rounded px-1 py-0.5 uppercase tracking-wide"
+                    style={{ fontSize: `${fz}px` }}
+                  />
+                ) : (
+                  <button onDoubleClick={() => startRenameFolder(f)} onClick={() => toggleCollapse(f)} className="flex-1 min-w-0 text-left uppercase tracking-wide truncate text-muted-foreground hover:text-foreground" title="Double-click to rename" style={{ fontSize: `${fz}px` }}>{f}</button>
+                )}
+                <button onClick={() => startRenameFolder(f)} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Rename folder">
+                  <Pencil className="w-3 h-3" />
                 </button>
                 <button onClick={() => { if (confirm(`Delete folder "${f}"? Its sources move to the root.`)) project.deleteFolder(f); }} className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground" title="Delete folder (keep sources)">
                   <X className="w-3 h-3" />

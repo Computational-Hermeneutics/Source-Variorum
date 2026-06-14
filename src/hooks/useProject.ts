@@ -195,6 +195,20 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
+  const renameFolder = useCallback(
+    (oldName: string, newName: string) =>
+      commit((c) => {
+        const name = newName.trim();
+        if (!name || name === oldName || (c.folders ?? []).includes(name)) return c;
+        return {
+          ...c,
+          folders: (c.folders ?? []).map((f) => (f === oldName ? name : f)),
+          witnesses: c.witnesses.map((w) => (w.folder === oldName ? { ...w, folder: name } : w)),
+        };
+      }),
+    [commit]
+  );
+
   const moveToFolder = useCallback(
     (witnessId: string, folder: string) =>
       commit((c) => ({
@@ -335,6 +349,7 @@ export function useProject(initial: Collation) {
     revertWitness,
     duplicateWitness,
     createFolder,
+    renameFolder,
     moveToFolder,
     deleteFolder,
     trashWitness,
