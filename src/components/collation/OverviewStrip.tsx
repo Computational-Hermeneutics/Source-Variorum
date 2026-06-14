@@ -75,7 +75,12 @@ export function OverviewStrip({
     if (!el) return;
     const update = () => {
       const sh = el.scrollHeight || 1;
-      setVp({ top: (el.scrollTop / sh) * VH, h: Math.max(8, (el.clientHeight / sh) * VH) });
+      // Enforce a minimum handle height so the indicator stays visible even on
+      // very long witnesses (where the true proportion is a sliver), and keep it
+      // within the strip.
+      const h = Math.max(28, (el.clientHeight / sh) * VH);
+      const top = Math.min(VH - h, (el.scrollTop / sh) * VH);
+      setVp({ top, h });
     };
     update();
     el.addEventListener("scroll", update, { passive: true });
@@ -199,9 +204,9 @@ export function OverviewStrip({
           {showHeat && heatBuckets.map((b, i) => (
             <rect key={`h${i}`} x={heatX} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={b.op} />
           ))}
-          {/* Viewport indicator across the whole strip — a soft primary-tinted
-              band so the current scroll position reads without overpowering. */}
-          <rect x={0.5} y={vp.top} width={9} height={vp.h} fill="var(--primary)" fillOpacity={0.1} stroke="var(--primary)" strokeOpacity={0.7} strokeWidth={1.25} rx={1.2} />
+          {/* Viewport indicator across the whole strip — a primary-tinted band,
+              clearly visible but not as harsh as solid black. */}
+          <rect x={0.5} y={vp.top} width={9} height={vp.h} fill="var(--primary)" fillOpacity={0.22} stroke="var(--primary)" strokeOpacity={1} strokeWidth={2} rx={1.2} />
         </svg>
       </div>
       <div onPointerDown={onResizeDown} title="Drag to resize" className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/30 z-20" />
