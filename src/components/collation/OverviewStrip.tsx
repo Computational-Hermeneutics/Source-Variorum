@@ -108,7 +108,7 @@ export function OverviewStrip({
   }, [colMinimap, baseText]);
 
   // ----- Variant map: bucketed, bar length ∝ change density -----
-  const NB = 150;
+  const NB = 220;
   const { vbands, navPoints, selectedY } = useMemo(() => {
     const bw = len / NB;
     const acc: Array<Partial<Record<VariantType, number>>> = Array.from({ length: NB }, () => ({}));
@@ -131,7 +131,7 @@ export function OverviewStrip({
       for (const t in acc[b]) { const l = acc[b][t as VariantType]!; total += l; if (l > domLen) { domLen = l; dom = t as VariantType; } }
       if (!dom) continue;
       const density = Math.min(1, total / bw);
-      vbands.push({ y: (b / NB) * VH, h: VH / NB + 0.6, w: 0.18 + 0.82 * density, color: VARIANT_TYPE_COLORS[dom] });
+      vbands.push({ y: (b / NB) * VH, h: (VH / NB) * 0.7, w: 0.22 + 0.78 * density, color: VARIANT_TYPE_COLORS[dom] });
     }
     navPoints.sort((a, b) => a.y - b.y);
     return { vbands, navPoints, selectedY };
@@ -188,9 +188,10 @@ export function OverviewStrip({
           {colMinimap && mini.rows.map((r, i) => (
             <rect key={`m${i}`} x={mainX + r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.14 : 0.26} />
           ))}
-          {/* Variant map — the clear signal: coloured bars over the faint texture. */}
+          {/* Variant map — thin coloured ticks growing from the right edge, so the
+              change signal reads as its own histogram beside the faint minimap. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={mainX} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.78} />
+            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.8} rx={0.15} />
           ))}
           {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
           {/* Version hotspots — a thin heat line on the left, before the minimap. */}
@@ -198,9 +199,9 @@ export function OverviewStrip({
           {showHeat && heatBuckets.map((b, i) => (
             <rect key={`h${i}`} x={heatX} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={b.op} />
           ))}
-          {/* Viewport indicator across the whole strip — strong outline so the
-              current scroll position stands out against the map. */}
-          <rect x={0.5} y={vp.top} width={9} height={vp.h} className="fill-foreground/10 stroke-foreground" strokeWidth={2.25} rx={1} />
+          {/* Viewport indicator across the whole strip — a soft primary-tinted
+              band so the current scroll position reads without overpowering. */}
+          <rect x={0.5} y={vp.top} width={9} height={vp.h} fill="var(--primary)" fillOpacity={0.1} stroke="var(--primary)" strokeOpacity={0.7} strokeWidth={1.25} rx={1.2} />
         </svg>
       </div>
       <div onPointerDown={onResizeDown} title="Drag to resize" className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/30 z-20" />

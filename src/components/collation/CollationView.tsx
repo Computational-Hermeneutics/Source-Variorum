@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft } from "lucide-react";
+import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
@@ -18,6 +18,7 @@ import type { Hotspots } from "@/lib/collate/hotspots";
 import type { EddyRow } from "@/lib/collate/eddy";
 
 type Side = "a" | "b";
+type LockMode = "one" | "user" | "off";
 type Project = ReturnType<typeof useProject>;
 type View = ReturnType<typeof deriveView>;
 type ApparatusEdit = Pick<ApparatusEntry, "note" | "category">;
@@ -57,7 +58,6 @@ export function CollationView({
   stripCols,
   stripVisible,
   onHideStrip,
-  scrollLocked,
   search,
   isDark,
 }: {
@@ -87,7 +87,6 @@ export function CollationView({
   stripCols: { minimap: boolean; variants: boolean; hotspots: boolean };
   stripVisible: boolean;
   onHideStrip: () => void;
-  scrollLocked: boolean;
   search?: string;
   isDark: boolean;
 }) {
@@ -132,96 +131,49 @@ export function CollationView({
 
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
-  // Each panel scrolls in its own container. When locked, scrolling one mirrors
-  // the other by position ratio.
+  // Each panel scrolls in its own container.
   const panelARef = useRef<HTMLDivElement>(null);
   const panelBRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
   const gutterRef = useRef<HTMLDivElement>(null);
-  const [ribbons, setRibbons] = useState<Ribbon[]>([]);
-  const [gutterSize, setGutterSize] = useState({ width: 0, height: 0 });
 
-  // Content-relative top offset of every anchor on each side, cached so the
-  // ribbon recompute does pure arithmetic instead of per-tick layout reads.
-  const offsetsRef = useRef<{ a: Map<string, number>; b: Map<string, number> }>({ a: new Map(), b: new Map() });
-  // The braid is frozen (hidden) while a panel is actively scrolling and redrawn
-  // once scrolling settles — keeps scrolling smooth on long witnesses.
-  const [scrolling, setScrolling] = useState(false);
-  const scrollingRef = useRef(false);
-  const scrollEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Scroll lock has three modes:
+  //   "one"  — both panels pinned to the same scrollTop (both start at line 1)
+  //   "user" — locked at an offset the reader chose (unlock, align by hand, lock)
+  //   "off"  — independent scrolling
+  const [lockMode, setLockMode] = useState<LockMode>("one");
+  const userOffsetRef = useRef(0); // B.scrollTop − A.scrollTop, captured for "user"
+  useEffect(() => { try { const m = localStorage.getItem("source-variorum-lock-mode"); if (m === "one" || m === "off") setLockMode(m); } catch { /* ignore */ } }, []);
+  const cycleLock = () => setLockMode((m) => {
+    const a = panelARef.current, b = panelBRef.current;
+    let next: LockMode;
+    if (m === "one") next = "off";
+    else if (m === "off") { userOffsetRef.current = a && b ? b.scrollTop - a.scrollTop : 0; next = "user"; }
+    else next = "one";
+    if (next === "one" && a && b) { syncingRef.current = true; b.scrollTop = a.scrollTop; requestAnimationFrame(() => { syncingRef.current = false; }); }
+    try { localStorage.setItem("source-variorum-lock-mode", next === "user" ? "off" : next); } catch { /* ignore */ }
+    return next;
+  });
 
-  const buildOffsets = useCallback(() => {
-    const pa = panelARef.current, pb = panelBRef.current;
-    const a = new Map<string, number>(), b = new Map<string, number>();
-    if (pa) { const base = pa.getBoundingClientRect().top - pa.scrollTop; for (const [k, el] of anchorsRef.current) if (k.endsWith(":a")) a.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
-    if (pb) { const base = pb.getBoundingClientRect().top - pb.scrollTop; for (const [k, el] of anchorsRef.current) if (k.endsWith(":b")) b.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
-    offsetsRef.current = { a, b };
-  }, []);
-
-  const recomputeRibbons = useCallback(() => {
-    const wrapper = wrapperRef.current, gutter = gutterRef.current, pa = panelARef.current, pb = panelBRef.current;
-    if (!wrapper || !gutter || !pa || !pb) return;
-    const H = wrapper.clientHeight;
-    const aScroll = pa.scrollTop, bScroll = pb.scrollTop;
-    const oa = offsetsRef.current.a, ob = offsetsRef.current.b;
-    const next: Ribbon[] = [];
-    for (const v of variants) {
-      const ca = oa.get(v.id), cb = ob.get(v.id);
-      if (ca == null || cb == null) continue;
-      const yA = ca - aScroll, yB = cb - bScroll;
-      // Draw a ribbon when at least one end is on-screen, so a diagonal still
-      // leaves the viewport toward an off-screen counterpart (the braid's point).
-      const visA = yA >= -24 && yA <= H + 24;
-      const visB = yB >= -24 && yB <= H + 24;
-      if (!visA && !visB) continue;
-      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
-    }
-    setRibbons(next);
-    setGutterSize({ width: gutter.clientWidth, height: H });
-  }, [variants]);
-
-  // Locked = the two panels scroll together by position, so both start at line 1
-  // and each source's own top (e.g. its header macro) stays visible. The braid's
-  // sloped ribbons show how the content actually corresponds.
   const syncCounterpart = useCallback((from: Side) => {
-    const src = from === "a" ? panelARef.current : panelBRef.current;
-    const dst = from === "a" ? panelBRef.current : panelARef.current;
-    if (!src || !dst) return;
+    const a = panelARef.current, b = panelBRef.current;
+    if (!a || !b) return;
+    const offset = lockMode === "user" ? userOffsetRef.current : 0;
     syncingRef.current = true;
-    dst.scrollTop = src.scrollTop;
+    if (from === "a") b.scrollTop = Math.max(0, a.scrollTop + offset);
+    else a.scrollTop = Math.max(0, b.scrollTop - offset);
     requestAnimationFrame(() => { syncingRef.current = false; });
-  }, []);
+  }, [lockMode]);
 
   const onPanelScroll = useCallback((from: Side) => () => {
-    if (scrollLocked && !syncingRef.current) syncCounterpart(from);
-    if (!scrollingRef.current) { scrollingRef.current = true; setScrolling(true); }
-    if (scrollEndRef.current) clearTimeout(scrollEndRef.current);
-    scrollEndRef.current = setTimeout(() => {
-      scrollingRef.current = false; setScrolling(false);
-      buildOffsets(); recomputeRibbons();
-    }, 120);
-  }, [scrollLocked, syncCounterpart, buildOffsets, recomputeRibbons]);
+    if (lockMode !== "off" && !syncingRef.current) syncCounterpart(from);
+  }, [lockMode, syncCounterpart]);
 
   const registerAnchor = useCallback((id: string, side: Side, el: HTMLElement | null) => {
     const key = `${id}:${side}`;
     if (el) anchorsRef.current.set(key, el);
     else anchorsRef.current.delete(key);
   }, []);
-
-  useLayoutEffect(() => {
-    if (editMode) return; // braid is hidden while editing text
-    const recompute = () => { buildOffsets(); recomputeRibbons(); };
-    recompute();
-    const wrapper = wrapperRef.current;
-    if (!wrapper) return;
-    const ro = new ResizeObserver(recompute);
-    ro.observe(wrapper);
-    const t = setTimeout(recompute, 250);
-    return () => {
-      ro.disconnect();
-      clearTimeout(t);
-    };
-  }, [buildOffsets, recomputeRibbons, editMode, fontSize]);
 
   const scrollToLine = useCallback(
     (side: Side, line: number) => {
@@ -245,18 +197,27 @@ export function CollationView({
     }
   }, []);
 
-  // A click in the text body highlights in place. When the panels are UNLOCKED,
-  // it also scrolls the OTHER panel to bring the linked locus into view — a peek
-  // at where the reading maps (when locked, the panels already move together).
+  // A click in the text body highlights the locus AND scrolls the other panel so
+  // its linked passage lines up with the clicked one (works in any lock mode;
+  // the sync is suppressed so the clicked panel itself stays put).
   const onTextSelect = useCallback(
     (side: Side) => (id: string | null) => {
       setSelectedId(id);
-      if (id && !scrollLocked) {
-        const other: Side = side === "a" ? "b" : "a";
-        anchorsRef.current.get(`${id}:${other}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      if (!id) return;
+      const other: Side = side === "a" ? "b" : "a";
+      const se = anchorsRef.current.get(`${id}:${side}`);
+      const de = anchorsRef.current.get(`${id}:${other}`);
+      const src = side === "a" ? panelARef.current : panelBRef.current;
+      const dst = other === "a" ? panelARef.current : panelBRef.current;
+      if (se && de && src && dst) {
+        const srcViewOffset = se.getBoundingClientRect().top - src.getBoundingClientRect().top;
+        const dstAbs = de.getBoundingClientRect().top - dst.getBoundingClientRect().top + dst.scrollTop;
+        syncingRef.current = true;
+        dst.scrollTop = Math.max(0, dstAbs - srcViewOffset);
+        requestAnimationFrame(() => { syncingRef.current = false; });
       }
     },
-    [scrollLocked]
+    []
   );
 
   // ----- Advanced-mode hand-linking -----
@@ -442,26 +403,39 @@ export function CollationView({
             {braidOpen ? (
               <>
                 {!editMode && (
-                  <div className="absolute inset-0 transition-opacity duration-150" style={{ opacity: scrolling ? 0 : 1 }}>
-                    <BraidGutter
-                      width={gutterSize.width}
-                      height={gutterSize.height}
-                      ribbons={ribbons}
-                      maxLength={maxLength}
+                  <div className="absolute inset-0">
+                    <BraidLayer
+                      variants={variants}
+                      anchorsRef={anchorsRef}
+                      panelARef={panelARef}
+                      panelBRef={panelBRef}
+                      wrapperRef={wrapperRef}
+                      gutterRef={gutterRef}
+                      visibleTypes={visibleTypes}
                       selectedId={selectedId}
                       hoveredId={hoveredId}
-                      visibleTypes={visibleTypes}
+                      maxLength={maxLength}
                       onSelect={onSelect}
                       onHover={setHoveredId}
+                      fontSize={fontSize}
                     />
                   </div>
                 )}
-                {/* Resize handles on either side + a collapse button. */}
+                {/* Resize handles on either side + collapse & lock buttons. */}
                 <div onPointerDown={onBraidResize("left")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 left-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
                 <div onPointerDown={onBraidResize("right")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
-                <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Hide the braid" className="absolute top-1 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded bg-card/80 border border-border text-muted-foreground hover:text-foreground">
-                  <ChevronsRightLeft className="w-3 h-3" />
-                </button>
+                <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Hide the braid" className="p-0.5 rounded bg-card/80 border border-border text-muted-foreground hover:text-foreground">
+                    <ChevronsRightLeft className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); cycleLock(); }}
+                    title={lockMode === "one" ? "Scroll lock: 1:1 — both panels at line 1. Click to unlock." : lockMode === "off" ? "Scroll: unlocked — scroll each panel freely, then click to lock at this alignment." : "Scroll lock: your alignment. Click for 1:1."}
+                    className={"p-0.5 rounded bg-card/80 border hover:bg-muted " + (lockMode === "off" ? "border-border text-muted-foreground" : lockMode === "user" ? "border-[var(--sv-variation)]/50 text-[var(--sv-variation)]" : "border-primary/50 text-primary")}
+                  >
+                    {lockMode === "off" ? <LockOpen className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                  </button>
+                </div>
               </>
             ) : (
               <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Show the braid" className="absolute inset-0 flex items-center justify-center text-muted-foreground hover:bg-muted/40">
@@ -571,6 +545,107 @@ export function CollationView({
       )}
       </div>
     </div>
+  );
+}
+
+/** The braid ribbons, isolated into their own component so scroll-driven ribbon
+ *  updates re-render only this layer — never the (potentially thousands of rows)
+ *  text panels. Reads anchor positions once per layout into an offset cache, then
+ *  recomputes ribbon endpoints cheaply (pure arithmetic) on every scroll frame. */
+function BraidLayer({
+  variants,
+  anchorsRef,
+  panelARef,
+  panelBRef,
+  wrapperRef,
+  gutterRef,
+  visibleTypes,
+  selectedId,
+  hoveredId,
+  maxLength,
+  onSelect,
+  onHover,
+  fontSize,
+}: {
+  variants: Variant[];
+  anchorsRef: React.RefObject<Map<string, HTMLElement>>;
+  panelARef: React.RefObject<HTMLDivElement | null>;
+  panelBRef: React.RefObject<HTMLDivElement | null>;
+  wrapperRef: React.RefObject<HTMLDivElement | null>;
+  gutterRef: React.RefObject<HTMLDivElement | null>;
+  visibleTypes: Set<VariantType>;
+  selectedId: string | null;
+  hoveredId: string | null;
+  maxLength: number;
+  onSelect: (id: string | null) => void;
+  onHover: (id: string | null) => void;
+  fontSize: number;
+}) {
+  const [ribbons, setRibbons] = useState<Ribbon[]>([]);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  const offs = useRef<{ a: Map<string, number>; b: Map<string, number> }>({ a: new Map(), b: new Map() });
+  const raf = useRef<number | null>(null);
+
+  const build = useCallback(() => {
+    const pa = panelARef.current, pb = panelBRef.current, anchors = anchorsRef.current;
+    const a = new Map<string, number>(), b = new Map<string, number>();
+    if (pa && anchors) { const base = pa.getBoundingClientRect().top - pa.scrollTop; for (const [k, el] of anchors) if (k.endsWith(":a")) a.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
+    if (pb && anchors) { const base = pb.getBoundingClientRect().top - pb.scrollTop; for (const [k, el] of anchors) if (k.endsWith(":b")) b.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
+    offs.current = { a, b };
+  }, [anchorsRef, panelARef, panelBRef]);
+
+  const compute = useCallback(() => {
+    const wrapper = wrapperRef.current, gutter = gutterRef.current, pa = panelARef.current, pb = panelBRef.current;
+    if (!wrapper || !gutter || !pa || !pb) return;
+    const H = wrapper.clientHeight, aS = pa.scrollTop, bS = pb.scrollTop;
+    const oa = offs.current.a, ob = offs.current.b;
+    const next: Ribbon[] = [];
+    for (const v of variants) {
+      const ca = oa.get(v.id), cb = ob.get(v.id);
+      if (ca == null || cb == null) continue;
+      const yA = ca - aS, yB = cb - bS;
+      // Draw a ribbon when at least one end is on-screen, so a diagonal still
+      // leaves the viewport toward an off-screen counterpart (the braid's point).
+      const visA = yA >= -24 && yA <= H + 24, visB = yB >= -24 && yB <= H + 24;
+      if (!visA && !visB) continue;
+      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
+    }
+    setRibbons(next);
+    setSize({ width: gutter.clientWidth, height: H });
+  }, [variants, wrapperRef, gutterRef, panelARef, panelBRef]);
+
+  // Rebuild the offset cache + recompute on layout-affecting changes.
+  useLayoutEffect(() => {
+    const refresh = () => { build(); compute(); };
+    refresh();
+    const wrapper = wrapperRef.current;
+    const ro = new ResizeObserver(refresh);
+    if (wrapper) ro.observe(wrapper);
+    const t = setTimeout(refresh, 250);
+    return () => { ro.disconnect(); clearTimeout(t); };
+  }, [build, compute, fontSize, variants, wrapperRef]);
+
+  // Recompute (cheap, no rebuild) on scroll — rAF-throttled, this layer only.
+  useEffect(() => {
+    const pa = panelARef.current, pb = panelBRef.current;
+    const onScroll = () => { if (raf.current == null) raf.current = requestAnimationFrame(() => { raf.current = null; compute(); }); };
+    pa?.addEventListener("scroll", onScroll, { passive: true });
+    pb?.addEventListener("scroll", onScroll, { passive: true });
+    return () => { pa?.removeEventListener("scroll", onScroll); pb?.removeEventListener("scroll", onScroll); };
+  }, [compute, panelARef, panelBRef]);
+
+  return (
+    <BraidGutter
+      width={size.width}
+      height={size.height}
+      ribbons={ribbons}
+      maxLength={maxLength}
+      selectedId={selectedId}
+      hoveredId={hoveredId}
+      visibleTypes={visibleTypes}
+      onSelect={onSelect}
+      onHover={onHover}
+    />
   );
 }
 
