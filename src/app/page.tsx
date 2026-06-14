@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, Lock, LockOpen } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, Lock, LockOpen, ListTree } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -122,6 +122,7 @@ export default function Home() {
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
+  const [showApparatus, setShowApparatus] = useState(false);
   // The overview strip can show any combination of three columns (or none).
   const [stripCols, setStripCols] = useState({ minimap: true, variants: true, hotspots: false });
   const setStripCol = (k: "minimap" | "variants" | "hotspots", v: boolean) =>
@@ -340,6 +341,7 @@ export default function Home() {
         { kind: "checkbox", label: "Variant map", checked: stripCols.variants, onToggle: () => setStripCol("variants", !stripCols.variants) },
         { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
         { kind: "separator" },
+        { kind: "action", label: "Critical apparatus & notes…", onClick: () => setShowApparatus(true) },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
         { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
@@ -399,6 +401,8 @@ export default function Home() {
               <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
             </div>
 
+            <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Critical apparatus & notes"><ListTree className="w-3.5 h-3.5" /></button>
+
             <button onClick={() => setShowOverview(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Change overview"><BarChart3 className="w-3.5 h-3.5" /></button>
 
             <button onClick={toggleLock} className={"p-1.5 rounded border border-border " + (scrollLocked ? "bg-card hover:bg-muted text-muted-foreground" : "bg-primary/10 border-primary/40 text-primary")} title={scrollLocked ? "Panels scroll together (click to unlock for independent scrolling)" : "Panels scroll independently (click to lock in sync)"}>{scrollLocked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}</button>
@@ -447,6 +451,8 @@ export default function Home() {
             onLangB={chooseLangB}
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
+            showApparatus={showApparatus}
+            onCloseApparatus={() => setShowApparatus(false)}
             hotspots={hotspots}
             eddy={eddy}
             baseId={collation.leftId}

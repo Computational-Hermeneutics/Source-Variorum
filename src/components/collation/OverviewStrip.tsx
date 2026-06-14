@@ -183,13 +183,14 @@ export function OverviewStrip({
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           {hasMain && <rect x={mainX} y={0} width={mainW} height={VH} className="fill-card/40" />}
-          {/* Panel minimap — the dominant, darker background. */}
+          {/* Panel minimap — a faint code-shape texture for orientation only, so
+              it sits quietly behind the variant signal. */}
           {colMinimap && mini.rows.map((r, i) => (
-            <rect key={`m${i}`} x={mainX + r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.5 : 0.32} />
+            <rect key={`m${i}`} x={mainX + r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.14 : 0.26} />
           ))}
-          {/* Variant map — faint coloured bars over the darker minimap. */}
+          {/* Variant map — the clear signal: coloured bars over the faint texture. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={mainX} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.32} />
+            <rect key={`v${i}`} x={mainX} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.78} />
           ))}
           {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
           {/* Version hotspots — a thin heat line on the left, before the minimap. */}

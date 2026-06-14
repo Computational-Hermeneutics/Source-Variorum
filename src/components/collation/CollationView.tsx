@@ -49,6 +49,8 @@ export function CollationView({
   onLangB,
   showOverview,
   onCloseOverview,
+  showApparatus,
+  onCloseApparatus,
   hotspots,
   eddy,
   baseId,
@@ -77,6 +79,8 @@ export function CollationView({
   onLangB: (id: string) => void;
   showOverview: boolean;
   onCloseOverview: () => void;
+  showApparatus: boolean;
+  onCloseApparatus: () => void;
   hotspots: Hotspots | null;
   eddy: EddyRow[];
   baseId: string;
@@ -137,40 +141,66 @@ export function CollationView({
   const [ribbons, setRibbons] = useState<Ribbon[]>([]);
   const [gutterSize, setGutterSize] = useState({ width: 0, height: 0 });
 
-  const onPanelScroll = useCallback((from: Side) => () => {
-    if (scrollLocked && !syncingRef.current) {
-      const src = from === "a" ? panelARef.current : panelBRef.current;
-      const dst = from === "a" ? panelBRef.current : panelARef.current;
-      const other: Side = from === "a" ? "b" : "a";
-      if (src && dst) {
-        // Content-aligned sync: keep the variant nearest the source viewport
-        // centre aligned with its counterpart, so the braid stays horizontal and
-        // populated (rather than a blind scroll-ratio that ignores text length).
-        const srcRect = src.getBoundingClientRect();
-        const centreY = srcRect.top + src.clientHeight / 2;
-        let bestId: string | null = null, bestD = Infinity, bestSrcTop = 0;
-        for (const v of variants) {
-          const el = anchorsRef.current.get(`${v.id}:${from}`);
-          if (!el) continue;
-          const r = el.getBoundingClientRect();
-          const d = Math.abs(r.top + r.height / 2 - centreY);
-          if (d < bestD) { bestD = d; bestId = v.id; bestSrcTop = r.top - srcRect.top; }
-        }
-        const oel = bestId ? anchorsRef.current.get(`${bestId}:${other}`) : null;
-        if (oel) {
-          syncingRef.current = true;
-          const dstRect = dst.getBoundingClientRect();
-          const oelAbs = oel.getBoundingClientRect().top - dstRect.top + dst.scrollTop;
-          dst.scrollTop = Math.max(0, oelAbs - bestSrcTop);
-          requestAnimationFrame(() => { syncingRef.current = false; });
-        }
-      }
+  // Content-relative top offset of every anchor on each side, cached so the
+  // ribbon recompute does pure arithmetic instead of per-tick layout reads.
+  const offsetsRef = useRef<{ a: Map<string, number>; b: Map<string, number> }>({ a: new Map(), b: new Map() });
+  // The braid is frozen (hidden) while a panel is actively scrolling and redrawn
+  // once scrolling settles — keeps scrolling smooth on long witnesses.
+  const [scrolling, setScrolling] = useState(false);
+  const scrollingRef = useRef(false);
+  const scrollEndRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const buildOffsets = useCallback(() => {
+    const pa = panelARef.current, pb = panelBRef.current;
+    const a = new Map<string, number>(), b = new Map<string, number>();
+    if (pa) { const base = pa.getBoundingClientRect().top - pa.scrollTop; for (const [k, el] of anchorsRef.current) if (k.endsWith(":a")) a.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
+    if (pb) { const base = pb.getBoundingClientRect().top - pb.scrollTop; for (const [k, el] of anchorsRef.current) if (k.endsWith(":b")) b.set(k.slice(0, -2), el.getBoundingClientRect().top - base); }
+    offsetsRef.current = { a, b };
+  }, []);
+
+  const recomputeRibbons = useCallback(() => {
+    const wrapper = wrapperRef.current, gutter = gutterRef.current, pa = panelARef.current, pb = panelBRef.current;
+    if (!wrapper || !gutter || !pa || !pb) return;
+    const H = wrapper.clientHeight;
+    const aScroll = pa.scrollTop, bScroll = pb.scrollTop;
+    const oa = offsetsRef.current.a, ob = offsetsRef.current.b;
+    const next: Ribbon[] = [];
+    for (const v of variants) {
+      const ca = oa.get(v.id), cb = ob.get(v.id);
+      if (ca == null || cb == null) continue;
+      const yA = ca - aScroll, yB = cb - bScroll;
+      // Draw a ribbon when at least one end is on-screen, so a diagonal still
+      // leaves the viewport toward an off-screen counterpart (the braid's point).
+      const visA = yA >= -24 && yA <= H + 24;
+      const visB = yB >= -24 && yB <= H + 24;
+      if (!visA && !visB) continue;
+      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
     }
-    measureRef.current?.();
-  }, [scrollLocked, variants]);
-  // measure() is defined below; hold it in a ref so the scroll handler (created
-  // first) can call the latest version.
-  const measureRef = useRef<(() => void) | null>(null);
+    setRibbons(next);
+    setGutterSize({ width: gutter.clientWidth, height: H });
+  }, [variants]);
+
+  // Locked = the two panels scroll together by position, so both start at line 1
+  // and each source's own top (e.g. its header macro) stays visible. The braid's
+  // sloped ribbons show how the content actually corresponds.
+  const syncCounterpart = useCallback((from: Side) => {
+    const src = from === "a" ? panelARef.current : panelBRef.current;
+    const dst = from === "a" ? panelBRef.current : panelARef.current;
+    if (!src || !dst) return;
+    syncingRef.current = true;
+    dst.scrollTop = src.scrollTop;
+    requestAnimationFrame(() => { syncingRef.current = false; });
+  }, []);
+
+  const onPanelScroll = useCallback((from: Side) => () => {
+    if (scrollLocked && !syncingRef.current) syncCounterpart(from);
+    if (!scrollingRef.current) { scrollingRef.current = true; setScrolling(true); }
+    if (scrollEndRef.current) clearTimeout(scrollEndRef.current);
+    scrollEndRef.current = setTimeout(() => {
+      scrollingRef.current = false; setScrolling(false);
+      buildOffsets(); recomputeRibbons();
+    }, 120);
+  }, [scrollLocked, syncCounterpart, buildOffsets, recomputeRibbons]);
 
   const registerAnchor = useCallback((id: string, side: Side, el: HTMLElement | null) => {
     const key = `${id}:${side}`;
@@ -178,44 +208,20 @@ export function CollationView({
     else anchorsRef.current.delete(key);
   }, []);
 
-  const measure = useCallback(() => {
-    const wrapper = wrapperRef.current;
-    const gutter = gutterRef.current;
-    if (!wrapper || !gutter) return;
-    const wRect = wrapper.getBoundingClientRect();
-    const H = wrapper.clientHeight;
-    const next: Ribbon[] = [];
-    for (const v of variants) {
-      const elA = anchorsRef.current.get(`${v.id}:a`);
-      const elB = anchorsRef.current.get(`${v.id}:b`);
-      if (!elA || !elB) continue;
-      const rA = elA.getBoundingClientRect();
-      const rB = elB.getBoundingClientRect();
-      const yA = rA.top - wRect.top + rA.height / 2;
-      const yB = rB.top - wRect.top + rB.height / 2;
-      // Panels scroll independently — drop ribbons whose either end is scrolled
-      // out of the visible region (with a small margin).
-      if (yA < -24 || yA > H + 24 || yB < -24 || yB > H + 24) continue;
-      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
-    }
-    setRibbons(next);
-    setGutterSize({ width: gutter.clientWidth, height: H });
-  }, [variants]);
-  measureRef.current = measure;
-
   useLayoutEffect(() => {
     if (editMode) return; // braid is hidden while editing text
-    measure();
+    const recompute = () => { buildOffsets(); recomputeRibbons(); };
+    recompute();
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
-    const ro = new ResizeObserver(() => measure());
+    const ro = new ResizeObserver(recompute);
     ro.observe(wrapper);
-    const t = setTimeout(measure, 250);
+    const t = setTimeout(recompute, 250);
     return () => {
       ro.disconnect();
       clearTimeout(t);
     };
-  }, [measure, editMode, fontSize]);
+  }, [buildOffsets, recomputeRibbons, editMode, fontSize]);
 
   const scrollToLine = useCallback(
     (side: Side, line: number) => {
@@ -436,7 +442,7 @@ export function CollationView({
             {braidOpen ? (
               <>
                 {!editMode && (
-                  <div className="absolute inset-0">
+                  <div className="absolute inset-0 transition-opacity duration-150" style={{ opacity: scrolling ? 0 : 1 }}>
                     <BraidGutter
                       width={gutterSize.width}
                       height={gutterSize.height}
@@ -502,32 +508,35 @@ export function CollationView({
         )}
       </div>
 
-      {/* Apparatus + annotations sit below the braid in their own scroll area so
-          the panels above keep most of the height. */}
-      <div className="shrink-0 overflow-y-auto border-t border-border" style={{ maxHeight: "30vh" }}>
-        <AnnotationsPanel
-          witnessA={witnessA}
-          witnessB={witnessB}
-          annotationsA={annotationsFor(witnessA.id)}
-          annotationsB={annotationsFor(witnessB.id)}
-          onRemove={project.removeAnnotation}
-          onJump={scrollToLine}
-        />
-
-        <ApparatusList
-          entries={apparatus}
-          mode={mode}
-          selectedId={selectedId}
-          apparatusEdits={collation.apparatusEdits}
-          onEditNote={project.editNote}
-          onSelect={onSelect}
-          onHover={setHoveredId}
-          onUnlink={(vid) => {
-            const lid = linkIdOf(vid);
-            if (lid) project.removeManualLink(lid);
-          }}
-        />
-      </div>
+      {/* Apparatus + annotations live in a modal (View ▸ Critical apparatus, or
+          the toolbar) so the two text panels keep the full height. */}
+      {showApparatus && (
+        <ModalCard title="Critical apparatus & notes" subtitle={`${apparatus.length} ${apparatus.length === 1 ? "entry" : "entries"} — click one to add a note`} onClose={onCloseApparatus}>
+          <div className="-mx-4 -mb-4 max-h-[70vh] overflow-y-auto">
+            <AnnotationsPanel
+              witnessA={witnessA}
+              witnessB={witnessB}
+              annotationsA={annotationsFor(witnessA.id)}
+              annotationsB={annotationsFor(witnessB.id)}
+              onRemove={project.removeAnnotation}
+              onJump={scrollToLine}
+            />
+            <ApparatusList
+              entries={apparatus}
+              mode={mode}
+              selectedId={selectedId}
+              apparatusEdits={collation.apparatusEdits}
+              onEditNote={project.editNote}
+              onSelect={onSelect}
+              onHover={setHoveredId}
+              onUnlink={(vid) => {
+                const lid = linkIdOf(vid);
+                if (lid) project.removeManualLink(lid);
+              }}
+            />
+          </div>
+        </ModalCard>
+      )}
 
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
 
