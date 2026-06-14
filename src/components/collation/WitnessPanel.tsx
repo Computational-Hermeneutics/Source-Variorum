@@ -171,6 +171,8 @@ export function WitnessPanel({
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
                     onClick={(e) => {
+                      // Don't let the click reach the background (which deselects).
+                      e.stopPropagation();
                       // Annotate only on modifier-click; a plain click just
                       // highlights the variant in place (no scroll/jump).
                       if (e.metaKey || e.ctrlKey) {

@@ -177,8 +177,9 @@ export function CollationView({
         {editMode && <span className="ml-auto text-[10px] text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
       </div>
 
-      {/* Three-column braid */}
-      <div ref={wrapperRef} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
+      {/* Three-column braid. Clicking the background (not a span or ribbon)
+          clears the current selection. */}
+      <div ref={wrapperRef} onClick={() => onSelect(null)} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
         <div className="border-r border-border min-w-0">
           <WitnessHeader witness={witnessA} side="A" project={project} which="left" annCount={annotationsFor(witnessA.id).length} />
           <WitnessPanel

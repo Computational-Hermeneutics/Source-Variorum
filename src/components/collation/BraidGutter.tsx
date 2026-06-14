@@ -89,7 +89,7 @@ export function BraidGutter({
             style={{ cursor: r.type === "match" ? "default" : "pointer", transition: "opacity 120ms, stroke-width 120ms" }}
             onMouseEnter={() => onHover(r.id)}
             onMouseLeave={() => onHover(null)}
-            onClick={() => onSelect(r.id === selectedId ? null : r.id)}
+            onClick={(e) => { e.stopPropagation(); onSelect(r.id === selectedId ? null : r.id); }}
           />
         );
       })}
