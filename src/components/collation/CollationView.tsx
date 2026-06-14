@@ -11,6 +11,7 @@ import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
 import { BraidGutter, type Ribbon } from "./BraidGutter";
+import { Histogram } from "./Histogram";
 
 type Side = "a" | "b";
 type Project = ReturnType<typeof useProject>;
@@ -228,6 +229,17 @@ export function CollationView({
         {editMode && <span className="ml-auto text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
         {advancedMode && !editMode && <span className="ml-auto text-primary">Advanced — click a passage or drag to select an exact range on each side, then link</span>}
       </div>
+
+      {/* Global change-overview strip (Juxta-style histogram). */}
+      {!editMode && (
+        <Histogram
+          variants={variants}
+          baseLength={witnessA.text.length}
+          visibleTypes={visibleTypes}
+          selectedId={selectedId}
+          onSelect={onSelect}
+        />
+      )}
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
           clears the current selection. In focus/expand mode one panel fills the
