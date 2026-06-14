@@ -12,6 +12,7 @@ import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
 import { LANGS, detectLang } from "@/lib/highlight";
 import { DEFAULT_NORMALIZE, type NormalizeOptions } from "@/lib/collate/similarity";
+import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toTEI } from "@/lib/export/collation-export";
 
@@ -527,13 +528,17 @@ function AddSourcePanel({
     // Multiple files → import each as a witness directly (siglum from filename).
     if (files.length > 1) {
       const sources = await Promise.all(
-        files.map(async (f) => ({ siglum: siglumFromName(f.name), title: f.name, text: await f.text() }))
+        files.map(async (f) => {
+          const raw = await f.text();
+          return { siglum: siglumFromName(f.name), title: f.name, text: looksLikeXml(raw, f.name) ? teiToPlainText(raw) : raw };
+        })
       );
       onAddMany(sources);
       return;
     }
     const f = files[0];
-    setText(normalizeNewlines(await f.text()));
+    const raw = await f.text();
+    setText(normalizeNewlines(looksLikeXml(raw, f.name) ? teiToPlainText(raw) : raw));
     if (!title) setTitle(f.name);
     if (!sig) setSig(siglumFromName(f.name));
   };
@@ -542,7 +547,8 @@ function AddSourcePanel({
     setBusy(true);
     try {
       const res = await fetch(url);
-      setText(normalizeNewlines(await res.text()));
+      const raw = await res.text();
+      setText(normalizeNewlines(looksLikeXml(raw, url) ? teiToPlainText(raw) : raw));
     } catch {
       alert("Could not fetch that URL (CORS or network). Paste or upload instead.");
     } finally {
@@ -564,7 +570,7 @@ function AddSourcePanel({
         <input value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[12px]" placeholder="Title" />
         <input value={url} onChange={(e) => setUrl(e.target.value)} className="flex-1 bg-background border border-border rounded px-2 py-1 text-[11px]" placeholder="Fetch from URL…" />
         <button onClick={fetchUrl} disabled={busy} className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] disabled:opacity-50">{busy ? "…" : "Fetch"}</button>
-        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer whitespace-nowrap" title="Choose one file to edit before adding, or several to import them all at once">File(s)<input type="file" multiple className="hidden" onChange={onFile} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" /></label>
+        <label className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] cursor-pointer whitespace-nowrap" title="Choose one file to edit before adding, or several to import them all at once">File(s)<input type="file" multiple className="hidden" onChange={onFile} accept=".txt,.md,.xml,.tei,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" /></label>
       </div>
       <div className="text-[10px] text-muted-foreground mb-1">Tip: select multiple files to import them all as separate sources at once.</div>
       <textarea value={text} onChange={(e) => setText(e.target.value)} className="w-full h-32 bg-background border border-border rounded px-2 py-1.5 text-[12px] font-mono resize-y" placeholder="Paste source text…" />

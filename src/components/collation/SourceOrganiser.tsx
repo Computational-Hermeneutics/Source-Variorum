@@ -16,6 +16,7 @@ function uid(): string {
 import type { Witness } from "@/types/collation";
 import type { Demo } from "@/data/demos";
 import type { useProject } from "@/hooks/useProject";
+import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 
 type Project = ReturnType<typeof useProject>;
 const COLLAPSE_KEY = "source-variorum-collapsed-folders";
@@ -122,7 +123,11 @@ export function SourceOrganiser({
       e.target.value = "";
       if (!files.length) return;
       const sources = await Promise.all(
-        files.map(async (f) => ({ siglum: siglumOf(f.name), title: f.name, text: await f.text() }))
+        files.map(async (f) => {
+          const raw = await f.text();
+          const text = looksLikeXml(raw, f.name) ? teiToPlainText(raw) : raw;
+          return { siglum: siglumOf(f.name), title: f.name, text };
+        })
       );
       onImport(sources);
     },
@@ -184,7 +189,7 @@ export function SourceOrganiser({
           <button onClick={() => stepFz(1)} title="Larger file-list text" className="px-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground text-[13px]">A+</button>
           <button onClick={() => onHidden(true)} title="Hide sources panel" className="ml-0.5 p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"><ChevronRight className="w-3.5 h-3.5 rotate-180" /></button>
         </div>
-        <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
+        <input ref={importRef} type="file" multiple className="hidden" onChange={onImportFiles} accept=".txt,.md,.xml,.tei,.mac,.lst,.s,.asm,.c,.js,.ts,.py,text/*" />
       </div>
 
       <div className="flex-1 overflow-y-auto py-1" style={{ fontSize: `${fz}px` }}>
