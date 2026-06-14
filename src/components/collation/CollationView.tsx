@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2 } from "lucide-react";
+import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
@@ -55,7 +55,7 @@ export function CollationView({
   stripCols,
   stripVisible,
   onHideStrip,
-  scrollRef,
+  scrollLocked,
   search,
   isDark,
 }: {
@@ -83,7 +83,7 @@ export function CollationView({
   stripCols: { minimap: boolean; variants: boolean; hotspots: boolean };
   stripVisible: boolean;
   onHideStrip: () => void;
-  scrollRef: React.RefObject<HTMLElement | null>;
+  scrollLocked: boolean;
   search?: string;
   isDark: boolean;
 }) {
@@ -94,12 +94,6 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  // Clicking a passage in one panel temporarily slides the OTHER panel so its
-  // linked locus lines up — a peek at where the reading maps. Cleared on
-  // deselect. `previewFrom` = the side that was clicked; `previewShift` = px to
-  // translate the counterpart body by.
-  const [previewFrom, setPreviewFrom] = useState<Side | null>(null);
-  const [previewShift, setPreviewShift] = useState(0);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
@@ -107,11 +101,76 @@ export function CollationView({
   const [leftPick, setLeftPick] = useState<{ start: number; end: number } | null>(null);
   const [rightPick, setRightPick] = useState<{ start: number; end: number } | null>(null);
 
+  // Braid column is draggable (handles on either side) and collapsible.
+  const [braidWidth, setBraidWidth] = useState(120);
+  const prevBraidRef = useRef(120);
+  useEffect(() => {
+    try { const w = localStorage.getItem("source-variorum-braid-width"); if (w != null) setBraidWidth(Math.max(8, Math.min(360, parseInt(w, 10) || 120))); } catch { /* ignore */ }
+  }, []);
+  const persistBraid = (w: number) => { try { localStorage.setItem("source-variorum-braid-width", String(w)); } catch { /* ignore */ } };
+  const onBraidResize = (fromSide: "left" | "right") => (e: React.PointerEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const startX = e.clientX; const startW = braidWidth;
+    const clamp = (w: number) => Math.max(8, Math.min(360, w));
+    const widthFrom = (ev: PointerEvent) => clamp(startW + (fromSide === "left" ? -(ev.clientX - startX) : ev.clientX - startX) * 2);
+    const move = (ev: PointerEvent) => setBraidWidth(widthFrom(ev));
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
+      persistBraid(widthFrom(ev));
+    };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+  const toggleBraid = () => setBraidWidth((w) => {
+    if (w > 12) { prevBraidRef.current = w; persistBraid(8); return 8; }
+    const n = prevBraidRef.current > 12 ? prevBraidRef.current : 120; persistBraid(n); return n;
+  });
+  const braidOpen = braidWidth >= 40;
+
   const anchorsRef = useRef<Map<string, HTMLElement>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
+  // Each panel scrolls in its own container. When locked, scrolling one mirrors
+  // the other by position ratio.
+  const panelARef = useRef<HTMLDivElement>(null);
+  const panelBRef = useRef<HTMLDivElement>(null);
+  const syncingRef = useRef(false);
   const gutterRef = useRef<HTMLDivElement>(null);
   const [ribbons, setRibbons] = useState<Ribbon[]>([]);
   const [gutterSize, setGutterSize] = useState({ width: 0, height: 0 });
+
+  const onPanelScroll = useCallback((from: Side) => () => {
+    if (scrollLocked && !syncingRef.current) {
+      const src = from === "a" ? panelARef.current : panelBRef.current;
+      const dst = from === "a" ? panelBRef.current : panelARef.current;
+      const other: Side = from === "a" ? "b" : "a";
+      if (src && dst) {
+        // Content-aligned sync: keep the variant nearest the source viewport
+        // centre aligned with its counterpart, so the braid stays horizontal and
+        // populated (rather than a blind scroll-ratio that ignores text length).
+        const srcRect = src.getBoundingClientRect();
+        const centreY = srcRect.top + src.clientHeight / 2;
+        let bestId: string | null = null, bestD = Infinity, bestSrcTop = 0;
+        for (const v of variants) {
+          const el = anchorsRef.current.get(`${v.id}:${from}`);
+          if (!el) continue;
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.top + r.height / 2 - centreY);
+          if (d < bestD) { bestD = d; bestId = v.id; bestSrcTop = r.top - srcRect.top; }
+        }
+        const oel = bestId ? anchorsRef.current.get(`${bestId}:${other}`) : null;
+        if (oel) {
+          syncingRef.current = true;
+          const dstRect = dst.getBoundingClientRect();
+          const oelAbs = oel.getBoundingClientRect().top - dstRect.top + dst.scrollTop;
+          dst.scrollTop = Math.max(0, oelAbs - bestSrcTop);
+          requestAnimationFrame(() => { syncingRef.current = false; });
+        }
+      }
+    }
+    measureRef.current?.();
+  }, [scrollLocked, variants]);
+  // measure() is defined below; hold it in a ref so the scroll handler (created
+  // first) can call the latest version.
+  const measureRef = useRef<(() => void) | null>(null);
 
   const registerAnchor = useCallback((id: string, side: Side, el: HTMLElement | null) => {
     const key = `${id}:${side}`;
@@ -124,6 +183,7 @@ export function CollationView({
     const gutter = gutterRef.current;
     if (!wrapper || !gutter) return;
     const wRect = wrapper.getBoundingClientRect();
+    const H = wrapper.clientHeight;
     const next: Ribbon[] = [];
     for (const v of variants) {
       const elA = anchorsRef.current.get(`${v.id}:a`);
@@ -131,17 +191,17 @@ export function CollationView({
       if (!elA || !elB) continue;
       const rA = elA.getBoundingClientRect();
       const rB = elB.getBoundingClientRect();
-      next.push({
-        id: v.id,
-        type: v.type,
-        yA: rA.top - wRect.top + rA.height / 2,
-        yB: rB.top - wRect.top + rB.height / 2,
-        length: v.length,
-      });
+      const yA = rA.top - wRect.top + rA.height / 2;
+      const yB = rB.top - wRect.top + rB.height / 2;
+      // Panels scroll independently — drop ribbons whose either end is scrolled
+      // out of the visible region (with a small margin).
+      if (yA < -24 || yA > H + 24 || yB < -24 || yB > H + 24) continue;
+      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
     }
     setRibbons(next);
-    setGutterSize({ width: gutter.clientWidth, height: wrapper.scrollHeight });
+    setGutterSize({ width: gutter.clientWidth, height: H });
   }, [variants]);
+  measureRef.current = measure;
 
   useLayoutEffect(() => {
     if (editMode) return; // braid is hidden while editing text
@@ -173,35 +233,25 @@ export function CollationView({
   // highlights it in place — no jump.
   const onSelect = useCallback((id: string | null, scroll = true) => {
     setSelectedId(id);
-    setPreviewFrom(null); // selections from the gutter/apparatus jump the shared scroll instead
     if (id && scroll) {
       const el = anchorsRef.current.get(`${id}:a`) ?? anchorsRef.current.get(`${id}:b`);
       el?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }, []);
 
-  // A click in the text body: highlight in place and slide the counterpart panel
-  // to its linked locus (no shared-scroll jump).
+  // A click in the text body highlights in place. When the panels are UNLOCKED,
+  // it also scrolls the OTHER panel to bring the linked locus into view — a peek
+  // at where the reading maps (when locked, the panels already move together).
   const onTextSelect = useCallback(
     (side: Side) => (id: string | null) => {
       setSelectedId(id);
-      setPreviewFrom(id ? side : null);
+      if (id && !scrollLocked) {
+        const other: Side = side === "a" ? "b" : "a";
+        anchorsRef.current.get(`${id}:${other}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
     },
-    []
+    [scrollLocked]
   );
-
-  // Measure how far to slide the counterpart body so its locus aligns with the
-  // clicked one. Both panels share the page scroll, so the viewport delta is the
-  // wrapper delta.
-  useLayoutEffect(() => {
-    if (!previewFrom || !selectedId) { setPreviewShift(0); return; }
-    const a = anchorsRef.current.get(`${selectedId}:a`);
-    const b = anchorsRef.current.get(`${selectedId}:b`);
-    if (!a || !b) { setPreviewShift(0); return; }
-    const ra = a.getBoundingClientRect();
-    const rb = b.getBoundingClientRect();
-    setPreviewShift(previewFrom === "a" ? ra.top - rb.top : rb.top - ra.top);
-  }, [previewFrom, selectedId]);
 
   // ----- Advanced-mode hand-linking -----
   const variantById = useMemo(() => {
@@ -268,7 +318,7 @@ export function CollationView({
   const requestAnnotate = (witnessId: string) => (line: number) => setPendingAnn({ witnessId, line });
 
   return (
-    <div className="flex">
+    <div className="flex flex-1 min-h-0">
       {stripVisible && !editMode && (
         <OverviewStrip
           variants={variants}
@@ -278,7 +328,7 @@ export function CollationView({
           visibleTypes={visibleTypes}
           selectedId={selectedId}
           onSelect={onSelect}
-          scrollRef={scrollRef}
+          scrollRef={panelARef}
           onHide={onHideStrip}
           hotspots={hotspots}
           colMinimap={stripCols.minimap}
@@ -286,7 +336,7 @@ export function CollationView({
           colHotspots={stripCols.hotspots}
         />
       )}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col min-h-0">
       {/* A slim hint bar, shown only in edit / advanced mode (the variant legend
           now lives in the status bar; the change-overview is a modal). */}
       {(editMode || advancedMode) && (
@@ -344,9 +394,9 @@ export function CollationView({
       {/* Three-column braid. Clicking the background (not a span or ribbon)
           clears the current selection. In focus/expand mode one panel fills the
           width and the gutter + other panel are hidden. */}
-      <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid" style={{ gridTemplateColumns: focusSide ? "1fr" : "1fr 120px 1fr" }}>
+      <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid flex-1 min-h-0" style={{ gridTemplateColumns: focusSide ? "1fr" : `1fr ${braidWidth}px 1fr` }}>
         {focusSide !== "b" && (
-          <div className="border-r border-border min-w-0 bg-card">
+          <div ref={panelARef} data-sv-scroll="a" onScroll={onPanelScroll("a")} className="border-r border-border min-w-0 bg-card overflow-y-auto min-h-0">
             <WitnessHeader
               witness={witnessA} side="A" panel="a" project={project} which="left" mode={mode}
               annCount={annotationsFor(witnessA.id).length}
@@ -355,7 +405,6 @@ export function CollationView({
               focused={focusSide === "a"} onToggleFocus={() => setFocusSide(focusSide === "a" ? null : "a")}
               lang={langA} onLang={onLangA}
             />
-            <div className="will-change-transform" style={{ transform: previewFrom === "b" ? `translateY(${previewShift}px)` : undefined, transition: "transform 300ms ease" }}>
             <WitnessPanel
               side="a"
               witness={witnessA}
@@ -379,32 +428,45 @@ export function CollationView({
               isDark={isDark}
               search={search}
             />
-            </div>
           </div>
         )}
 
         {!focusSide && (
           <div ref={gutterRef} className="relative bg-muted/10">
-            {!editMode && (
-              <div className="absolute inset-0 transition-opacity duration-300" style={{ opacity: previewFrom ? 0.12 : 1 }}>
-                <BraidGutter
-                  width={gutterSize.width}
-                  height={gutterSize.height}
-                  ribbons={ribbons}
-                  maxLength={maxLength}
-                  selectedId={selectedId}
-                  hoveredId={hoveredId}
-                  visibleTypes={visibleTypes}
-                  onSelect={onSelect}
-                  onHover={setHoveredId}
-                />
-              </div>
+            {braidOpen ? (
+              <>
+                {!editMode && (
+                  <div className="absolute inset-0">
+                    <BraidGutter
+                      width={gutterSize.width}
+                      height={gutterSize.height}
+                      ribbons={ribbons}
+                      maxLength={maxLength}
+                      selectedId={selectedId}
+                      hoveredId={hoveredId}
+                      visibleTypes={visibleTypes}
+                      onSelect={onSelect}
+                      onHover={setHoveredId}
+                    />
+                  </div>
+                )}
+                {/* Resize handles on either side + a collapse button. */}
+                <div onPointerDown={onBraidResize("left")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 left-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
+                <div onPointerDown={onBraidResize("right")} onClick={(e) => e.stopPropagation()} title="Drag to resize the braid" className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 z-10" />
+                <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Hide the braid" className="absolute top-1 left-1/2 -translate-x-1/2 z-20 p-0.5 rounded bg-card/80 border border-border text-muted-foreground hover:text-foreground">
+                  <ChevronsRightLeft className="w-3 h-3" />
+                </button>
+              </>
+            ) : (
+              <button onClick={(e) => { e.stopPropagation(); toggleBraid(); }} title="Show the braid" className="absolute inset-0 flex items-center justify-center text-muted-foreground hover:bg-muted/40">
+                <ChevronsLeftRight className="w-3 h-3" />
+              </button>
             )}
           </div>
         )}
 
         {focusSide !== "a" && (
-          <div className="border-l border-border min-w-0 bg-card">
+          <div ref={panelBRef} data-sv-scroll="b" onScroll={onPanelScroll("b")} className="border-l border-border min-w-0 bg-card overflow-y-auto min-h-0">
             <WitnessHeader
               witness={witnessB} side="B" panel="b" project={project} which="right" mode={mode}
               annCount={annotationsFor(witnessB.id).length}
@@ -413,7 +475,6 @@ export function CollationView({
               focused={focusSide === "b"} onToggleFocus={() => setFocusSide(focusSide === "b" ? null : "b")}
               lang={langB} onLang={onLangB}
             />
-            <div className="will-change-transform" style={{ transform: previewFrom === "a" ? `translateY(${previewShift}px)` : undefined, transition: "transform 300ms ease" }}>
             <WitnessPanel
               side="b"
               witness={witnessB}
@@ -437,33 +498,36 @@ export function CollationView({
               isDark={isDark}
               search={search}
             />
-            </div>
           </div>
         )}
       </div>
 
-      <AnnotationsPanel
-        witnessA={witnessA}
-        witnessB={witnessB}
-        annotationsA={annotationsFor(witnessA.id)}
-        annotationsB={annotationsFor(witnessB.id)}
-        onRemove={project.removeAnnotation}
-        onJump={scrollToLine}
-      />
+      {/* Apparatus + annotations sit below the braid in their own scroll area so
+          the panels above keep most of the height. */}
+      <div className="shrink-0 overflow-y-auto border-t border-border" style={{ maxHeight: "30vh" }}>
+        <AnnotationsPanel
+          witnessA={witnessA}
+          witnessB={witnessB}
+          annotationsA={annotationsFor(witnessA.id)}
+          annotationsB={annotationsFor(witnessB.id)}
+          onRemove={project.removeAnnotation}
+          onJump={scrollToLine}
+        />
 
-      <ApparatusList
-        entries={apparatus}
-        mode={mode}
-        selectedId={selectedId}
-        apparatusEdits={collation.apparatusEdits}
-        onEditNote={project.editNote}
-        onSelect={onSelect}
-        onHover={setHoveredId}
-        onUnlink={(vid) => {
-          const lid = linkIdOf(vid);
-          if (lid) project.removeManualLink(lid);
-        }}
-      />
+        <ApparatusList
+          entries={apparatus}
+          mode={mode}
+          selectedId={selectedId}
+          apparatusEdits={collation.apparatusEdits}
+          onEditNote={project.editNote}
+          onSelect={onSelect}
+          onHover={setHoveredId}
+          onUnlink={(vid) => {
+            const lid = linkIdOf(vid);
+            if (lid) project.removeManualLink(lid);
+          }}
+        />
+      </div>
 
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
 
@@ -784,7 +848,7 @@ function AnnotationsPanel({
       <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border">
         Annotations · {total}
       </div>
-      <div className="divide-y divide-border/60 max-h-[28vh] overflow-y-auto">
+      <div className="divide-y divide-border/60">
         {annotationsA.map((ann) => row(witnessA, "a", ann))}
         {annotationsB.map((ann) => row(witnessB, "b", ann))}
       </div>
@@ -823,12 +887,12 @@ function ApparatusList({
   const noted = entries.filter((v) => apparatusEdits[v.id]?.note?.trim()).length;
   return (
     <div className="border-t border-border">
-      <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border flex items-center gap-2">
+      <div className="px-4 py-2 text-[12px] font-semibold text-foreground/80 bg-muted/30 border-b border-border flex items-center gap-2 sticky top-0 z-10">
         <span>Critical apparatus · {entries.length} {entries.length === 1 ? "entry" : "entries"}</span>
         {noted > 0 && <span className="text-[10px] font-normal text-muted-foreground">· {noted} noted</span>}
         <span className="ml-auto text-[10px] font-normal text-muted-foreground">click an entry to add a note</span>
       </div>
-      <div className="divide-y divide-border/60 max-h-[40vh] overflow-y-auto">
+      <div className="divide-y divide-border/60">
         {entries.length === 0 && <div className="px-4 py-3 text-[12px] text-muted-foreground">No variants — the witnesses are identical.</div>}
         {entries.map((v) => {
           const selected = v.id === selectedId;

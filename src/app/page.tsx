@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, Lock, LockOpen } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -131,12 +131,15 @@ export default function Home() {
       return next;
     });
   const stripVisible = stripCols.minimap || stripCols.variants || stripCols.hotspots;
+  // Lock = the two panels scroll in sync (default). Unlock = independent scroll.
+  const [scrollLocked, setScrollLocked] = useState(true);
+  const toggleLock = () => setScrollLocked((v) => { const n = !v; try { localStorage.setItem("source-variorum-scroll-lock", n ? "1" : "0"); } catch { /* ignore */ } return n; });
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const setSidebarHiddenP = (v: boolean) => { setSidebarHidden(v); try { localStorage.setItem("source-variorum-sidebar-hidden", v ? "1" : "0"); } catch { /* ignore */ } };
   const [search, setSearch] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
-  const scrollTop = () => mainRef.current?.scrollTo({ top: 0 });
+  const scrollTop = () => { mainRef.current?.scrollTo({ top: 0 }); document.querySelectorAll("[data-sv-scroll]").forEach((el) => (el as HTMLElement).scrollTo({ top: 0 })); };
 
   // Hydrate working collation + font size on mount; otherwise load a default
   // sample (all sample texts are fetched from /public, so there is no inline one).
@@ -161,6 +164,7 @@ export default function Home() {
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
       const sc = localStorage.getItem("source-variorum-strip-cols");
       if (sc) setStripCols((prev) => ({ ...prev, ...JSON.parse(sc) }));
+      if (localStorage.getItem("source-variorum-scroll-lock") === "0") setScrollLocked(false);
       if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
     } catch {
       /* ignore */
@@ -397,6 +401,8 @@ export default function Home() {
 
             <button onClick={() => setShowOverview(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Change overview"><BarChart3 className="w-3.5 h-3.5" /></button>
 
+            <button onClick={toggleLock} className={"p-1.5 rounded border border-border " + (scrollLocked ? "bg-card hover:bg-muted text-muted-foreground" : "bg-primary/10 border-primary/40 text-primary")} title={scrollLocked ? "Panels scroll together (click to unlock for independent scrolling)" : "Panels scroll independently (click to lock in sync)"}>{scrollLocked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}</button>
+
             {project.isDirty && (
               <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
                 <RotateCcw className="w-3.5 h-3.5" /> Revert
@@ -421,7 +427,7 @@ export default function Home() {
 
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} hidden={sidebarHidden} onHidden={setSidebarHiddenP} />
-        <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
           <CollationView
             project={project}
             view={view}
@@ -447,7 +453,7 @@ export default function Home() {
             stripCols={stripCols}
             stripVisible={stripVisible}
             onHideStrip={() => setStripCols((p) => { const next = { minimap: false, variants: false, hotspots: false }; try { localStorage.setItem("source-variorum-strip-cols", JSON.stringify(next)); } catch {} return next; })}
-            scrollRef={mainRef}
+            scrollLocked={scrollLocked}
             search={search}
             isDark={isDark}
           />
@@ -722,7 +728,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
                 <span className="font-mono text-[12px]">Eddy(D&#x2c7;) = (1/n) &Sigma;<sub>k</sub> &#8741;D&#x2c7; &minus; D<sub>k</sub>&#8741;</span></p>
               <p><strong>Viv</strong> (vivacity) — a <em>passage&apos;s</em> overall instability: the average of all the Eddy values for that passage (its &ldquo;diameter&rdquo;). A high Viv marks a <em>hotspot</em> where the versions most disagree.<br />
                 <span className="font-mono text-[12px]">Viv(i) = (1/n) &Sigma;<sub>k</sub> Eddy(D<sub>k</sub><sup>i</sup>)</span></p>
-              <p className="text-[12px] text-muted-foreground">In Source Variorum the <strong>Version hotspots</strong> overview is a simplified <em>Viv</em>: at each point in the base text it counts how many of the other witnesses diverge there (rather than vector-space distance). Per-version <em>Eddy</em> ranking is a planned addition.</p>
+              <p className="text-[12px] text-muted-foreground">Source Variorum implements both, but as <strong>cheap pairwise/aggregate approximations, not the VVV vector-space originals</strong>. Our <em>Eddy</em> (the version-distinctiveness ranking) is a witness&apos;s mean <span className="font-mono text-[11px]">(1 &minus; Dice-bigram)</span> lexical distance from every other witness; our <em>Viv</em> (the <strong>Version hotspots</strong> overview) counts, at each point in the base text, how many witnesses diverge from the copy-text. They are heuristic, orientation-oriented measures, not canonical variant-graph computations: the numbers locate <em>where</em> and <em>which</em>, but should not be read as exact divergence distances.</p>
               <p className="text-[9px] leading-snug text-muted-foreground/80">Eddy &amp; Viv were defined by the VVV / Translation Arrays team (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry); see ShakerVis (Geng, Cheesman, Laramee, Flanagan &amp; Thiel, <em>Information Visualization</em> 14(4), 2013) and Cheesman et al., delightedbeauty.org/vvv.</p>
             </div>
           </details>

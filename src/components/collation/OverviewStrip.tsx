@@ -15,7 +15,7 @@ import { heat } from "./HotspotBar";
  *   • Variant map     — where the two open witnesses differ (dominant type),
  *                       drawn faintly over the minimap.
  *   • Version hotspots — where ALL witnesses diverge (Viv heat), 3+ witnesses;
- *                       a thin heat line alongside, on the far right.
+ *                       a thin heat line on the left, before the minimap.
  * Bars are drawn sparse (length ∝ amount of change) so the strip reads as a map
  * rather than a solid block. A viewport box tracks scroll; click jumps to the
  * nearest variant.
@@ -142,27 +142,29 @@ export function OverviewStrip({
     if (!showHeat || !hotspots) return [];
     const N = 150;
     const { freq, others, baseLength } = hotspots;
-    const out: { y: number; h: number; w: number; color: string }[] = [];
+    const out: { y: number; h: number; w: number; color: string; op: number }[] = [];
     for (let i = 0; i < N; i++) {
       const s = Math.floor((i / N) * baseLength);
       const e = Math.max(s + 1, Math.floor(((i + 1) / N) * baseLength));
       let sum = 0;
       for (let j = s; j < e && j < baseLength; j++) sum += freq[j];
       const intensity = sum / Math.max(1, e - s) / others; // 0..1
-      if (intensity > 0.01) out.push({ y: (i / N) * VH, h: VH / N + 0.6, w: 0.15 + 0.85 * intensity, color: heat(intensity) });
+      // Low-divergence buckets fade out so the genuine hotspots read clearly.
+      if (intensity > 0.01) out.push({ y: (i / N) * VH, h: VH / N + 0.6, w: 0.15 + 0.85 * intensity, color: heat(intensity), op: 0.25 + 0.7 * intensity });
     }
     return out;
   }, [showHeat, hotspots]);
 
-  // ----- Layout: a "main" zone holds the panel minimap (a darker, dominant
-  // background) with the variant map drawn faintly over it; version hotspots run
-  // as a thin heat line alongside, on the far right. -----
+  // ----- Layout: a thin hotspot heat line on the LEFT, a small gap, then the
+  // "main" zone — the panel minimap (darker, dominant background) with the
+  // variant map drawn faintly over it. -----
   const hasMain = colMinimap || colVariants;
   if (!hasMain && !showHeat) return null;
-  const HEAT_W = 1.3; // thin hotspot line on the right
-  const mainW = hasMain ? (showHeat ? 10 - HEAT_W - GAP : 10) : 0;
+  const HEAT_W = 1.3; // thin hotspot line
+  const heatX = 0;
   const heatW = HEAT_W;
-  const heatX = 10 - HEAT_W;
+  const mainX = showHeat ? HEAT_W + GAP : 0;
+  const mainW = hasMain ? 10 - mainX : 0;
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -174,29 +176,30 @@ export function OverviewStrip({
   };
 
   return (
-    <div className="shrink-0 border-r border-border bg-muted/20 flex flex-col items-stretch sticky top-0 self-start relative" style={{ height: "calc(100dvh - 84px)", width: `${width}px` }}>
+    <div className="shrink-0 border-r border-border bg-muted/20 flex flex-col items-stretch relative h-full" style={{ width: `${width}px` }}>
       <button onClick={onHide} title="Hide overview strip" className="h-5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted">
         <PanelLeftClose className="w-3 h-3" />
       </button>
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
-          {hasMain && <rect x={0} y={0} width={mainW} height={VH} className="fill-card/40" />}
+          {hasMain && <rect x={mainX} y={0} width={mainW} height={VH} className="fill-card/40" />}
           {/* Panel minimap — the dominant, darker background. */}
           {colMinimap && mini.rows.map((r, i) => (
-            <rect key={`m${i}`} x={r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.5 : 0.32} />
+            <rect key={`m${i}`} x={mainX + r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.5 : 0.32} />
           ))}
           {/* Variant map — faint coloured bars over the darker minimap. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={0} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.5} />
+            <rect key={`v${i}`} x={mainX} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.32} />
           ))}
-          {colVariants && selectedY != null && <rect x={0} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
-          {/* Version hotspots — a thin heat line alongside, on the far right. */}
+          {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
+          {/* Version hotspots — a thin heat line on the left, before the minimap. */}
           {showHeat && <rect x={heatX} y={0} width={heatW} height={VH} className="fill-card/30" />}
           {showHeat && heatBuckets.map((b, i) => (
-            <rect key={`h${i}`} x={heatX + (1 - b.w) * heatW} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={0.95} />
+            <rect key={`h${i}`} x={heatX} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={b.op} />
           ))}
-          {/* Viewport indicator across the whole strip */}
-          <rect x={0.4} y={vp.top} width={9.2} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />
+          {/* Viewport indicator across the whole strip — strong outline so the
+              current scroll position stands out against the map. */}
+          <rect x={0.5} y={vp.top} width={9} height={vp.h} className="fill-foreground/10 stroke-foreground" strokeWidth={2.25} rx={1} />
         </svg>
       </div>
       <div onPointerDown={onResizeDown} title="Drag to resize" className="absolute top-0 right-0 h-full w-1.5 -mr-0.5 cursor-col-resize hover:bg-primary/30 z-20" />
