@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.12 |
+| **Version** | 0.5.13 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -103,6 +103,16 @@ reads code and prose.
 
 Juxta / Juxta Commons, the Versioning Machine, and dotplot / sequence-alignment
 views, reworked as a braided variorum for both code and text.
+
+It is also inspired, in part, by the **Version Variation Visualization (VVV) /
+Translation Arrays** project at Swansea University (Tom Cheesman, Robert S.
+Laramee, Kevin Flanagan, Stephan Thiel and colleagues) — its base-text +
+aligned-versions interface, its use of a strong highlight colour for version
+variation, and its *Eddy* / *Viv* metrics for where versions most diverge. See
+ShakerVis (Geng, Cheesman, Laramee, Flanagan & Thiel, *Information Visualization*
+14(4), 2013), <https://cronfa.swan.ac.uk/Record/cronfa24678>, and Geng, Laramee,
+Cheesman, Ehrmann & Berry, "Visualising Translation Variation: Shakespeare's
+*Othello*" (ISVC 2011).
 
 ## Development
 

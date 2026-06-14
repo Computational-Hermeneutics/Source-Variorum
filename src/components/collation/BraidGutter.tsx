@@ -60,8 +60,10 @@ export function BraidGutter({
     >
       {sorted.map((r) => {
         if (!visibleTypes.has(r.type)) return null;
-        const color = VARIANT_TYPE_COLORS[r.type];
-        const active = r.id === selectedId || r.id === hoveredId;
+        const isSelected = r.id === selectedId;
+        // Selected ribbon glows in the version-variation yellow (VVV-style).
+        const color = isSelected ? "var(--sv-variation)" : VARIANT_TYPE_COLORS[r.type];
+        const active = isSelected || r.id === hoveredId;
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;

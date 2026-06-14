@@ -41,6 +41,8 @@
     /* Source Variorum braid helpers (literal colours, used in inline styles) */
     --sv-match: #3563a8;
     --sv-sel: #3563a8;
+    /* Version-variation highlight (VVV-style strong yellow) for the selected locus. */
+    --sv-variation: #f4b400;
   }
 
   .dark {

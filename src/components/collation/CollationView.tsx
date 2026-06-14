@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2 } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
-import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS, variantLabel } from "@/types/collation";
+import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { LANGS } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
@@ -43,6 +43,8 @@ export function CollationView({
   langB,
   onLangA,
   onLangB,
+  showOverview,
+  onCloseOverview,
   isDark,
 }: {
   project: Project;
@@ -61,6 +63,8 @@ export function CollationView({
   langB?: string;
   onLangA: (id: string) => void;
   onLangB: (id: string) => void;
+  showOverview: boolean;
+  onCloseOverview: () => void;
   isDark: boolean;
 }) {
   const editMode = editSide !== null;
@@ -215,30 +219,27 @@ export function CollationView({
 
   return (
     <div className="flex flex-col">
-      {/* Read-only variant legend + counts (toggle visibility from the View menu). */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 border-b border-border text-[10px] bg-muted/30 sticky top-0 z-20 text-muted-foreground">
-        {VARIANT_TYPES.map((t) => {
-          const on = visibleTypes.has(t);
-          return (
-            <span key={t} className="inline-flex items-center gap-1" style={{ opacity: on ? 1 : 0.3 }} title={on ? `${variantLabel(t, mode)} — shown` : `${variantLabel(t, mode)} — hidden (toggle in View ▸ Show)`}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
-              {variantLabel(t, mode)} {metrics.counts[t]}
-            </span>
-          );
-        })}
-        {editMode && <span className="ml-auto text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
-        {advancedMode && !editMode && <span className="ml-auto text-primary">Advanced — click a passage or drag to select an exact range on each side, then link</span>}
-      </div>
+      {/* A slim hint bar, shown only in edit / advanced mode (the variant legend
+          now lives in the status bar; the change-overview is a modal). */}
+      {(editMode || advancedMode) && (
+        <div className="px-3 py-1 border-b border-border text-[10px] bg-muted/30 sticky top-0 z-20 text-muted-foreground">
+          {editMode && <span className="text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
+          {advancedMode && !editMode && <span className="text-primary">Advanced — click a passage or drag to select an exact range on each side, then link</span>}
+        </div>
+      )}
 
-      {/* Global change-overview strip (Juxta-style histogram). */}
-      {!editMode && (
-        <Histogram
-          variants={variants}
-          baseLength={witnessA.text.length}
-          visibleTypes={visibleTypes}
-          selectedId={selectedId}
-          onSelect={onSelect}
-        />
+      {/* Global change-overview (Juxta-style histogram), opened from the toolbar. */}
+      {showOverview && (
+        <ModalCard title="Change overview" subtitle="Where the witnesses diverge across the base text — click to jump" onClose={onCloseOverview}>
+          <Histogram
+            variants={variants}
+            baseLength={witnessA.text.length}
+            visibleTypes={visibleTypes}
+            selectedId={selectedId}
+            onSelect={(id, scroll) => { onSelect(id, scroll); onCloseOverview(); }}
+            large
+          />
+        </ModalCard>
       )}
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
@@ -437,6 +438,29 @@ function LinkBar({
           <button onClick={onCancel} className="ml-1 px-2 py-1 rounded text-[12px] text-muted-foreground hover:bg-muted">Cancel</button>
         </>
       )}
+    </div>
+  );
+}
+
+/** Minimal modal shell for in-view dialogs (the change-overview). */
+function ModalCard({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-20" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-4xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold leading-tight">{title}</h2>
+            {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4">{children}</div>
+      </div>
     </div>
   );
 }

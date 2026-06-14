@@ -45,15 +45,23 @@ function colorize(absStart: number, str: string, tokens: HToken[], isDark: boole
  *  what changed; when a variant is selected every other span is faded so the
  *  locus under work stands alone. */
 function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean, anySelected: boolean) {
+  // The selected locus glows in the strong version-variation yellow (VVV-style),
+  // so the active reading stands out on both panels regardless of variant type.
+  if (selected) {
+    return {
+      background: "color-mix(in srgb, var(--sv-variation) 55%, transparent)",
+      boxShadow: "inset 0 -2px 0 0 var(--sv-variation)",
+      opacity: 1,
+    };
+  }
   if (type === "match") {
-    return selected || hovered ? { background: "color-mix(in srgb, var(--sv-match) 14%, transparent)" } : {};
+    return hovered ? { background: "color-mix(in srgb, var(--sv-match) 14%, transparent)" } : {};
   }
   const color = VARIANT_TYPE_COLORS[type];
-  const alpha = selected ? 46 : hovered ? 30 : anySelected ? 8 : 22;
+  const alpha = hovered ? 30 : anySelected ? 8 : 22;
   return {
     background: `color-mix(in srgb, ${color} ${alpha}%, transparent)`,
-    boxShadow: selected ? `inset 0 -2px 0 0 ${color}` : undefined,
-    opacity: anySelected && !selected && !hovered ? 0.55 : 1,
+    opacity: anySelected && !hovered ? 0.55 : 1,
   };
 }
 
@@ -257,23 +265,41 @@ export function WitnessPanel({
   };
 
   if (editMode) {
+    // Keep the line-number gutter visible while editing. Both gutter and textarea
+    // use the same pixel line-height and the textarea does not wrap, so each
+    // logical line aligns 1:1 with its number (long lines scroll horizontally).
+    const editLineHeight = isMono ? 1.55 : 1.75;
+    const lhPx = Math.round(fontSize * editLineHeight);
+    const editLines = Math.max(1, draft.split("\n").length);
+    const editGutterCh = String(editLines).length + 1;
     return (
-      <textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={() => {
-          if (draft !== witness.text) onEditText(draft);
-        }}
-        spellCheck={false}
-        className="w-full min-h-[60vh] bg-amber-50/40 dark:bg-amber-900/10 border-0 outline-none px-4 py-3 resize-none"
-        style={{
-          fontFamily,
-          fontSize: `${fontSize}px`,
-          lineHeight: isMono ? 1.55 : 1.75,
-          whiteSpace: isMono ? "pre" : "pre-wrap",
-          tabSize: 8,
-        }}
-      />
+      <div className="py-3 flex bg-amber-50/40 dark:bg-amber-900/10 min-h-[60vh]" style={{ fontFamily, fontSize: `${fontSize}px` }}>
+        <div
+          aria-hidden
+          className="shrink-0 select-none text-right pr-3 pl-2 text-muted-foreground/45 tabular-nums"
+          style={{ minWidth: `${editGutterCh}ch`, fontFamily: "var(--code-font-family)", fontSize: `${Math.max(9, fontSize - 2)}px`, lineHeight: `${lhPx}px`, whiteSpace: "pre" }}
+        >
+          {Array.from({ length: editLines }, (_, i) => i + 1).join("\n")}
+        </div>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            if (draft !== witness.text) onEditText(draft);
+          }}
+          spellCheck={false}
+          rows={editLines}
+          className="flex-1 min-w-0 bg-transparent border-0 outline-none pr-4 resize-none overflow-hidden"
+          style={{
+            fontFamily,
+            fontSize: `${fontSize}px`,
+            lineHeight: `${lhPx}px`,
+            whiteSpace: "pre",
+            overflowX: "auto",
+            tabSize: 8,
+          }}
+        />
+      </div>
     );
   }
 

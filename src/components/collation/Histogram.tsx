@@ -22,12 +22,15 @@ export function Histogram({
   visibleTypes,
   selectedId,
   onSelect,
+  large,
 }: {
   variants: Variant[];
   baseLength: number;
   visibleTypes: Set<VariantType>;
   selectedId: string | null;
   onSelect: (id: string, scroll?: boolean) => void;
+  /** Taller, framed rendering for the modal (vs the compact strip). */
+  large?: boolean;
 }) {
   const { bars, navPoints, selectedX } = useMemo(() => {
     const intensity = new Float64Array(BUCKETS);
@@ -87,17 +90,29 @@ export function Histogram({
     if (best) onSelect(best, true);
   };
 
+  const svg = (
+    <svg viewBox={`0 0 ${BUCKETS} ${H}`} preserveAspectRatio="none" className={"w-full block " + (large ? "h-40" : "h-6")}>
+      <rect x={0} y={0} width={BUCKETS} height={H} className="fill-muted/30" />
+      {bars.map((b, i) =>
+        b.h > 0 ? <rect key={i} x={i} y={H - PAD - b.h} width={1} height={b.h} fill={b.color} opacity={0.85} /> : null
+      )}
+      {selectedX != null && <rect x={Math.max(0, selectedX - 0.5)} y={0} width={1.5} height={H} className="fill-foreground" opacity={0.7} />}
+    </svg>
+  );
+
+  if (large) {
+    return (
+      <div className="cursor-pointer rounded border border-border overflow-hidden" onClick={handleClick} title="Click to jump to the nearest variant">
+        {svg}
+      </div>
+    );
+  }
+
   return (
     <div className="px-3 py-1 border-b border-border bg-card/30 flex items-center gap-2">
       <span className="text-[9px] uppercase tracking-wide text-muted-foreground shrink-0" title="Where the witnesses diverge across the base text (witness A). Click to jump.">Change&nbsp;overview</span>
       <div className="flex-1 min-w-0 cursor-pointer" onClick={handleClick} title="Click to jump to the nearest variant">
-        <svg viewBox={`0 0 ${BUCKETS} ${H}`} preserveAspectRatio="none" className="w-full h-6 block">
-          <rect x={0} y={0} width={BUCKETS} height={H} className="fill-muted/30" />
-          {bars.map((b, i) =>
-            b.h > 0 ? <rect key={i} x={i} y={H - PAD - b.h} width={1} height={b.h} fill={b.color} opacity={0.85} /> : null
-          )}
-          {selectedX != null && <rect x={Math.max(0, selectedX - 0.5)} y={0} width={1.5} height={H} className="fill-foreground" opacity={0.7} />}
-        </svg>
+        {svg}
       </div>
     </div>
   );

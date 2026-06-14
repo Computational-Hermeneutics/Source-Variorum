@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3 } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -121,6 +121,7 @@ export default function Home() {
   const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
+  const [showOverview, setShowOverview] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const scrollTop = () => mainRef.current?.scrollTo({ top: 0 });
@@ -276,12 +277,19 @@ export default function Home() {
     {
       label: "View",
       entries: [
+        { kind: "header", label: "Mode" },
+        { kind: "checkbox", label: "Code", checked: collation.mode === "source", onToggle: () => project.setMode("source") },
+        { kind: "checkbox", label: "Text", checked: collation.mode === "text", onToggle: () => project.setMode("text") },
+        { kind: "separator" },
+        { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
+        { kind: "checkbox", label: "Deep-dive panel", checked: showDeepDive, onToggle: () => setShowDeepDive((v) => !v) },
+        { kind: "separator" },
         { kind: "header", label: "Text size" },
         { kind: "action", label: "Larger", shortcut: "A+", onClick: () => setFont(1) },
         { kind: "action", label: "Smaller", shortcut: "A−", onClick: () => setFont(-1) },
         { kind: "action", label: "Reset", onClick: () => setFontSize(13) },
         { kind: "separator" },
-        { kind: "header", label: "Show" },
+        { kind: "header", label: "Show variants" },
         ...VARIANT_TYPES.map((t): MenuEntry => ({
           kind: "checkbox",
           label: variantLabel(t, collation.mode),
@@ -290,7 +298,6 @@ export default function Home() {
           color: VARIANT_TYPE_COLORS[t],
         })),
         { kind: "separator" },
-        { kind: "checkbox", label: "Deep-dive panel", checked: showDeepDive, onToggle: () => setShowDeepDive((v) => !v) },
         { kind: "checkbox", label: "Dark mode", checked: isDark, onToggle: () => setIsDark((v) => !v) },
       ],
     },
@@ -315,32 +322,34 @@ export default function Home() {
   return (
     <div className="h-screen overflow-hidden flex flex-col bg-background text-foreground">
       <header className="border-b border-border bg-card/40 backdrop-blur sticky top-0 z-30">
-        <div className="px-4 py-2.5 flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2.5 mr-1">
+        <div className="px-3 py-1.5 flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 mr-1">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <button onClick={scrollTop} title="Scroll to top" className="shrink-0">
-              <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
+              <img src="/sv-icon.svg" alt="Source Variorum" width={24} height={24} className="w-6 h-6" />
             </button>
-            <button onClick={scrollTop} title="Scroll to top" className="text-[15px] font-semibold tracking-tight hover:text-primary text-left leading-tight">Source Variorum</button>
+            <button onClick={scrollTop} title="Scroll to top" className="text-[14px] font-semibold tracking-tight hover:text-primary text-left leading-tight">Source Variorum</button>
           </div>
 
           <MenuBar menus={menus} />
 
-          <div className="flex items-center gap-2 ml-auto flex-wrap">
-            {/* Mode (Code/Text) */}
-            <div className="flex rounded border border-border overflow-hidden text-[12px]">
-              {(["source", "text"] as CollationMode[]).map((m) => (
-                <button key={m} onClick={() => project.setMode(m)} className={"px-2.5 py-1 transition-colors " + (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m === "source" ? "Code" : "Text"}</button>
-              ))}
+          <div className="flex items-center gap-1.5 ml-auto flex-wrap">
+            {/* Compact mode pill (also in View menu + Settings). */}
+            <button
+              onClick={() => project.setMode(collation.mode === "source" ? "text" : "source")}
+              title="Toggle Code / Text mode (also in View menu and Settings)"
+              className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] font-medium"
+            >
+              {collation.mode === "source" ? "Code" : "Text"}
+            </button>
+
+            {/* Auto / Advanced (hand-braiding) — a cross-panel mode kept global. */}
+            <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Advanced: hand-edit the braid links">
+              <button onClick={() => { setAdvancedMode(false); }} className={"px-2 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
+              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
             </div>
 
-            {/* Auto / Advanced (hand-braiding) — a cross-panel mode, kept global.
-                Per-panel controls (edit, annotate, language, copy, expand) live
-                on each panel's own toolbar. */}
-            <div className="flex rounded border border-border overflow-hidden text-[12px]" title="Advanced: hand-edit the braid links">
-              <button onClick={() => { setAdvancedMode(false); }} className={"px-2.5 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
-              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2.5 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3.5 h-3.5" /> Advanced</button>
-            </div>
+            <button onClick={() => setShowOverview(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Change overview"><BarChart3 className="w-3.5 h-3.5" /></button>
 
             {project.isDirty && (
               <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
@@ -384,19 +393,41 @@ export default function Home() {
             langB={langB}
             onLangA={chooseLangA}
             onLangB={chooseLangB}
+            showOverview={showOverview}
+            onCloseOverview={() => setShowOverview(false)}
             isDark={isDark}
           />
         </main>
       </div>
 
-      <footer className="border-t border-border px-4 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
-        <span>Source Variorum v{APP_VERSION}</span>
-        <span className="opacity-50">·</span>
-        <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/ch-mark.svg" alt="" width={12} height={12} className="w-3 h-3 opacity-70" />
-          Computational Hermeneutics
-        </a>
+      <footer className="border-t border-border px-3 py-1 text-[10px] text-muted-foreground flex items-center gap-x-3 gap-y-0.5 flex-wrap">
+        {/* Variation legend + counts — click a type to show/hide it in the braid. */}
+        <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap">
+          {VARIANT_TYPES.map((t) => {
+            const on = visibleTypes.has(t);
+            return (
+              <button
+                key={t}
+                onClick={() => toggleType(t)}
+                style={{ opacity: on ? 1 : 0.35 }}
+                title={on ? `${variantLabel(t, collation.mode)} — shown (click to hide)` : `${variantLabel(t, collation.mode)} — hidden (click to show)`}
+                className="inline-flex items-center gap-1 hover:text-foreground"
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
+                {variantLabel(t, collation.mode)} {view.metrics.counts[t]}
+              </button>
+            );
+          })}
+        </div>
+        <span className="ml-auto inline-flex items-center gap-2 shrink-0">
+          <span>v{APP_VERSION}</span>
+          <span className="opacity-50">·</span>
+          <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/ch-mark.svg" alt="" width={12} height={12} className="w-3 h-3 opacity-70" />
+            Computational Hermeneutics
+          </a>
+        </span>
       </footer>
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
@@ -413,6 +444,8 @@ export default function Home() {
           onUserName={changeUserName}
           lang={lang}
           onLang={chooseLang}
+          mode={collation.mode}
+          onMode={project.setMode}
           tokenizer={tokenizer}
           onTokenizer={setTokenizerOpt}
           onResetData={() => {
@@ -597,6 +630,10 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <li><Key>Esc</Key> — close a dialog or clear a selection</li>
           </ul>
         </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Inspiration</h3>
+          <p className="text-[12px] text-muted-foreground">Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the <strong>Version Variation Visualization (VVV) / Translation Arrays</strong> project at Swansea University (Cheesman, Laramee, Flanagan, Thiel and colleagues) — including its strong highlight colour for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
+        </section>
       </div>
     </ModalShell>
   );
@@ -647,6 +684,8 @@ function SettingsModal({
   onUserName,
   lang,
   onLang,
+  mode,
+  onMode,
   tokenizer,
   onTokenizer,
   onResetData,
@@ -661,6 +700,8 @@ function SettingsModal({
   onUserName: (name: string) => void;
   lang: string;
   onLang: (id: string) => void;
+  mode: CollationMode;
+  onMode: (m: CollationMode) => void;
   tokenizer: NormalizeOptions;
   onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
   onResetData: () => void;
@@ -710,6 +751,13 @@ function SettingsModal({
 
           {tab === "appearance" && (
             <div className="divide-y divide-border">
+              <SettingsRow label="Mode" hint="Code (line/token, monospace) or Text (sentence/word, prose).">
+                <div className="flex rounded border border-border overflow-hidden text-[12px]">
+                  {(["source", "text"] as CollationMode[]).map((m) => (
+                    <button key={m} onClick={() => onMode(m)} className={"px-3 py-1 " + (mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m === "source" ? "Code" : "Text"}</button>
+                  ))}
+                </div>
+              </SettingsRow>
               <SettingsRow label="Theme" hint="Light or dark">
                 <button onClick={onToggleDark} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-[12px]">
                   {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
