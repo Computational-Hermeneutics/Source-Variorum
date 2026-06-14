@@ -152,14 +152,15 @@ export function OverviewStrip({
     return out;
   }, [showHeat, hotspots]);
 
-  // ----- Column layout: lay out the enabled columns left → right -----
-  const enabled: ("minimap" | "variants" | "hotspots")[] = [];
-  if (colMinimap) enabled.push("minimap");
-  if (colVariants) enabled.push("variants");
-  if (showHeat) enabled.push("hotspots");
-  if (enabled.length === 0) return null;
-  const colW = (10 - GAP * (enabled.length - 1)) / enabled.length;
-  const x0 = (name: string) => enabled.indexOf(name as "minimap") * (colW + GAP);
+  // ----- Layout: a "main" zone (panel minimap + variant map share it, the
+  // minimap underneath as a faint background) and an optional hotspot column. -----
+  const hasMain = colMinimap || colVariants;
+  const zones = (hasMain ? 1 : 0) + (showHeat ? 1 : 0);
+  if (zones === 0) return null;
+  const colW = (10 - GAP * (zones - 1)) / zones;
+  const mainW = colW;
+  const heatX = hasMain ? colW + GAP : 0;
+  const heatW = colW;
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -177,21 +178,20 @@ export function OverviewStrip({
       </button>
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
-          {enabled.map((c) => (
-            <rect key={`bg-${c}`} x={x0(c)} y={0} width={colW} height={VH} className={c === "minimap" ? "fill-card/50" : "fill-card/30"} />
-          ))}
-          {/* Code minimap */}
+          {hasMain && <rect x={0} y={0} width={mainW} height={VH} className="fill-card/40" />}
+          {/* Panel minimap — a faint background under the variant map. */}
           {colMinimap && mini.rows.map((r, i) => (
-            <rect key={`m${i}`} x={x0("minimap") + r.x * colW} y={r.y} width={Math.max(0.3, r.w * colW)} height={mini.h} className="fill-foreground" opacity={0.28} />
+            <rect key={`m${i}`} x={r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.13 : 0.28} />
           ))}
-          {/* Variant map */}
+          {/* Variant map — bars over the minimap. */}
           {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={x0("variants")} y={b.y} width={b.w * colW} height={b.h} fill={b.color} opacity={0.85} />
+            <rect key={`v${i}`} x={0} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.82} />
           ))}
-          {colVariants && selectedY != null && <rect x={x0("variants")} y={Math.max(0, selectedY - 1)} width={colW} height={3} fill="var(--sv-variation)" />}
-          {/* Hotspot map */}
+          {colVariants && selectedY != null && <rect x={0} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
+          {/* Hotspot column on the right. */}
+          {showHeat && <rect x={heatX} y={0} width={heatW} height={VH} className="fill-card/30" />}
           {showHeat && heatBuckets.map((b, i) => (
-            <rect key={`h${i}`} x={x0("hotspots")} y={b.y} width={b.w * colW} height={b.h} fill={b.color} opacity={0.9} />
+            <rect key={`h${i}`} x={heatX} y={b.y} width={b.w * heatW} height={b.h} fill={b.color} opacity={0.9} />
           ))}
           {/* Viewport indicator across the whole strip */}
           <rect x={0.4} y={vp.top} width={9.2} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />

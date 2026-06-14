@@ -33,7 +33,7 @@ function uid(): string {
 }
 
 function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
-  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, text, original: text };
+  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, author: w.author, folder: w.folder, text, original: text };
 }
 
 async function resolveWitnessText(w: DemoWitness): Promise<string> {
@@ -123,7 +123,7 @@ export default function Home() {
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   // The overview strip can show any combination of three columns (or none).
-  const [stripCols, setStripCols] = useState({ minimap: false, variants: true, hotspots: false });
+  const [stripCols, setStripCols] = useState({ minimap: true, variants: true, hotspots: false });
   const setStripCol = (k: "minimap" | "variants" | "hotspots", v: boolean) =>
     setStripCols((prev) => {
       const next = { ...prev, [k]: v };
@@ -332,7 +332,7 @@ export default function Home() {
         { kind: "separator" },
         { kind: "checkbox", label: "Sources panel", checked: !sidebarHidden, onToggle: () => setSidebarHiddenP(sidebarHidden ? false : true) },
         { kind: "header", label: "Overview strip" },
-        { kind: "checkbox", label: "Code minimap", checked: stripCols.minimap, onToggle: () => setStripCol("minimap", !stripCols.minimap) },
+        { kind: "checkbox", label: "Panel minimap", checked: stripCols.minimap, onToggle: () => setStripCol("minimap", !stripCols.minimap) },
         { kind: "checkbox", label: "Variant map", checked: stripCols.variants, onToggle: () => setStripCol("variants", !stripCols.variants) },
         { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
         { kind: "separator" },

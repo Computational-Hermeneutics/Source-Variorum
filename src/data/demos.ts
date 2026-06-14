@@ -12,6 +12,10 @@ export interface DemoWitness {
   title: string;
   date?: string;
   provenance?: string;
+  /** Optional author / editor / translator. */
+  author?: string;
+  /** Optional subfolder to file this witness under in the Sources organiser. */
+  folder?: string;
   /** Inline witness text (for short demos). */
   text?: string;
   /** Path under /public to fetch the witness text from (for large real sources). */
@@ -38,35 +42,36 @@ export interface Demo {
 // project so any two versions can be braided from the Sources sidebar.
 const SW = (file: string): string => `demos/spacewar-1962/${file}`;
 const SPACEWAR_CORPUS: DemoWitness[] = [
-  // Core versions (the development genealogy)
-  { siglum: "1", title: "Spacewar! 1 (reconstructed)", date: "early 1962", provenance: "spacewar_1_early1962_reconstructed.txt", file: SW("spacewar_1_early1962_reconstructed.txt") },
-  { siglum: "2b", title: "Spacewar! 2b (25 Mar 1962)", date: "25 Mar 1962", provenance: "spacewar_2b_25mar62.txt", file: SW("spacewar_2b_25mar62.txt") },
-  { siglum: "2b′", title: "Spacewar! 2b (2 Apr 1962)", date: "2 Apr 1962", provenance: "spacewar_2b_2apr62.txt", file: SW("spacewar_2b_2apr62.txt") },
-  { siglum: "3.1", title: "Spacewar! 3.1 (canonical)", date: "24 Sep 1962", provenance: "spacewar_3.1_complete.txt", file: SW("spacewar_3.1_complete.txt") },
-  { siglum: "4.1f", title: "Spacewar! 4.1f (CHM)", date: "1963 / 2005", provenance: "spacewar_4.1f.txt", file: SW("spacewar_4.1f.txt") },
-  { siglum: "4.2a", title: "Spacewar! 4.2a", date: "22 Feb 1963", provenance: "spacewar_4.2a.txt", file: SW("spacewar_4.2a.txt") },
-  { siglum: "4.3", title: "Spacewar! 4.3 (Twin Star)", date: "17 May 1963", provenance: "spacewar_4.3f.txt", file: SW("spacewar_4.3f.txt") },
-  { siglum: "4.4", title: "Spacewar! 4.4 (dual console)", date: "21 May 1963", provenance: "spacewar_4.4.txt", file: SW("spacewar_4.4.txt") },
-  { siglum: "4.4f", title: "Spacewar! 4.4f", date: "1963", provenance: "spacewar_4.4f.txt", file: SW("spacewar_4.4f.txt") },
-  { siglum: "4.8a", title: "Spacewar! 4.8 (part 1)", date: "1963", provenance: "spacewar_4.8_pt1.txt", file: SW("spacewar_4.8_pt1.txt") },
-  { siglum: "4.8b", title: "Spacewar! 4.8 (part 2)", date: "1963", provenance: "spacewar_4.8_pt2.txt", file: SW("spacewar_4.8_pt2.txt") },
-  { siglum: "4.8s", title: "Spacewar! 4.8 (scorer)", date: "1963", provenance: "spacewar_4.8_scorer.txt", file: SW("spacewar_4.8_scorer.txt") },
-  { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
+  // Core versions (the development genealogy). Authorship per the
+  // spacewar1962.github.io version table.
+  { siglum: "1", title: "Spacewar! 1 (reconstructed)", date: "early 1962", author: "Russell & the Hingham Institute group", provenance: "spacewar_1_early1962_reconstructed.txt", file: SW("spacewar_1_early1962_reconstructed.txt") },
+  { siglum: "2b", title: "Spacewar! 2b (25 Mar 1962)", date: "25 Mar 1962", author: "Russell, Samson, Graetz, et al.", provenance: "spacewar_2b_25mar62.txt", file: SW("spacewar_2b_25mar62.txt") },
+  { siglum: "2b′", title: "Spacewar! 2b (2 Apr 1962)", date: "2 Apr 1962", author: "Russell, Samson, Graetz, et al.", provenance: "spacewar_2b_2apr62.txt", file: SW("spacewar_2b_2apr62.txt") },
+  { siglum: "3.1", title: "Spacewar! 3.1 (canonical)", date: "24 Sep 1962", author: "Steve Russell", provenance: "spacewar_3.1_complete.txt", file: SW("spacewar_3.1_complete.txt") },
+  { siglum: "4.1f", title: "Spacewar! 4.1f (CHM)", date: "1963 / 2005", author: "“dfw”; restored by Peter Samson (CHM, 2005)", provenance: "spacewar_4.1f.txt", file: SW("spacewar_4.1f.txt") },
+  { siglum: "4.2a", title: "Spacewar! 4.2a", date: "22 Feb 1963", author: "“dfw”", provenance: "spacewar_4.2a.txt", file: SW("spacewar_4.2a.txt") },
+  { siglum: "4.3", title: "Spacewar! 4.3 (Twin Star)", date: "17 May 1963", author: "Monty Preonas (“ddp”)", provenance: "spacewar_4.3f.txt", file: SW("spacewar_4.3f.txt") },
+  { siglum: "4.4", title: "Spacewar! 4.4 (dual console)", date: "21 May 1963", author: "Preonas (“ddp”) & Morris", provenance: "spacewar_4.4.txt", file: SW("spacewar_4.4.txt") },
+  { siglum: "4.4f", title: "Spacewar! 4.4f", date: "1963", author: "Preonas (“ddp”) & Morris", provenance: "spacewar_4.4f.txt", file: SW("spacewar_4.4f.txt") },
+  { siglum: "4.8a", title: "Spacewar! 4.8 (part 1)", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8_pt1.txt", file: SW("spacewar_4.8_pt1.txt") },
+  { siglum: "4.8b", title: "Spacewar! 4.8 (part 2)", date: "24 Jul 1963", author: "“dfw”; score routine by Preonas, reworked by Samson", provenance: "spacewar_4.8_pt2.txt", file: SW("spacewar_4.8_pt2.txt") },
+  { siglum: "4.8s", title: "Spacewar! 4.8 (scorer)", date: "24 Jul 1963", author: "Preonas score routine, reworked by Peter Samson", provenance: "spacewar_4.8_scorer.txt", file: SW("spacewar_4.8_scorer.txt") },
+  { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", author: "“dfw”", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
   // Modern reconstructions / re-typings
-  { siglum: "2bм", title: "Spacewar! 2b (2016 retype)", date: "2016", provenance: "spacewar_2b_m_2016.txt", file: SW("spacewar_2b_m_2016.txt") },
-  { siglum: "sw15", title: "Spacewar! (2015 retype)", date: "2015", provenance: "spacewar2015.txt", file: SW("spacewar2015.txt") },
-  // Disassemblies, patches, and supporting listings
-  { siglum: "2b·d", title: "Spacewar! 2b — disassembly", date: "—", provenance: "spacewar_2b_disassembly.txt", file: SW("spacewar_2b_disassembly.txt") },
-  { siglum: "rst·d", title: "Spacewar! restart — disassembly", date: "—", provenance: "spaceWarRstrt_disassembly.txt", file: SW("spaceWarRstrt_disassembly.txt") },
-  { siglum: "rst", title: "Spacewar! auto-restart patch", date: "—", provenance: "spacewAutoRestartPatch.txt", file: SW("spacewAutoRestartPatch.txt") },
-  { siglum: "ssw", title: "Spacewar! sense-switch settings", date: "—", provenance: "spacewar-senseswitches.txt", file: SW("spacewar-senseswitches.txt") },
-  { siglum: "fio", title: "MACRO / FIO-DEC character set", date: "—", provenance: "macro_fiodec.txt", file: SW("macro_fiodec.txt") },
-  // Related PDP-1 display programs (same milieu, in the CCS corpus)
-  { siglum: "hs85", title: "Minskytron Hyperspace (85)", date: "1962", provenance: "hyperspace85.txt", file: SW("hyperspace85.txt") },
-  { siglum: "hs·d", title: "Hyperspace 85 — disassembly", date: "—", provenance: "hyperspace85_disassembly.txt", file: SW("hyperspace85_disassembly.txt") },
-  { siglum: "hs·doc", title: "Minskytron Hyperspace — how-to", date: "—", provenance: "minskytron-hyperspace-howto.txt", file: SW("minskytron-hyperspace-howto.txt") },
-  { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
-  { siglum: "stars", title: "Expensive Planetarium (stars)", date: "1962", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
+  { siglum: "2bм", title: "Spacewar! 2b (2016 retype)", date: "2016", author: "retype (Norbert Landsteiner)", provenance: "spacewar_2b_m_2016.txt", file: SW("spacewar_2b_m_2016.txt") },
+  { siglum: "sw15", title: "Spacewar! (2015 retype)", date: "2015", author: "Norbert Landsteiner", provenance: "spacewar2015.txt", file: SW("spacewar2015.txt") },
+  // Disassemblies, patches, and supporting listings → filed in a subfolder.
+  { siglum: "2b·d", title: "Spacewar! 2b — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spacewar_2b_disassembly.txt", file: SW("spacewar_2b_disassembly.txt") },
+  { siglum: "rst·d", title: "Spacewar! restart — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spaceWarRstrt_disassembly.txt", file: SW("spaceWarRstrt_disassembly.txt") },
+  { siglum: "rst", title: "Spacewar! auto-restart patch", date: "—", folder: "Disassemblies & listings", provenance: "spacewAutoRestartPatch.txt", file: SW("spacewAutoRestartPatch.txt") },
+  { siglum: "ssw", title: "Spacewar! sense-switch settings", date: "—", folder: "Disassemblies & listings", provenance: "spacewar-senseswitches.txt", file: SW("spacewar-senseswitches.txt") },
+  { siglum: "fio", title: "MACRO / FIO-DEC character set", date: "—", author: "DEC / MIT", folder: "Disassemblies & listings", provenance: "macro_fiodec.txt", file: SW("macro_fiodec.txt") },
+  // Related PDP-1 display programs (same milieu) → their own subfolder.
+  { siglum: "hs85", title: "Minskytron Hyperspace (85)", date: "1962", author: "Marvin Minsky / Martin Graetz", folder: "Related PDP-1 programs", provenance: "hyperspace85.txt", file: SW("hyperspace85.txt") },
+  { siglum: "hs·d", title: "Hyperspace 85 — disassembly", date: "—", folder: "Related PDP-1 programs", provenance: "hyperspace85_disassembly.txt", file: SW("hyperspace85_disassembly.txt") },
+  { siglum: "hs·doc", title: "Minskytron Hyperspace — how-to", date: "—", folder: "Related PDP-1 programs", provenance: "minskytron-hyperspace-howto.txt", file: SW("minskytron-hyperspace-howto.txt") },
+  { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", folder: "Related PDP-1 programs", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
+  { siglum: "stars", title: "Expensive Planetarium (stars)", date: "13 Mar 1962", author: "Peter Samson", folder: "Related PDP-1 programs", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
 ];
 
 const OTHELLO_EDITIONS: DemoWitness[] = [
