@@ -12,6 +12,7 @@ import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
 import { LANGS, detectLang } from "@/lib/highlight";
 import { DEFAULT_NORMALIZE, type NormalizeOptions } from "@/lib/collate/similarity";
+import { computeHotspots } from "@/lib/collate/hotspots";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toTEI } from "@/lib/export/collation-export";
@@ -205,6 +206,15 @@ export default function Home() {
   }, [project]);
 
   const view = useMemo(() => deriveView(collation, tokenizer), [collation, tokenizer]);
+
+  // Version hotspots (base vs every other witness, aggregated): only meaningful
+  // with 3+ witnesses, and only computed when the overview is actually open so we
+  // don't pay for N collations on every project.
+  const hotspots = useMemo(
+    () => (showOverview ? computeHotspots(collation, tokenizer) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showOverview, collation.witnesses, collation.leftId, collation.mode, tokenizer]
+  );
 
   const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
     setTokenizer((prev) => {
@@ -410,6 +420,7 @@ export default function Home() {
             onLangB={chooseLangB}
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
+            hotspots={hotspots}
             showStrip={showStrip}
             onHideStrip={() => setShowStripP(false)}
             scrollRef={mainRef}

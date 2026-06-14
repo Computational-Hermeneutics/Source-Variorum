@@ -13,6 +13,8 @@ import { WitnessPanel } from "./WitnessPanel";
 import { BraidGutter, type Ribbon } from "./BraidGutter";
 import { Histogram } from "./Histogram";
 import { OverviewStrip } from "./OverviewStrip";
+import { HotspotBar } from "./HotspotBar";
+import type { Hotspots } from "@/lib/collate/hotspots";
 
 type Side = "a" | "b";
 type Project = ReturnType<typeof useProject>;
@@ -46,6 +48,7 @@ export function CollationView({
   onLangB,
   showOverview,
   onCloseOverview,
+  hotspots,
   showStrip,
   onHideStrip,
   scrollRef,
@@ -70,6 +73,7 @@ export function CollationView({
   onLangB: (id: string) => void;
   showOverview: boolean;
   onCloseOverview: () => void;
+  hotspots: Hotspots | null;
   showStrip: boolean;
   onHideStrip: () => void;
   scrollRef: React.RefObject<HTMLElement | null>;
@@ -253,6 +257,15 @@ export function CollationView({
       {/* Global change-overview (Juxta-style histogram), opened from the toolbar. */}
       {showOverview && (
         <ModalCard title="Change overview" subtitle="Where the witnesses diverge across the base text — click to jump" onClose={onCloseOverview}>
+          {hotspots && hotspots.others >= 2 && (
+            <div className="mb-4">
+              <div className="text-[11px] text-muted-foreground mb-1">
+                <strong>Version hotspots</strong> — how many of the {hotspots.others} other witnesses diverge from the base ({witnessA.title}) at each point. Hot/tall = a passage the versions most contest.
+              </div>
+              <HotspotBar hotspots={hotspots} large />
+            </div>
+          )}
+          <div className="text-[11px] text-muted-foreground mb-1"><strong>This pair</strong> — variants between the two open panels.</div>
           <Histogram
             variants={variants}
             baseLength={witnessA.text.length}
