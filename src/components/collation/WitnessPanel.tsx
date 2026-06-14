@@ -140,6 +140,7 @@ export function WitnessPanel({
   advancedMode,
   pick,
   onPick,
+  onPickRange,
   lang,
   isDark,
 }: {
@@ -159,6 +160,8 @@ export function WitnessPanel({
   advancedMode: boolean;
   pick: { start: number; end: number } | null;
   onPick: (side: Side, vid: string, shift: boolean) => void;
+  /** Set a precise pick range from a native text selection (Advanced mode). */
+  onPickRange: (side: Side, start: number, end: number, shift: boolean) => void;
   /** Syntax-highlighting language id for code mode; undefined / "none" = off. */
   lang?: string;
   isDark: boolean;
@@ -169,17 +172,6 @@ export function WitnessPanel({
 
   const [draft, setDraft] = useState(witness.text);
   useEffect(() => setDraft(witness.text), [witness.text, witness.id]);
-
-  // Variants whose span on this side falls within the current advanced-mode pick.
-  const pickedVids = useMemo(() => {
-    const set = new Set<string>();
-    if (!pick) return set;
-    for (const v of variants) {
-      const sp = side === "a" ? v.a : v.b;
-      if (sp && sp.start < pick.end && pick.start < sp.end) set.add(v.id);
-    }
-    return set;
-  }, [variants, pick, side]);
 
   const rows = useMemo(() => buildRows(witness.text, variants, side), [witness.text, variants, side]);
   const gutterCh = String(rows.length).length + 1;
@@ -203,10 +195,10 @@ export function WitnessPanel({
   );
   const hl = (start: number, str: string): ReactNode => (htokens.length ? colorize(start, str, htokens, isDark) : str);
 
-  // Render a variant segment with word-level tinting: only the words that differ
-  // carry the variant background; shared words stay clean (syntax colour still
-  // applies via hl). Used at rest; a selected locus tints its whole span instead.
-  const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode => {
+  // Split a segment at absolute character ranges, applying a background style to
+  // the covered parts (syntax colour still applies via hl everywhere). Used both
+  // for word-level variant tinting and for the Advanced-mode pick highlight.
+  const tintRuns = (seg: LineSeg, runs: { start: number; end: number; style: React.CSSProperties }[]): ReactNode => {
     const out: ReactNode[] = [];
     const end = seg.start + seg.text.length;
     let cursor = seg.start;
@@ -217,19 +209,48 @@ export function WitnessPanel({
       const s = Math.max(r.start, cursor);
       const e = Math.min(r.end, end);
       if (s > cursor) out.push(<span key={key++}>{sliceHl(cursor, s)}</span>);
-      out.push(
-        r.changed ? (
-          <span key={key++} className="rounded-[2px]" style={{ background: `color-mix(in srgb, ${color} 30%, transparent)` }}>
-            {sliceHl(s, e)}
-          </span>
-        ) : (
-          <span key={key++}>{sliceHl(s, e)}</span>
-        )
-      );
+      out.push(<span key={key++} className="rounded-[2px]" style={r.style}>{sliceHl(s, e)}</span>);
       cursor = e;
     }
     if (cursor < end) out.push(<span key={key++}>{sliceHl(cursor, end)}</span>);
     return out;
+  };
+
+  // Word-level tinting: only the words that differ carry the variant background.
+  const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode =>
+    tintRuns(
+      seg,
+      runs.filter((r) => r.changed).map((r) => ({ start: r.start, end: r.end, style: { background: `color-mix(in srgb, ${color} 30%, transparent)` } }))
+    );
+
+  // Advanced-mode pick highlight: show the exact selected character range.
+  const PICK_STYLE: React.CSSProperties = { background: "color-mix(in srgb, var(--sv-sel) 32%, transparent)", boxShadow: "inset 0 0 0 1px var(--sv-sel)" };
+  const segPicked = (seg: LineSeg): boolean => !!pick && pick.start < seg.start + seg.text.length && seg.start < pick.end;
+  const pickBody = (seg: LineSeg): ReactNode => (pick ? tintRuns(seg, [{ start: pick.start, end: pick.end, style: PICK_STYLE }]) : hl(seg.start, seg.text));
+
+  // Read a native text selection inside this panel and turn it into a precise
+  // character range (CollateX-style boundary setting). Each rendered segment span
+  // carries data-seg-start; we measure from there to the selection endpoint.
+  const onMouseUp = (e: React.MouseEvent) => {
+    if (!advancedMode) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+    const root = e.currentTarget as HTMLElement;
+    const offsetOf = (node: Node | null, off: number): number | null => {
+      let el: HTMLElement | null = node ? (node.nodeType === 3 ? node.parentElement : (node as HTMLElement)) : null;
+      const segEl = el?.closest("[data-seg-start]") as HTMLElement | null;
+      if (!segEl || !root.contains(segEl)) return null;
+      const base = Number(segEl.getAttribute("data-seg-start"));
+      const r = document.createRange();
+      r.setStart(segEl, 0);
+      r.setEnd(node!, off);
+      return base + r.toString().length;
+    };
+    const a = offsetOf(sel.anchorNode, sel.anchorOffset);
+    const b = offsetOf(sel.focusNode, sel.focusOffset);
+    if (a == null || b == null || a === b) return;
+    onPickRange(side, Math.min(a, b), Math.max(a, b), e.shiftKey);
+    sel.removeAllRanges();
   };
 
   if (editMode) {
@@ -256,7 +277,7 @@ export function WitnessPanel({
   const lineHeight = isMono ? 1.55 : 1.75;
 
   return (
-    <div className="py-2" style={{ fontFamily, fontSize: `${fontSize}px`, lineHeight }}>
+    <div className="py-2" style={{ fontFamily, fontSize: `${fontSize}px`, lineHeight }} onMouseUp={onMouseUp}>
       {rows.map((row) => (
         <div key={row.n} className="flex">
           <span
@@ -274,19 +295,22 @@ export function WitnessPanel({
               "​"
             ) : (
               row.segs.map((seg, k) => {
-                // Plain (uncollated) text: render statically, no tint/handlers.
-                if (!seg.vid) return <span key={k}>{hl(seg.start, seg.text)}</span>;
+                // Plain (uncollated) text: static, but still shows the Advanced
+                // pick highlight if a native selection covers it.
+                if (!seg.vid)
+                  return (
+                    <span key={k} data-seg-start={seg.start}>
+                      {advancedMode && segPicked(seg) ? pickBody(seg) : hl(seg.start, seg.text)}
+                    </span>
+                  );
                 const selected = seg.vid === selectedId;
                 const hovered = seg.vid === hoveredId;
-                const picked = pickedVids.has(seg.vid);
                 const runs = wordRunsByVid.get(seg.vid);
                 // Word-level tinting applies at rest (auto mode, not selected); a
                 // selected locus reverts to whole-span tint to show the full reading.
                 const useWordTint = !advancedMode && !selected && !!runs;
                 const style = advancedMode
-                  ? picked
-                    ? { background: "color-mix(in srgb, var(--sv-sel) 30%, transparent)", boxShadow: "inset 0 0 0 1.5px var(--sv-sel)" }
-                    : tintStyle(seg.type, false, hovered, false)
+                  ? tintStyle(seg.type, false, hovered, false)
                   : useWordTint
                     ? hovered
                       ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
@@ -297,13 +321,17 @@ export function WitnessPanel({
                     key={k}
                     ref={seg.anchor ? (el) => registerAnchor(seg.vid, side, el) : undefined}
                     data-vid={seg.vid}
+                    data-seg-start={seg.start}
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
                     onClick={(e) => {
                       // Don't let the click reach the background.
                       e.stopPropagation();
-                      // Advanced mode: clicking picks the passage for hand-linking.
+                      // A drag-select (non-collapsed) is handled by onMouseUp as a
+                      // precise range pick — don't also do a whole-segment pick.
                       if (advancedMode) {
+                        const s = window.getSelection();
+                        if (s && !s.isCollapsed) return;
                         onPick(side, seg.vid, e.shiftKey);
                         return;
                       }
@@ -319,7 +347,11 @@ export function WitnessPanel({
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
                     style={style}
                   >
-                    {useWordTint && runs ? wordBody(seg, runs, VARIANT_TYPE_COLORS[seg.type]) : hl(seg.start, seg.text)}
+                    {advancedMode && segPicked(seg)
+                      ? pickBody(seg)
+                      : useWordTint && runs
+                        ? wordBody(seg, runs, VARIANT_TYPE_COLORS[seg.type])
+                        : hl(seg.start, seg.text)}
                   </span>
                 );
               })

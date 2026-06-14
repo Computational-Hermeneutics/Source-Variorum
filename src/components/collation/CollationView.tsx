@@ -154,6 +154,18 @@ export function CollationView({
     [variantById]
   );
 
+  // Precise picking: an arbitrary character range from a native text selection
+  // (CollateX-style boundary setting), not tied to segment boundaries.
+  const onPickRange = useCallback((side: Side, start: number, end: number, shift: boolean) => {
+    if (end <= start) return;
+    const setter = side === "a" ? setLeftPick : setRightPick;
+    setter((prev) =>
+      shift && prev
+        ? { start: Math.min(prev.start, start), end: Math.max(prev.end, end) }
+        : { start, end }
+    );
+  }, []);
+
   const clearPicks = useCallback(() => {
     setLeftPick(null);
     setRightPick(null);
@@ -198,7 +210,7 @@ export function CollationView({
           );
         })}
         {editMode && <span className="ml-auto text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
-        {advancedMode && !editMode && <span className="ml-auto text-primary">Advanced — pick a passage on each side, then link</span>}
+        {advancedMode && !editMode && <span className="ml-auto text-primary">Advanced — click a passage or drag to select an exact range on each side, then link</span>}
       </div>
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
@@ -223,6 +235,7 @@ export function CollationView({
             advancedMode={advancedMode}
             pick={leftPick}
             onPick={onPick}
+            onPickRange={onPickRange}
             lang={lang}
             isDark={isDark}
           />
@@ -265,6 +278,7 @@ export function CollationView({
             advancedMode={advancedMode}
             pick={rightPick}
             onPick={onPick}
+            onPickRange={onPickRange}
             lang={lang}
             isDark={isDark}
           />
@@ -357,7 +371,7 @@ function LinkBar({
   return (
     <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-card border border-border rounded-lg shadow-xl px-3 py-2 flex items-center gap-2">
       {!leftPick && !rightPick ? (
-        <span className="text-[12px] text-muted-foreground">Advanced: click a passage on the left and one on the right, then choose the link.</span>
+        <span className="text-[12px] text-muted-foreground">Advanced: click a passage, or <strong>drag to select</strong> an exact range, on each side — then choose the link.</span>
       ) : (
         <>
           <span className="text-[12px] text-muted-foreground mr-0.5">

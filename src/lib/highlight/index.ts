@@ -62,7 +62,7 @@ export function highlightRanges(text: string, langId: string | undefined): HToke
   const parser = lang.parser;
   const tokens: HToken[] = [];
   const lines = text.split("\n");
-  let state: unknown = parser.startState ? parser.startState(2) : {};
+  const state: unknown = parser.startState ? parser.startState(2) : {};
   let offset = 0;
   for (const line of lines) {
     const stream = new StringStream(line, 2, 2, undefined);
