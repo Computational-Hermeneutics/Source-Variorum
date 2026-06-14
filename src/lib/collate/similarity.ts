@@ -9,11 +9,34 @@
  * of "how alike are these two readings".
  */
 
-/** Collapse runs of whitespace and lowercase, so trivial reflowing/indentation
- *  differences do not register as variants. Callers that need verbatim equality
- *  compare the raw strings separately. */
-export function normalize(s: string): string {
-  return s.replace(/\s+/g, " ").trim().toLowerCase();
+/**
+ * Tokenizer/normalisation settings (Juxta-style): what trivial differences to
+ * ignore when deciding whether two readings count as the same. Defaults match
+ * the engine's historical behaviour (ignore case + whitespace, keep punctuation).
+ */
+export interface NormalizeOptions {
+  ignoreCase: boolean;
+  ignorePunctuation: boolean;
+  ignoreWhitespace: boolean;
+}
+
+export const DEFAULT_NORMALIZE: NormalizeOptions = {
+  ignoreCase: true,
+  ignorePunctuation: false,
+  ignoreWhitespace: true,
+};
+
+/** Normalise a reading for comparison. With the defaults this collapses
+ *  whitespace and lowercases, so trivial reflow/indentation/case differences do
+ *  not register as variants; punctuation, case, or whitespace can each be kept
+ *  significant by turning the corresponding flag off. Callers that need verbatim
+ *  equality compare the raw strings separately. */
+export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): string {
+  let r = s;
+  if (o.ignoreWhitespace) r = r.replace(/\s+/g, " ").trim();
+  if (o.ignorePunctuation) r = r.replace(/[^\p{L}\p{N}\s]/gu, "");
+  if (o.ignoreCase) r = r.toLowerCase();
+  return r;
 }
 
 function bigrams(s: string): Map<string, number> {
@@ -29,9 +52,9 @@ function bigrams(s: string): Map<string, number> {
  * Dice coefficient over character bigrams of the normalised strings.
  * Short strings (0–1 chars) fall back to exact equality.
  */
-export function similarity(a: string, b: string): number {
-  const na = normalize(a);
-  const nb = normalize(b);
+export function similarity(a: string, b: string, o: NormalizeOptions = DEFAULT_NORMALIZE): number {
+  const na = normalize(a, o);
+  const nb = normalize(b, o);
   if (na === nb) return 1;
   if (na.length < 2 || nb.length < 2) return na === nb ? 1 : 0;
 
@@ -54,7 +77,7 @@ export function similarity(a: string, b: string): number {
   return denom > 0 ? (2 * intersection) / denom : 0;
 }
 
-/** True when two readings are the same up to whitespace/case normalisation. */
-export function isMatch(a: string, b: string): boolean {
-  return normalize(a) === normalize(b);
+/** True when two readings are the same up to the active normalisation. */
+export function isMatch(a: string, b: string, o: NormalizeOptions = DEFAULT_NORMALIZE): boolean {
+  return normalize(a, o) === normalize(b, o);
 }

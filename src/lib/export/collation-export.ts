@@ -11,6 +11,7 @@ import jsPDF from "jspdf";
 import type { Collation, SavedCollation, Variant, Witness } from "@/types/collation";
 import { VARIANT_TYPE_LABELS } from "@/types/collation";
 import { collate } from "@/lib/collate/collate";
+import type { NormalizeOptions } from "@/lib/collate/similarity";
 import { buildApparatus } from "@/lib/collate/apparatus";
 import { computeCollationMetrics } from "@/lib/collate/metrics";
 import { applyManualLinks, pairKey } from "@/lib/collate/manual";
@@ -26,10 +27,12 @@ export function pairOf(c: Collation): [Witness, Witness] {
   return [a, b];
 }
 
-/** Recompute the full derived view (variants + apparatus + metrics) from a collation. */
-export function deriveView(c: Collation) {
+/** Recompute the full derived view (variants + apparatus + metrics) from a
+ *  collation. `normalize` lets the caller pass the active tokenizer settings
+ *  (ignore case / punctuation / whitespace); defaults to the engine defaults. */
+export function deriveView(c: Collation, normalize?: NormalizeOptions) {
   const [a, b] = pairOf(c);
-  let variants = collate(a, b, { mode: c.mode });
+  let variants = collate(a, b, normalize ? { mode: c.mode, normalize } : { mode: c.mode });
   const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
   if (links.length) variants = applyManualLinks(variants, links, a, b);
   const apparatus = buildApparatus(variants, a, b, c);

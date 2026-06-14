@@ -16,7 +16,7 @@
 import { diffArrays, diffWords } from "diff";
 import type { Span, Variant, VariantType, WordRun, Witness } from "@/types/collation";
 import { segment, type Segment } from "./tokenize";
-import { isMatch, similarity, normalize } from "./similarity";
+import { isMatch, similarity, normalize, DEFAULT_NORMALIZE, type NormalizeOptions } from "./similarity";
 import type { CollationMode } from "@/types/collation";
 
 export interface CollateOptions {
@@ -32,6 +32,8 @@ export interface CollateOptions {
    *  Wunsch residue pass). Lower than moveThreshold: corresponding sentences in
    *  two translations can read very differently yet still be the "same" locus. */
   subThreshold: number;
+  /** Normalisation (which trivial differences to ignore when matching). */
+  normalize: NormalizeOptions;
 }
 
 export const DEFAULT_OPTIONS: CollateOptions = {
@@ -40,6 +42,7 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   variantThreshold: 0.85,
   minMoveLength: 12,
   subThreshold: 0.2,
+  normalize: DEFAULT_NORMALIZE,
 };
 
 function spanOf(run: Segment[]): Span {
@@ -84,7 +87,7 @@ function pairReplacementBlock(
     let bestSim = 0;
     for (let j = 0; j < added.length; j++) {
       if (usedAdded.has(j)) continue;
-      const sim = similarity(r.text, added[j].text);
+      const sim = similarity(r.text, added[j].text, opts.normalize);
       if (sim > bestSim) {
         bestSim = sim;
         best = j;
@@ -118,7 +121,7 @@ function detectMoves(
   const usedAdd = new Set<number>();
 
   const order = dels
-    .map((run, i) => ({ i, len: normalize(textOf(run)).length }))
+    .map((run, i) => ({ i, len: normalize(textOf(run), opts.normalize).length }))
     .filter((d) => d.len >= opts.minMoveLength)
     .sort((x, y) => y.len - x.len);
 
@@ -129,8 +132,8 @@ function detectMoves(
     let bestSim = opts.moveThreshold;
     for (let j = 0; j < adds.length; j++) {
       if (usedAdd.has(j)) continue;
-      if (normalize(textOf(adds[j])).length < opts.minMoveLength) continue;
-      const sim = similarity(delText, textOf(adds[j]));
+      if (normalize(textOf(adds[j]), opts.normalize).length < opts.minMoveLength) continue;
+      const sim = similarity(delText, textOf(adds[j]), opts.normalize);
       if (sim >= bestSim) {
         bestSim = sim;
         best = j;
@@ -183,7 +186,7 @@ function pairResidue(
       // Cheap length-ratio prune before the bigram work.
       const la = delText[i].length || 1;
       const lb = addText[j].length || 1;
-      s = Math.max(la, lb) / Math.min(la, lb) > 6 ? 0 : similarity(delText[i], addText[j]);
+      s = Math.max(la, lb) / Math.min(la, lb) > 6 ? 0 : similarity(delText[i], addText[j], opts.normalize);
       simCache.set(key, s);
     }
     return s >= opts.subThreshold ? s : -0.25;
@@ -288,8 +291,8 @@ export function collate(
   const segsA = segment(witnessA.text, opts.mode);
   const segsB = segment(witnessB.text, opts.mode);
 
-  const keysA = segsA.map((s) => normalize(s.text));
-  const keysB = segsB.map((s) => normalize(s.text));
+  const keysA = segsA.map((s) => normalize(s.text, opts.normalize));
+  const keysB = segsB.map((s) => normalize(s.text, opts.normalize));
 
   const changes = diffArrays(keysA, keysB);
 
@@ -380,7 +383,7 @@ export function collate(
     // A match that survived as exact stays a match; guard against normalisation
     // having equated two visibly different strings (keep the verbatim check honest).
     let type = v.type;
-    if (type === "match" && !isMatch(textA, textB)) type = "substitution";
+    if (type === "match" && !isMatch(textA, textB, opts.normalize)) type = "substitution";
     const variant: Variant = {
       id: `v${i}`,
       type,

@@ -11,6 +11,7 @@ import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
 import { LANGS, detectLang } from "@/lib/highlight";
+import { DEFAULT_NORMALIZE, type NormalizeOptions } from "@/lib/collate/similarity";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF } from "@/lib/export/collation-export";
 
@@ -18,6 +19,7 @@ const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
 const LANG_KEY = "source-variorum-lang";
 const USER_KEY = "source-variorum-user";
+const TOKENIZER_KEY = "source-variorum-tokenizer";
 
 function uid(): string {
   try {
@@ -116,6 +118,7 @@ export default function Home() {
   const [langOverrides, setLangOverrides] = useState<Record<string, string>>({});
   const langTouched = useRef(false);
   const [userName, setUserName] = useState("");
+  const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +144,8 @@ export default function Home() {
       if (lg) { setLang(lg); langTouched.current = true; }
       const un = localStorage.getItem(USER_KEY);
       if (un) setUserName(un);
+      const tk = localStorage.getItem(TOKENIZER_KEY);
+      if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
     } catch {
       /* ignore */
     }
@@ -193,7 +198,15 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project]);
 
-  const view = useMemo(() => deriveView(collation), [collation]);
+  const view = useMemo(() => deriveView(collation, tokenizer), [collation, tokenizer]);
+
+  const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
+    setTokenizer((prev) => {
+      const next = { ...prev, [key]: val };
+      try { localStorage.setItem(TOKENIZER_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // Per-panel code language (derived): a per-witness override wins, else the
   // filename's auto-detected language, else the Settings default.
@@ -399,6 +412,8 @@ export default function Home() {
           onUserName={changeUserName}
           lang={lang}
           onLang={chooseLang}
+          tokenizer={tokenizer}
+          onTokenizer={setTokenizerOpt}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -595,6 +610,19 @@ const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "text", label: "Text" },
 ];
 
+function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      role="switch"
+      aria-checked={on}
+      className={"relative inline-flex h-5 w-9 items-center rounded-full transition-colors " + (on ? "bg-primary" : "bg-muted border border-border")}
+    >
+      <span className={"inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform " + (on ? "translate-x-4" : "translate-x-0.5")} />
+    </button>
+  );
+}
+
 function SettingsRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-4 py-2.5">
@@ -618,6 +646,8 @@ function SettingsModal({
   onUserName,
   lang,
   onLang,
+  tokenizer,
+  onTokenizer,
   onResetData,
 }: {
   onClose: () => void;
@@ -630,6 +660,8 @@ function SettingsModal({
   onUserName: (name: string) => void;
   lang: string;
   onLang: (id: string) => void;
+  tokenizer: NormalizeOptions;
+  onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
   onResetData: () => void;
 }) {
   const [tab, setTab] = useState<SettingsTab>("user");
@@ -707,8 +739,17 @@ function SettingsModal({
           )}
 
           {tab === "text" && (
-            <div className="text-[12px] text-muted-foreground py-2 space-y-2">
-              <p>Collation options for prose witnesses will live here — for example ignore <strong>case</strong>, <strong>punctuation</strong>, or <strong>whitespace</strong> when aligning (Juxta-style tokenizer settings), and segment granularity.</p>
+            <div className="divide-y divide-border">
+              <div className="pb-2 text-[11px] text-muted-foreground">When aligning witnesses, treat these trivial differences as <em>not</em> a variant (Juxta-style tokenizer settings). Applies to both modes.</div>
+              <SettingsRow label="Ignore case" hint="“The” and “the” count as the same reading.">
+                <Toggle on={tokenizer.ignoreCase} onClick={() => onTokenizer("ignoreCase", !tokenizer.ignoreCase)} />
+              </SettingsRow>
+              <SettingsRow label="Ignore punctuation" hint="Commas, full stops, quotes etc. don’t count as differences.">
+                <Toggle on={tokenizer.ignorePunctuation} onClick={() => onTokenizer("ignorePunctuation", !tokenizer.ignorePunctuation)} />
+              </SettingsRow>
+              <SettingsRow label="Ignore whitespace" hint="Reflow / indentation / extra spaces don’t count.">
+                <Toggle on={tokenizer.ignoreWhitespace} onClick={() => onTokenizer("ignoreWhitespace", !tokenizer.ignoreWhitespace)} />
+              </SettingsRow>
             </div>
           )}
         </div>
