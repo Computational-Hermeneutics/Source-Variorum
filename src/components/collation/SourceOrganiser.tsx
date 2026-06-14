@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
-  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, ArrowLeftToLine, ArrowRightToLine, Copy,
+  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy,
 } from "lucide-react";
 
 function uid(): string {
@@ -296,13 +296,6 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenu(false)} />
             <div className="absolute right-0 top-full mt-1 w-44 z-50 bg-card border border-border rounded-md shadow-lg py-1 text-[12px]">
-              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.setLeft(w.id); setMenu(false); }}>
-                <ArrowLeftToLine className="w-3 h-3 text-muted-foreground" /> Show on left (base)
-              </button>
-              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.setRight(w.id); setMenu(false); }}>
-                <ArrowRightToLine className="w-3 h-3 text-muted-foreground" /> Show on right
-              </button>
-              <div className="border-t border-border my-1" />
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
                 <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
               </button>

@@ -594,6 +594,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <p>A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a text so a reader can track how textual decisions were made. Source Variorum brings that apparatus of textual criticism to computational close reading, in two modes — source code and prose.</p>
           <p>Load several witnesses into a project, pick any two for the left and right panels, and read the <strong>braid</strong> between them: ribbons connecting matching passages, including text that has <strong>moved</strong>. Variants are typed and gathered into an editable critical apparatus. Edit witness text to correct errors, annotate with ⌘/Ctrl-click, and save or export the project.</p>
           <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first, no model calls.</p>
+          <p className="text-[12px] text-muted-foreground"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
         </div>
         <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -668,10 +669,6 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <li><Key>?</Key> — open this help</li>
             <li><Key>Esc</Key> — close a dialog or clear a selection</li>
           </ul>
-        </section>
-        <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Inspiration</h3>
-          <p className="text-[12px] text-muted-foreground">Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the <strong>Version Variation Visualization (VVV) / Translation Arrays</strong> project at Swansea University (Cheesman, Laramee, Flanagan, Thiel and colleagues) — including its strong highlight colour for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
         </section>
       </div>
     </ModalShell>

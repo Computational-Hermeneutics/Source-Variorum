@@ -512,13 +512,13 @@ function WitnessHeader({
     }).catch(() => {});
   };
   return (
-    <div className="border-b border-border bg-card/60 sticky top-[37px] z-10">
+    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10">
       {/* Row 1: witness selector + badges */}
-      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2">
+      <div className="px-2 pt-1 pb-0.5 flex items-center gap-1.5">
         <select
           value={witness.id}
           onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
-          className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[60%] truncate font-medium"
+          className="text-[11px] bg-transparent border border-border rounded px-1 py-0.5 max-w-[58%] truncate font-medium"
           title={witness.title}
         >
           {witnesses.map((w) => (
@@ -527,9 +527,9 @@ function WitnessHeader({
             </option>
           ))}
         </select>
-        {which === "left" && <span className="text-[9px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
+        {which === "left" && <span className="text-[8px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
         {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
-        {witness.date && <span className="text-[11px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
+        {witness.date && <span className="text-[10px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
         <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>
       </div>
       {/* Row 2: per-panel toolbar */}
@@ -588,21 +588,22 @@ function PanelToolbar({
       onClick={onClick}
       title={title}
       aria-pressed={on}
-      className={"inline-flex items-center justify-center w-7 h-7 rounded border text-[11px] transition-colors " + (on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted")}
+      className={"inline-flex items-center justify-center w-6 h-6 rounded transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-foreground/75 hover:bg-muted hover:text-foreground")}
     >
       {children}
     </button>
   );
+  const Sep = () => <span className="w-px h-4 bg-border mx-0.5 shrink-0" />;
   return (
-    <div className="px-3 pb-1.5 flex items-center gap-1.5" data-panel={panel}>
-      <Tb on={editing} onClick={onToggleEdit} title="Edit this witness text"><Pencil className="w-3.5 h-3.5" /></Tb>
-      <Tb on={annotating} onClick={onToggleAnnotate} title="Annotate: click a line to add a note"><Highlighter className="w-3.5 h-3.5" /></Tb>
+    <div className="px-2 pb-1 flex items-center gap-0.5" data-panel={panel}>
+      <Tb on={editing} onClick={onToggleEdit} title="Edit this witness text"><Pencil className="w-3 h-3" /></Tb>
+      <Tb on={annotating} onClick={onToggleAnnotate} title="Annotate: click a line to add a note"><Highlighter className="w-3 h-3" /></Tb>
       {mode === "source" && (
         <select
           value={lang ?? "none"}
           onChange={(e) => onLang(e.target.value)}
           title="Syntax highlighting for this panel"
-          className="h-7 rounded border border-border bg-card hover:bg-muted text-[11px] px-1 max-w-[8.5rem]"
+          className="h-6 rounded border border-border bg-card hover:bg-muted text-[10px] px-0.5 max-w-[7.5rem]"
         >
           <option value="none">No highlighting</option>
           <optgroup label="Modern">
@@ -617,11 +618,12 @@ function PanelToolbar({
           </optgroup>
         </select>
       )}
-      <span className="flex-1" />
-      <Tb on={copied} onClick={onCopy} title={copied ? "Copied" : "Copy this witness text"}>{copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}</Tb>
-      <Tb on={focused} onClick={onToggleFocus} title={focused ? "Restore both panels" : "Expand this panel"}>{focused ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}</Tb>
-      <Tb onClick={project.undo} title="Undo"><Undo2 className="w-3.5 h-3.5" /></Tb>
-      <Tb onClick={project.redo} title="Redo"><Redo2 className="w-3.5 h-3.5" /></Tb>
+      <Sep />
+      <Tb on={copied} onClick={onCopy} title={copied ? "Copied" : "Copy this witness text"}>{copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}</Tb>
+      <Tb on={focused} onClick={onToggleFocus} title={focused ? "Restore both panels" : "Expand this panel"}>{focused ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}</Tb>
+      <Sep />
+      <Tb onClick={project.undo} title="Undo"><Undo2 className="w-3 h-3" /></Tb>
+      <Tb onClick={project.redo} title="Redo"><Redo2 className="w-3 h-3" /></Tb>
     </div>
   );
 }
