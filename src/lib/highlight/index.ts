@@ -12,8 +12,20 @@
  * JS/C/…) can be added later via highlightTree.
  */
 
-import { StringStream, type StreamParser } from "@codemirror/language";
+import { StringStream, type StreamParser, type LanguageSupport } from "@codemirror/language";
 import { pdp1Parser } from "./lang-pdp1";
+import { agc } from "./langs/agc";
+import { basic } from "./langs/basic";
+import { fortran } from "./langs/fortran";
+import { iplv } from "./langs/iplv";
+import { mad } from "./langs/mad";
+
+/** Pull the bare StreamParser out of a vendored CCS-WB LanguageSupport so we can
+ *  run it standalone (no editor). `streamParser` exists at runtime on every
+ *  StreamLanguage even though it is not in the public type. */
+function parserOf(support: LanguageSupport): StreamParser<unknown> {
+  return (support.language as unknown as { streamParser: StreamParser<unknown> }).streamParser;
+}
 
 export interface HToken {
   from: number;
@@ -36,6 +48,11 @@ export interface HLang {
  */
 export const LANGS: HLang[] = [
   { id: "pdp1", label: "PDP-1 MACRO", parser: pdp1Parser as StreamParser<unknown>, ext: ["mac", "pdp1", "s", "asm", "lst"] },
+  { id: "agc", label: "AGC (Apollo)", parser: parserOf(agc()), ext: ["agc"] },
+  { id: "mad", label: "MAD", parser: parserOf(mad()), ext: ["mad"] },
+  { id: "fortran", label: "FORTRAN", parser: parserOf(fortran()), ext: ["f", "for", "ftn", "f77", "fortran"] },
+  { id: "iplv", label: "IPL-V", parser: parserOf(iplv()), ext: ["ipl", "iplv"] },
+  { id: "basic", label: "BASIC", parser: parserOf(basic()), ext: ["bas", "basic"] },
 ];
 
 export function langById(id: string | undefined): HLang | undefined {

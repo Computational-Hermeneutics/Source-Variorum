@@ -17,6 +17,7 @@ import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, to
 const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
 const LANG_KEY = "source-variorum-lang";
+const USER_KEY = "source-variorum-user";
 
 function uid(): string {
   try {
@@ -107,6 +108,7 @@ export default function Home() {
   const [fontSize, setFontSize] = useState(13);
   const [lang, setLang] = useState<string>("none");
   const langTouched = useRef(false);
+  const [userName, setUserName] = useState("");
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +132,8 @@ export default function Home() {
       if (fs) setFontSize(Math.min(22, Math.max(9, parseInt(fs, 10) || 13)));
       const lg = localStorage.getItem(LANG_KEY);
       if (lg) { setLang(lg); langTouched.current = true; }
+      const un = localStorage.getItem(USER_KEY);
+      if (un) setUserName(un);
     } catch {
       /* ignore */
     }
@@ -166,6 +170,7 @@ export default function Home() {
   }, [collation.witnesses]);
 
   const chooseLang = (id: string) => { langTouched.current = true; setLang(id); try { localStorage.setItem(LANG_KEY, id); } catch { /* ignore */ } };
+  const changeUserName = (name: string) => { setUserName(name); try { localStorage.setItem(USER_KEY, name); } catch { /* ignore */ } };
 
   // Undo/redo keyboard shortcuts (skip when typing in a field — let native undo work).
   useEffect(() => {
@@ -371,8 +376,6 @@ export default function Home() {
       <footer className="border-t border-border px-4 py-2 text-[10px] text-muted-foreground flex items-center gap-2">
         <span>Source Variorum v{APP_VERSION}</span>
         <span className="opacity-50">·</span>
-        <span>by David M. Berry</span>
-        <span className="opacity-50">·</span>
         <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:text-foreground">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/ch-mark.svg" alt="" width={12} height={12} className="w-3 h-3 opacity-70" />
@@ -390,6 +393,10 @@ export default function Home() {
           fontSize={fontSize}
           onFont={setFont}
           onResetFont={() => setFontSize(13)}
+          userName={userName}
+          onUserName={changeUserName}
+          lang={lang}
+          onLang={chooseLang}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -578,24 +585,16 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 }
 
 
-function SettingsModal({
-  onClose,
-  isDark,
-  onToggleDark,
-  fontSize,
-  onFont,
-  onResetFont,
-  onResetData,
-}: {
-  onClose: () => void;
-  isDark: boolean;
-  onToggleDark: () => void;
-  fontSize: number;
-  onFont: (delta: number) => void;
-  onResetFont: () => void;
-  onResetData: () => void;
-}) {
-  const Row = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+type SettingsTab = "user" | "appearance" | "code" | "text";
+const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
+  { id: "user", label: "User" },
+  { id: "appearance", label: "Appearance" },
+  { id: "code", label: "Code" },
+  { id: "text", label: "Text" },
+];
+
+function SettingsRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
     <div className="flex items-center gap-4 py-2.5">
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-medium">{label}</div>
@@ -604,24 +603,113 @@ function SettingsModal({
       <div className="shrink-0 flex items-center gap-2">{children}</div>
     </div>
   );
+}
+
+function SettingsModal({
+  onClose,
+  isDark,
+  onToggleDark,
+  fontSize,
+  onFont,
+  onResetFont,
+  userName,
+  onUserName,
+  lang,
+  onLang,
+  onResetData,
+}: {
+  onClose: () => void;
+  isDark: boolean;
+  onToggleDark: () => void;
+  fontSize: number;
+  onFont: (delta: number) => void;
+  onResetFont: () => void;
+  userName: string;
+  onUserName: (name: string) => void;
+  lang: string;
+  onLang: (id: string) => void;
+  onResetData: () => void;
+}) {
+  const [tab, setTab] = useState<SettingsTab>("user");
   return (
-    <ModalShell title="Settings" subtitle="Preferences are stored in this browser" onClose={onClose}>
-      <div className="divide-y divide-border">
-        <Row label="Appearance" hint="Light or dark theme">
-          <button onClick={onToggleDark} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-[12px]">
-            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            {isDark ? "Dark" : "Light"}
-          </button>
-        </Row>
-        <Row label="Panel text size" hint={`Reading panels · ${fontSize}px`}>
-          <button onClick={() => onFont(-1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Smaller">A−</button>
-          <span className="w-9 text-center tabular-nums text-[12px]">{fontSize}px</span>
-          <button onClick={() => onFont(1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Larger">A+</button>
-          <button onClick={onResetFont} className="ml-1 px-2 h-7 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Reset to 13px">Reset</button>
-        </Row>
-        <Row label="Saved data" hint="The autosaved working project and your preferences">
-          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px]">Clear &amp; reload…</button>
-        </Row>
+    <ModalShell
+      title="Settings"
+      subtitle="Preferences are stored in this browser"
+      onClose={onClose}
+      footer={
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-muted-foreground flex-1">Saved data — the autosaved working project and your preferences.</span>
+          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] shrink-0">Clear &amp; reload…</button>
+        </div>
+      }
+    >
+      <div className="flex gap-5 min-h-[16rem]">
+        {/* Left tab rail */}
+        <nav className="shrink-0 w-28 flex flex-col gap-0.5">
+          {SETTINGS_TABS.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={"text-left px-2.5 py-1.5 rounded text-[13px] " + (tab === t.id ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted text-foreground/80")}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
+
+        {/* Panel content */}
+        <div className="flex-1 min-w-0">
+          {tab === "user" && (
+            <div className="divide-y divide-border">
+              <SettingsRow label="Your name" hint="Signs annotations and apparatus notes (like CCS-WB).">
+                <input
+                  value={userName}
+                  onChange={(e) => onUserName(e.target.value)}
+                  placeholder="e.g. DMB"
+                  className="w-44 bg-background border border-border rounded px-2 py-1 text-[12px]"
+                />
+              </SettingsRow>
+              <div className="py-2.5 text-[11px] text-muted-foreground">More editorial-identity settings (initials, ORCID, signing style) will live here.</div>
+            </div>
+          )}
+
+          {tab === "appearance" && (
+            <div className="divide-y divide-border">
+              <SettingsRow label="Theme" hint="Light or dark">
+                <button onClick={onToggleDark} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-[12px]">
+                  {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+                  {isDark ? "Dark" : "Light"}
+                </button>
+              </SettingsRow>
+              <SettingsRow label="Panel text size" hint={`Reading panels · ${fontSize}px`}>
+                <button onClick={() => onFont(-1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Smaller">A−</button>
+                <span className="w-9 text-center tabular-nums text-[12px]">{fontSize}px</span>
+                <button onClick={() => onFont(1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Larger">A+</button>
+                <button onClick={onResetFont} className="ml-1 px-2 h-7 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Reset to 13px">Reset</button>
+              </SettingsRow>
+            </div>
+          )}
+
+          {tab === "code" && (
+            <div className="divide-y divide-border">
+              <SettingsRow label="Default syntax language" hint="Used for code-mode witnesses when not auto-detected.">
+                <select value={lang} onChange={(e) => onLang(e.target.value)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[10rem]">
+                  <option value="none">No highlighting</option>
+                  {LANGS.map((l) => (
+                    <option key={l.id} value={l.id}>{l.label}</option>
+                  ))}
+                </select>
+              </SettingsRow>
+              <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more code options will live here.</div>
+            </div>
+          )}
+
+          {tab === "text" && (
+            <div className="text-[12px] text-muted-foreground py-2 space-y-2">
+              <p>Collation options for prose witnesses will live here — for example ignore <strong>case</strong>, <strong>punctuation</strong>, or <strong>whitespace</strong> when aligning (Juxta-style tokenizer settings), and segment granularity.</p>
+            </div>
+          )}
+        </div>
       </div>
     </ModalShell>
   );
