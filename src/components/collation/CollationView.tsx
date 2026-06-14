@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair } from "lucide-react";
+import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair, Diff as DiffIcon } from "lucide-react";
+import { diffLines } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
@@ -98,6 +99,7 @@ export function CollationView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
@@ -447,6 +449,9 @@ export function CollationView({
                   </button>
                 ))}
               </div>
+              <button onClick={(e) => { e.stopPropagation(); setShowDiff(true); }} title="Standard diff — unified +/− line view of the two witnesses" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
+                <DiffIcon className="w-3 h-3" />
+              </button>
             </div>
           </div>
         )}
@@ -518,6 +523,8 @@ export function CollationView({
         </ModalCard>
       )}
 
+      {showDiff && <DiffModal witnessA={witnessA} witnessB={witnessB} mode={mode} onClose={() => setShowDiff(false)} />}
+
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
 
       {pendingAnn && (
@@ -551,6 +558,64 @@ export function CollationView({
       )}
       </div>
     </div>
+  );
+}
+
+type DiffRow = { kind: "add" | "del" | "ctx" | "skip"; aNo?: number; bNo?: number; text: string };
+
+/** Standard unified diff (git-style) of the two witnesses: +/− lines with line
+ *  numbers, long unchanged runs collapsed to context. A familiar second reading
+ *  of the same comparison the braid shows. */
+function DiffModal({ witnessA, witnessB, mode, onClose }: { witnessA: Witness; witnessB: Witness; mode: CollationMode; onClose: () => void }) {
+  const rows = useMemo<DiffRow[]>(() => {
+    const parts = diffLines(witnessA.text, witnessB.text);
+    const out: DiffRow[] = [];
+    const CTX = 3; // lines of context kept around each change
+    let aNo = 1, bNo = 1;
+    parts.forEach((p, i) => {
+      const lines = p.value.replace(/\n$/, "").split("\n");
+      if (p.added) { for (const t of lines) out.push({ kind: "add", bNo: bNo++, text: t }); }
+      else if (p.removed) { for (const t of lines) out.push({ kind: "del", aNo: aNo++, text: t }); }
+      else {
+        const first = i === 0, last = i === parts.length - 1;
+        lines.forEach((t, j) => {
+          const nearChange = (!first && j < CTX) || (!last && j >= lines.length - CTX);
+          if (lines.length <= CTX * 2 + 1 || nearChange) out.push({ kind: "ctx", aNo: aNo, bNo: bNo, text: t });
+          else if (j === CTX) out.push({ kind: "skip", text: `⋯ ${lines.length - CTX * 2} unchanged lines ⋯` });
+          aNo++; bNo++;
+        });
+      }
+    });
+    return out;
+  }, [witnessA.text, witnessB.text]);
+
+  const adds = rows.filter((r) => r.kind === "add").length;
+  const dels = rows.filter((r) => r.kind === "del").length;
+  const mono = mode === "source";
+  return (
+    <ModalCard title="Standard diff" subtitle={`${witnessA.siglum} → ${witnessB.siglum} · ${dels} removed, ${adds} added`} onClose={onClose}>
+      <div className="-mx-4 -mb-4 max-h-[72vh] overflow-auto">
+        <table className="w-full border-collapse" style={{ fontFamily: mono ? "var(--code-font-family)" : "inherit", fontSize: "11.5px" }}>
+          <tbody>
+            {rows.map((r, i) => {
+              if (r.kind === "skip") return (
+                <tr key={i}><td colSpan={3} className="px-3 py-1 text-center text-[10px] text-muted-foreground bg-muted/40 select-none">{r.text}</td></tr>
+              );
+              const bg = r.kind === "add" ? "bg-[#3f7d5b]/12" : r.kind === "del" ? "bg-[#9c3b3b]/12" : "";
+              const sign = r.kind === "add" ? "+" : r.kind === "del" ? "−" : " ";
+              const signColor = r.kind === "add" ? "text-[#3f7d5b]" : r.kind === "del" ? "text-[#9c3b3b]" : "text-muted-foreground/40";
+              return (
+                <tr key={i} className={bg}>
+                  <td className="w-9 px-1 text-right tabular-nums text-[9px] text-muted-foreground/50 select-none align-top">{r.aNo ?? ""}</td>
+                  <td className="w-9 px-1 text-right tabular-nums text-[9px] text-muted-foreground/50 select-none align-top border-r border-border">{r.bNo ?? ""}</td>
+                  <td className="px-2 align-top whitespace-pre-wrap break-words"><span className={"select-none mr-1.5 " + signColor}>{sign}</span>{r.text || "​"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </ModalCard>
   );
 }
 
@@ -773,7 +838,7 @@ function WitnessHeader({
       <select
         value={witness.id}
         onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
-        className="text-[10px] bg-transparent border border-border rounded px-1 py-0.5 min-w-[5rem] max-w-[42%] truncate font-medium"
+        className="text-[10px] bg-transparent border border-border rounded px-1 py-0.5 min-w-[5rem] max-w-[42%] truncate"
         title={witness.title}
       >
         {witnesses.map((w) => (

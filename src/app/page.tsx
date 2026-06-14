@@ -16,7 +16,7 @@ import { computeHotspots } from "@/lib/collate/hotspots";
 import { computeEddy } from "@/lib/collate/eddy";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
-import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toTEI } from "@/lib/export/collation-export";
+import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toBraidPDF, toTEI } from "@/lib/export/collation-export";
 
 const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
@@ -308,7 +308,8 @@ export default function Home() {
         { kind: "header", label: "Export" },
         { kind: "action", label: "Markdown (.md)", onClick: () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown") },
         { kind: "action", label: "TEI P5 (.xml)", shortcut: "app/rdg", onClick: () => download(`${slugify(collation.name)}.xml`, toTEI(collation), "application/tei+xml") },
-        { kind: "action", label: "PDF (.pdf)", onClick: () => toPDF(collation).save(`${slugify(collation.name)}.pdf`) },
+        { kind: "action", label: "PDF — apparatus (.pdf)", onClick: () => toPDF(collation).save(`${slugify(collation.name)}.pdf`) },
+        { kind: "action", label: "PDF — side-by-side braid (.pdf)", onClick: () => toBraidPDF(collation).save(`${slugify(collation.name)}-braid.pdf`) },
         { kind: "action", label: "JSON (.json)", onClick: () => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json") },
       ],
     },
@@ -688,8 +689,13 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <p>Two witnesses sit side by side with a central <strong>braid</strong> of ribbons connecting matching passages, including text that has <strong>moved</strong> between them. The left panel is the <strong>base</strong> (copy-text). Click any passage or ribbon to highlight the shared reading in both panels and fade the rest; click empty space to clear.</p>
         </section>
         <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two modes</h3>
-          <p><strong>Code</strong> is line- and token-aware in monospace; <strong>Text</strong> is sentence- and word-aware in proportional type. Switch in the <strong>View</strong> menu or <strong>Settings</strong>.</p>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two collation engines: Code &amp; Text</h3>
+          <p>The mode (View menu or Settings) changes both the typography <em>and</em> how the braid is computed, because the two materials behave differently:</p>
+          <ul className="list-disc pl-5 space-y-1 mt-1.5">
+            <li><strong>Code</strong> aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so the engine trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. The braid stays tight and faithful to the listing.</li>
+            <li><strong>Text</strong> aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. The engine pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Correspondence here is semantic, not positional.</li>
+          </ul>
+          <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style tokenizer toggles (Settings ▸ Text); only the matching thresholds differ by mode.</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
