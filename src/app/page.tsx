@@ -103,10 +103,17 @@ export default function Home() {
   const [showAbout, setShowAbout] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  // Per-panel edit / annotate: only the named side enters that mode (so one
+  // witness can be edited while the other is read). null = neither.
+  const [editSide, setEditSide] = useState<"a" | "b" | null>(null);
+  const [annotateSide, setAnnotateSide] = useState<"a" | "b" | null>(null);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
+  // `lang` is the default code language (Settings). Per-panel language is derived
+  // during render: a per-witness override (set from the panel toolbar) wins, else
+  // auto-detect from the witness filename, else the default.
   const [lang, setLang] = useState<string>("none");
+  const [langOverrides, setLangOverrides] = useState<Record<string, string>>({});
   const langTouched = useRef(false);
   const [userName, setUserName] = useState("");
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
@@ -161,14 +168,8 @@ export default function Home() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
-  // Auto-detect the code language from the witness filenames the first time we
-  // see a collation, unless the user has already chosen one.
-  useEffect(() => {
-    if (langTouched.current) return;
-    const detected = collation.witnesses.map((w) => detectLang(w.title)).find(Boolean);
-    if (detected) setLang(detected);
-  }, [collation.witnesses]);
-
+  // The Settings "default code language": persisted, and used to seed a panel
+  // whose witness filename does not auto-detect a language.
   const chooseLang = (id: string) => { langTouched.current = true; setLang(id); try { localStorage.setItem(LANG_KEY, id); } catch { /* ignore */ } };
   const changeUserName = (name: string) => { setUserName(name); try { localStorage.setItem(USER_KEY, name); } catch { /* ignore */ } };
 
@@ -193,6 +194,14 @@ export default function Home() {
   }, [project]);
 
   const view = useMemo(() => deriveView(collation), [collation]);
+
+  // Per-panel code language (derived): a per-witness override wins, else the
+  // filename's auto-detected language, else the Settings default.
+  const langFor = (w: Witness | undefined): string => (w ? langOverrides[w.id] ?? detectLang(w.title) ?? lang : lang);
+  const langA = langFor(view.a);
+  const langB = langFor(view.b);
+  const chooseLangA = (id: string) => { if (view.a) setLangOverrides((o) => ({ ...o, [view.a!.id]: id })); };
+  const chooseLangB = (id: string) => { if (view.b) setLangOverrides((o) => ({ ...o, [view.b!.id]: id })); };
 
   const loadDemo = (id: string) => {
     collationFromDemo(id).then(project.load).catch(() => alert("Could not load that demo's source files."));
@@ -244,8 +253,8 @@ export default function Home() {
         { kind: "action", label: "Undo", shortcut: "⌘Z", onClick: project.undo, disabled: !project.canUndo },
         { kind: "action", label: "Redo", shortcut: "⌘⇧Z", onClick: project.redo, disabled: !project.canRedo },
         { kind: "separator" },
-        { kind: "checkbox", label: "Edit witness text", checked: editMode, onToggle: () => { setEditMode((v) => !v); setAdvancedMode(false); } },
-        { kind: "checkbox", label: "Advanced hand-braiding", checked: advancedMode, onToggle: () => { setAdvancedMode((v) => !v); setEditMode(false); } },
+        { kind: "checkbox", label: "Edit base witness", checked: editSide !== null, onToggle: () => { setEditSide((v) => (v ? null : "a")); setAdvancedMode(false); } },
+        { kind: "checkbox", label: "Advanced hand-braiding", checked: advancedMode, onToggle: () => { setAdvancedMode((v) => !v); setEditSide(null); } },
         { kind: "separator" },
         { kind: "action", label: "Revert to last saved", onClick: () => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }, disabled: !project.isDirty },
       ],
@@ -311,25 +320,12 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Syntax language (code mode only) */}
-            {collation.mode === "source" && (
-              <select
-                value={lang}
-                onChange={(e) => chooseLang(e.target.value)}
-                title="Syntax highlighting for code"
-                className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[9rem]"
-              >
-                <option value="none">No highlighting</option>
-                {LANGS.map((l) => (
-                  <option key={l.id} value={l.id}>{l.label}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Auto / Advanced (hand-braiding) */}
+            {/* Auto / Advanced (hand-braiding) — a cross-panel mode, kept global.
+                Per-panel controls (edit, annotate, language, copy, expand) live
+                on each panel's own toolbar. */}
             <div className="flex rounded border border-border overflow-hidden text-[12px]" title="Advanced: hand-edit the braid links">
               <button onClick={() => { setAdvancedMode(false); }} className={"px-2.5 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
-              <button onClick={() => { setAdvancedMode(true); setEditMode(false); }} className={"inline-flex items-center gap-1 px-2.5 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3.5 h-3.5" /> Advanced</button>
+              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2.5 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3.5 h-3.5" /> Advanced</button>
             </div>
 
             {project.isDirty && (
@@ -361,13 +357,19 @@ export default function Home() {
             project={project}
             view={view}
             fontSize={fontSize}
-            editMode={editMode}
+            editSide={editSide}
+            onEditSide={setEditSide}
+            annotateSide={annotateSide}
+            onAnnotateSide={setAnnotateSide}
             advancedMode={advancedMode}
             visibleTypes={visibleTypes}
             onToggleType={toggleType}
             showDeepDive={showDeepDive}
             onToggleDeepDive={() => setShowDeepDive((v) => !v)}
-            lang={lang}
+            langA={langA}
+            langB={langB}
+            onLangA={chooseLangA}
+            onLangB={chooseLangB}
             isDark={isDark}
           />
         </main>

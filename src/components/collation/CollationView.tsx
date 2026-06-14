@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2 } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS, variantLabel } from "@/types/collation";
+import { LANGS } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
@@ -28,27 +29,40 @@ export function CollationView({
   project,
   view,
   fontSize,
-  editMode,
+  editSide,
+  onEditSide,
+  annotateSide,
+  onAnnotateSide,
   advancedMode,
   visibleTypes,
   onToggleType,
   showDeepDive,
   onToggleDeepDive,
-  lang,
+  langA,
+  langB,
+  onLangA,
+  onLangB,
   isDark,
 }: {
   project: Project;
   view: View;
   fontSize: number;
-  editMode: boolean;
+  editSide: Side | null;
+  onEditSide: (s: Side | null) => void;
+  annotateSide: Side | null;
+  onAnnotateSide: (s: Side | null) => void;
   advancedMode: boolean;
   visibleTypes: Set<VariantType>;
   onToggleType: (t: VariantType) => void;
   showDeepDive: boolean;
   onToggleDeepDive: () => void;
-  lang?: string;
+  langA?: string;
+  langB?: string;
+  onLangA: (id: string) => void;
+  onLangB: (id: string) => void;
   isDark: boolean;
 }) {
+  const editMode = editSide !== null;
   const { collation } = project;
   const { a: witnessA, b: witnessB, variants, metrics } = view;
   const mode = collation.mode;
@@ -56,6 +70,8 @@ export function CollationView({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
+  // Per-panel "expand": focus one panel, hiding the other column + the gutter.
+  const [focusSide, setFocusSide] = useState<Side | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
   const [leftPick, setLeftPick] = useState<{ start: number; end: number } | null>(null);
   const [rightPick, setRightPick] = useState<{ start: number; end: number } | null>(null);
@@ -214,75 +230,98 @@ export function CollationView({
       </div>
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
-          clears the current selection. */}
-      <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
-        <div className="border-r border-border min-w-0 bg-card">
-          <WitnessHeader witness={witnessA} side="A" project={project} which="left" annCount={annotationsFor(witnessA.id).length} />
-          <WitnessPanel
-            side="a"
-            witness={witnessA}
-            variants={variants}
-            mode={mode}
-            fontSize={fontSize}
-            editMode={editMode}
-            selectedId={selectedId}
-            hoveredId={hoveredId}
-            onSelect={onSelect}
-            onHover={setHoveredId}
-            onEditText={(text) => project.updateWitness(witnessA.id, { text })}
-            onAnnotate={requestAnnotate(witnessA.id)}
-            registerAnchor={registerAnchor}
-            advancedMode={advancedMode}
-            pick={leftPick}
-            onPick={onPick}
-            onPickRange={onPickRange}
-            lang={lang}
-            isDark={isDark}
-          />
-        </div>
+          clears the current selection. In focus/expand mode one panel fills the
+          width and the gutter + other panel are hidden. */}
+      <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid" style={{ gridTemplateColumns: focusSide ? "1fr" : "1fr 120px 1fr" }}>
+        {focusSide !== "b" && (
+          <div className="border-r border-border min-w-0 bg-card">
+            <WitnessHeader
+              witness={witnessA} side="A" panel="a" project={project} which="left" mode={mode}
+              annCount={annotationsFor(witnessA.id).length}
+              editing={editSide === "a"} onToggleEdit={() => onEditSide(editSide === "a" ? null : "a")}
+              annotating={annotateSide === "a"} onToggleAnnotate={() => onAnnotateSide(annotateSide === "a" ? null : "a")}
+              focused={focusSide === "a"} onToggleFocus={() => setFocusSide(focusSide === "a" ? null : "a")}
+              lang={langA} onLang={onLangA}
+            />
+            <WitnessPanel
+              side="a"
+              witness={witnessA}
+              variants={variants}
+              mode={mode}
+              fontSize={fontSize}
+              editMode={editSide === "a"}
+              annotateMode={annotateSide === "a"}
+              selectedId={selectedId}
+              hoveredId={hoveredId}
+              onSelect={onSelect}
+              onHover={setHoveredId}
+              onEditText={(text) => project.updateWitness(witnessA.id, { text })}
+              onAnnotate={requestAnnotate(witnessA.id)}
+              registerAnchor={registerAnchor}
+              advancedMode={advancedMode}
+              pick={leftPick}
+              onPick={onPick}
+              onPickRange={onPickRange}
+              lang={langA}
+              isDark={isDark}
+            />
+          </div>
+        )}
 
-        <div ref={gutterRef} className="relative bg-muted/10">
-          {!editMode && (
-            <div className="absolute inset-0">
-              <BraidGutter
-                width={gutterSize.width}
-                height={gutterSize.height}
-                ribbons={ribbons}
-                maxLength={maxLength}
-                selectedId={selectedId}
-                hoveredId={hoveredId}
-                visibleTypes={visibleTypes}
-                onSelect={onSelect}
-                onHover={setHoveredId}
-              />
-            </div>
-          )}
-        </div>
+        {!focusSide && (
+          <div ref={gutterRef} className="relative bg-muted/10">
+            {!editMode && (
+              <div className="absolute inset-0">
+                <BraidGutter
+                  width={gutterSize.width}
+                  height={gutterSize.height}
+                  ribbons={ribbons}
+                  maxLength={maxLength}
+                  selectedId={selectedId}
+                  hoveredId={hoveredId}
+                  visibleTypes={visibleTypes}
+                  onSelect={onSelect}
+                  onHover={setHoveredId}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
-        <div className="border-l border-border min-w-0 bg-card">
-          <WitnessHeader witness={witnessB} side="B" project={project} which="right" annCount={annotationsFor(witnessB.id).length} />
-          <WitnessPanel
-            side="b"
-            witness={witnessB}
-            variants={variants}
-            mode={mode}
-            fontSize={fontSize}
-            editMode={editMode}
-            selectedId={selectedId}
-            hoveredId={hoveredId}
-            onSelect={onSelect}
-            onHover={setHoveredId}
-            onEditText={(text) => project.updateWitness(witnessB.id, { text })}
-            onAnnotate={requestAnnotate(witnessB.id)}
-            registerAnchor={registerAnchor}
-            advancedMode={advancedMode}
-            pick={rightPick}
-            onPick={onPick}
-            onPickRange={onPickRange}
-            lang={lang}
-            isDark={isDark}
-          />
-        </div>
+        {focusSide !== "a" && (
+          <div className="border-l border-border min-w-0 bg-card">
+            <WitnessHeader
+              witness={witnessB} side="B" panel="b" project={project} which="right" mode={mode}
+              annCount={annotationsFor(witnessB.id).length}
+              editing={editSide === "b"} onToggleEdit={() => onEditSide(editSide === "b" ? null : "b")}
+              annotating={annotateSide === "b"} onToggleAnnotate={() => onAnnotateSide(annotateSide === "b" ? null : "b")}
+              focused={focusSide === "b"} onToggleFocus={() => setFocusSide(focusSide === "b" ? null : "b")}
+              lang={langB} onLang={onLangB}
+            />
+            <WitnessPanel
+              side="b"
+              witness={witnessB}
+              variants={variants}
+              mode={mode}
+              fontSize={fontSize}
+              editMode={editSide === "b"}
+              annotateMode={annotateSide === "b"}
+              selectedId={selectedId}
+              hoveredId={hoveredId}
+              onSelect={onSelect}
+              onHover={setHoveredId}
+              onEditText={(text) => project.updateWitness(witnessB.id, { text })}
+              onAnnotate={requestAnnotate(witnessB.id)}
+              registerAnchor={registerAnchor}
+              advancedMode={advancedMode}
+              pick={rightPick}
+              onPick={onPick}
+              onPickRange={onPickRange}
+              lang={langB}
+              isDark={isDark}
+            />
+          </div>
+        )}
       </div>
 
       <AnnotationsPanel
@@ -393,36 +432,149 @@ function LinkBar({
 function WitnessHeader({
   witness,
   side,
+  panel,
   project,
   which,
+  mode,
   annCount,
+  editing,
+  onToggleEdit,
+  annotating,
+  onToggleAnnotate,
+  focused,
+  onToggleFocus,
+  lang,
+  onLang,
 }: {
   witness: Witness;
   side: "A" | "B";
+  panel: Side;
   project: Project;
   which: "left" | "right";
+  mode: CollationMode;
   annCount: number;
+  editing: boolean;
+  onToggleEdit: () => void;
+  annotating: boolean;
+  onToggleAnnotate: () => void;
+  focused: boolean;
+  onToggleFocus: () => void;
+  lang?: string;
+  onLang: (id: string) => void;
 }) {
   const c = project.collation;
   const witnesses = c.witnesses;
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(witness.text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    }).catch(() => {});
+  };
   return (
-    <div className="px-3 py-2 border-b border-border bg-card/60 flex items-center gap-2 sticky top-[37px] z-10">
-      <select
-        value={witness.id}
-        onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
-        className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[70%] truncate font-medium"
-        title={witness.title}
-      >
-        {witnesses.map((w) => (
-          <option key={w.id} value={w.id}>
-            {w.title}
-          </option>
-        ))}
-      </select>
-      {which === "left" && <span className="text-[9px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
-      {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
-      {witness.date && <span className="text-[11px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
-      <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>
+    <div className="border-b border-border bg-card/60 sticky top-[37px] z-10">
+      {/* Row 1: witness selector + badges */}
+      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2">
+        <select
+          value={witness.id}
+          onChange={(e) => (which === "left" ? project.setLeft(e.target.value) : project.setRight(e.target.value))}
+          className="text-[12px] bg-transparent border border-border rounded px-1.5 py-0.5 max-w-[60%] truncate font-medium"
+          title={witness.title}
+        >
+          {witnesses.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.title}
+            </option>
+          ))}
+        </select>
+        {which === "left" && <span className="text-[9px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
+        {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
+        {witness.date && <span className="text-[11px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
+        <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>
+      </div>
+      {/* Row 2: per-panel toolbar */}
+      <PanelToolbar
+        panel={panel}
+        mode={mode}
+        editing={editing}
+        onToggleEdit={onToggleEdit}
+        annotating={annotating}
+        onToggleAnnotate={onToggleAnnotate}
+        focused={focused}
+        onToggleFocus={onToggleFocus}
+        lang={lang}
+        onLang={onLang}
+        copied={copied}
+        onCopy={copy}
+        project={project}
+      />
+    </div>
+  );
+}
+
+/** CCS-WB-style per-panel toolbar so each witness can be worked on individually:
+ *  edit · annotate · language · expand · copy · undo/redo. */
+function PanelToolbar({
+  panel,
+  mode,
+  editing,
+  onToggleEdit,
+  annotating,
+  onToggleAnnotate,
+  focused,
+  onToggleFocus,
+  lang,
+  onLang,
+  copied,
+  onCopy,
+  project,
+}: {
+  panel: Side;
+  mode: CollationMode;
+  editing: boolean;
+  onToggleEdit: () => void;
+  annotating: boolean;
+  onToggleAnnotate: () => void;
+  focused: boolean;
+  onToggleFocus: () => void;
+  lang?: string;
+  onLang: (id: string) => void;
+  copied: boolean;
+  onCopy: () => void;
+  project: Project;
+}) {
+  const Tb = ({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-pressed={on}
+      className={"inline-flex items-center justify-center w-7 h-7 rounded border text-[11px] transition-colors " + (on ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card hover:bg-muted")}
+    >
+      {children}
+    </button>
+  );
+  return (
+    <div className="px-3 pb-1.5 flex items-center gap-1.5" data-panel={panel}>
+      <Tb on={editing} onClick={onToggleEdit} title="Edit this witness text"><Pencil className="w-3.5 h-3.5" /></Tb>
+      <Tb on={annotating} onClick={onToggleAnnotate} title="Annotate: click a line to add a note"><Highlighter className="w-3.5 h-3.5" /></Tb>
+      {mode === "source" && (
+        <select
+          value={lang ?? "none"}
+          onChange={(e) => onLang(e.target.value)}
+          title="Syntax highlighting for this panel"
+          className="h-7 rounded border border-border bg-card hover:bg-muted text-[11px] px-1 max-w-[8.5rem]"
+        >
+          <option value="none">No highlighting</option>
+          {LANGS.map((l) => (
+            <option key={l.id} value={l.id}>{l.label}</option>
+          ))}
+        </select>
+      )}
+      <span className="flex-1" />
+      <Tb on={copied} onClick={onCopy} title={copied ? "Copied" : "Copy this witness text"}>{copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}</Tb>
+      <Tb on={focused} onClick={onToggleFocus} title={focused ? "Restore both panels" : "Expand this panel"}>{focused ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}</Tb>
+      <Tb onClick={project.undo} title="Undo"><Undo2 className="w-3.5 h-3.5" /></Tb>
+      <Tb onClick={project.redo} title="Redo"><Redo2 className="w-3.5 h-3.5" /></Tb>
     </div>
   );
 }

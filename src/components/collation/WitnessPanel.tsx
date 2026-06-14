@@ -130,6 +130,7 @@ export function WitnessPanel({
   mode,
   fontSize,
   editMode,
+  annotateMode,
   selectedId,
   hoveredId,
   onSelect,
@@ -150,6 +151,8 @@ export function WitnessPanel({
   mode: CollationMode;
   fontSize: number;
   editMode: boolean;
+  /** Annotate mode for this panel: a plain click on a line adds a note. */
+  annotateMode?: boolean;
   selectedId: string | null;
   hoveredId: string | null;
   onSelect: (id: string | null, scroll?: boolean) => void;
@@ -288,8 +291,9 @@ export function WitnessPanel({
             {row.n}
           </span>
           <span
-            className="flex-1 pr-4 min-w-0"
+            className={"flex-1 pr-4 min-w-0" + (annotateMode ? " cursor-text" : "")}
             style={{ whiteSpace: isMono ? "pre-wrap" : "pre-wrap", wordBreak: isMono ? "break-word" : "normal" }}
+            onClick={annotateMode ? () => onAnnotate(row.n) : undefined}
           >
             {row.segs.length === 0 ? (
               "​"
@@ -327,6 +331,11 @@ export function WitnessPanel({
                     onClick={(e) => {
                       // Don't let the click reach the background.
                       e.stopPropagation();
+                      // Annotate mode: any click on this panel adds a note.
+                      if (annotateMode) {
+                        onAnnotate(row.n);
+                        return;
+                      }
                       // A drag-select (non-collapsed) is handled by onMouseUp as a
                       // precise range pick — don't also do a whole-segment pick.
                       if (advancedMode) {
