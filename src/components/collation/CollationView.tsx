@@ -601,9 +601,16 @@ function PanelToolbar({
           className="h-7 rounded border border-border bg-card hover:bg-muted text-[11px] px-1 max-w-[8.5rem]"
         >
           <option value="none">No highlighting</option>
-          {LANGS.map((l) => (
-            <option key={l.id} value={l.id}>{l.label}</option>
-          ))}
+          <optgroup label="Modern">
+            {LANGS.filter((l) => l.group === "modern").map((l) => (
+              <option key={l.id} value={l.id}>{l.label}</option>
+            ))}
+          </optgroup>
+          <optgroup label="Historical">
+            {LANGS.filter((l) => l.group === "historical").map((l) => (
+              <option key={l.id} value={l.id}>{l.label}</option>
+            ))}
+          </optgroup>
         </select>
       )}
       <span className="flex-1" />

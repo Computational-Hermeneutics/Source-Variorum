@@ -7,9 +7,9 @@
  * (vendored from the CCS Workbench) line by line to get token ranges, and the
  * renderer colours the text while the variant tint keeps owning the background.
  *
- * Only stream-mode (historical assembly / early) languages are covered here;
- * these are the scholarly core of the workbench. Lezer-tree languages (modern
- * JS/C/…) can be added later via highlightTree.
+ * Two highlighter paths feed one colour table (tokenStyle): stream-mode parsers
+ * (the historical assembly dialects, vendored from CCS-WB, run line by line) and
+ * Lezer tree parsers (modern languages — JS/TS, Python, HTML, …, via ./lezer.ts).
  */
 
 import { StringStream, type StreamParser, type LanguageSupport } from "@codemirror/language";
@@ -19,6 +19,20 @@ import { basic } from "./langs/basic";
 import { fortran } from "./langs/fortran";
 import { iplv } from "./langs/iplv";
 import { mad } from "./langs/mad";
+import { lezerRanges } from "./lezer";
+import { javascript } from "@codemirror/lang-javascript";
+import { python } from "@codemirror/lang-python";
+import { html } from "@codemirror/lang-html";
+import { css } from "@codemirror/lang-css";
+import { cpp } from "@codemirror/lang-cpp";
+import { java } from "@codemirror/lang-java";
+import { rust } from "@codemirror/lang-rust";
+import { sql } from "@codemirror/lang-sql";
+import { json } from "@codemirror/lang-json";
+import { xml } from "@codemirror/lang-xml";
+import { go } from "@codemirror/lang-go";
+import { php } from "@codemirror/lang-php";
+import { markdown } from "@codemirror/lang-markdown";
 
 /** Pull the bare StreamParser out of a vendored CCS-WB LanguageSupport so we can
  *  run it standalone (no editor). `streamParser` exists at runtime on every
@@ -36,23 +50,43 @@ export interface HToken {
 export interface HLang {
   id: string;
   label: string;
-  parser: StreamParser<unknown>;
+  /** Grouping for the language picker. */
+  group: "modern" | "historical";
   /** File extensions (no dot) that auto-select this language. */
   ext: string[];
+  /** Stream-mode parser (historical dialects) — mutually exclusive with support. */
+  parser?: StreamParser<unknown>;
+  /** Lezer LanguageSupport (modern languages). */
+  support?: LanguageSupport;
 }
 
 /**
- * Registry of available code languages. `none` disables highlighting. Add a new
- * stream language by vendoring its parser (see lang-pdp1.ts) and pushing an
- * entry here — nothing else needs to change.
+ * Registry of available code languages. `none` disables highlighting.
+ * - Modern languages use Lezer parsers (`support`).
+ * - Historical dialects use stream parsers (`parser`), vendored under ./langs/.
  */
 export const LANGS: HLang[] = [
-  { id: "pdp1", label: "PDP-1 MACRO", parser: pdp1Parser as StreamParser<unknown>, ext: ["mac", "pdp1", "s", "asm", "lst"] },
-  { id: "agc", label: "AGC (Apollo)", parser: parserOf(agc()), ext: ["agc"] },
-  { id: "mad", label: "MAD", parser: parserOf(mad()), ext: ["mad"] },
-  { id: "fortran", label: "FORTRAN", parser: parserOf(fortran()), ext: ["f", "for", "ftn", "f77", "fortran"] },
-  { id: "iplv", label: "IPL-V", parser: parserOf(iplv()), ext: ["ipl", "iplv"] },
-  { id: "basic", label: "BASIC", parser: parserOf(basic()), ext: ["bas", "basic"] },
+  // Modern (Lezer)
+  { id: "javascript", label: "JavaScript / TS", group: "modern", support: javascript({ typescript: true, jsx: true }), ext: ["js", "jsx", "ts", "tsx", "mjs", "cjs"] },
+  { id: "python", label: "Python", group: "modern", support: python(), ext: ["py", "pyw"] },
+  { id: "html", label: "HTML", group: "modern", support: html(), ext: ["html", "htm", "xhtml"] },
+  { id: "css", label: "CSS", group: "modern", support: css(), ext: ["css", "scss"] },
+  { id: "cpp", label: "C / C++", group: "modern", support: cpp(), ext: ["c", "h", "cpp", "cc", "cxx", "hpp", "hh"] },
+  { id: "java", label: "Java", group: "modern", support: java(), ext: ["java"] },
+  { id: "rust", label: "Rust", group: "modern", support: rust(), ext: ["rs"] },
+  { id: "go", label: "Go", group: "modern", support: go(), ext: ["go"] },
+  { id: "php", label: "PHP", group: "modern", support: php(), ext: ["php"] },
+  { id: "sql", label: "SQL", group: "modern", support: sql(), ext: ["sql"] },
+  { id: "json", label: "JSON", group: "modern", support: json(), ext: ["json"] },
+  { id: "xml", label: "XML / TEI", group: "modern", support: xml(), ext: ["xml", "tei", "svg", "rss"] },
+  { id: "markdown", label: "Markdown", group: "modern", support: markdown(), ext: ["md", "markdown"] },
+  // Historical assembly / early dialects (stream parsers)
+  { id: "pdp1", label: "PDP-1 MACRO", group: "historical", parser: pdp1Parser as StreamParser<unknown>, ext: ["mac", "pdp1", "asm", "lst"] },
+  { id: "agc", label: "AGC (Apollo)", group: "historical", parser: parserOf(agc()), ext: ["agc"] },
+  { id: "mad", label: "MAD", group: "historical", parser: parserOf(mad()), ext: ["mad"] },
+  { id: "fortran", label: "FORTRAN", group: "historical", parser: parserOf(fortran()), ext: ["f", "for", "ftn", "f77", "fortran"] },
+  { id: "iplv", label: "IPL-V", group: "historical", parser: parserOf(iplv()), ext: ["ipl", "iplv"] },
+  { id: "basic", label: "BASIC", group: "historical", parser: parserOf(basic()), ext: ["bas", "basic"] },
 ];
 
 export function langById(id: string | undefined): HLang | undefined {
@@ -69,14 +103,16 @@ export function detectLang(name: string | undefined): string | undefined {
 }
 
 /**
- * Tokenize `text` with the given language id. Runs the StreamParser one line at
- * a time over a fresh StringStream, mirroring how CodeMirror drives legacy
- * modes, and returns absolute character ranges. Returns [] for unknown / `none`.
+ * Tokenize `text` with the given language id and return absolute character
+ * ranges. Modern languages parse to a Lezer tree; historical dialects run their
+ * StreamParser line by line. Returns [] for unknown / `none`.
  */
 export function highlightRanges(text: string, langId: string | undefined): HToken[] {
   const lang = langById(langId);
   if (!lang) return [];
+  if (lang.support) return lezerRanges(text, lang.support);
   const parser = lang.parser;
+  if (!parser) return [];
   const tokens: HToken[] = [];
   const lines = text.split("\n");
   const state: unknown = parser.startState ? parser.startState(2) : {};

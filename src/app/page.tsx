@@ -776,11 +776,18 @@ function SettingsModal({
           {tab === "code" && (
             <div className="divide-y divide-border">
               <SettingsRow label="Default syntax language" hint="Used for code-mode witnesses when not auto-detected.">
-                <select value={lang} onChange={(e) => onLang(e.target.value)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[10rem]">
+                <select value={lang} onChange={(e) => onLang(e.target.value)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[12rem]">
                   <option value="none">No highlighting</option>
-                  {LANGS.map((l) => (
-                    <option key={l.id} value={l.id}>{l.label}</option>
-                  ))}
+                  <optgroup label="Modern">
+                    {LANGS.filter((l) => l.group === "modern").map((l) => (
+                      <option key={l.id} value={l.id}>{l.label}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Historical">
+                    {LANGS.filter((l) => l.group === "historical").map((l) => (
+                      <option key={l.id} value={l.id}>{l.label}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </SettingsRow>
               <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more code options will live here.</div>
