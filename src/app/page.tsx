@@ -98,6 +98,8 @@ export default function Home() {
   const [isDark, setIsDark] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
@@ -154,6 +156,11 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "TEXTAREA" || t.tagName === "INPUT" || t.isContentEditable)) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        setShowHelp(true);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
         e.preventDefault();
         if (e.shiftKey) project.redo();
@@ -245,7 +252,12 @@ export default function Home() {
     },
     {
       label: "Help",
-      entries: [{ kind: "action", label: "About Source Variorum", onClick: () => setShowAbout(true) }],
+      entries: [
+        { kind: "action", label: "Help…", shortcut: "?", onClick: () => setShowHelp(true) },
+        { kind: "action", label: "Settings…", onClick: () => setShowSettings(true) },
+        { kind: "separator" },
+        { kind: "action", label: "About Source Variorum", onClick: () => setShowAbout(true) },
+      ],
     },
   ];
 
@@ -265,14 +277,7 @@ export default function Home() {
             <button onClick={scrollTop} title="Scroll to top" className="shrink-0">
               <img src="/sv-icon.svg" alt="Source Variorum" width={28} height={28} className="w-7 h-7" />
             </button>
-            <div className="leading-tight">
-              <button onClick={scrollTop} title="Scroll to top" className="text-[15px] font-semibold tracking-tight hover:text-primary text-left">Source Variorum</button>
-              <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/ch-mark.svg" alt="" width={11} height={11} className="w-[11px] h-[11px] opacity-70" />
-                Part of Computational Hermeneutics
-              </a>
-            </div>
+            <button onClick={scrollTop} title="Scroll to top" className="text-[15px] font-semibold tracking-tight hover:text-primary text-left leading-tight">Source Variorum</button>
           </div>
 
           <MenuBar menus={menus} />
@@ -343,6 +348,27 @@ export default function Home() {
       </footer>
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          isDark={isDark}
+          onToggleDark={() => setIsDark((v) => !v)}
+          fontSize={fontSize}
+          onFont={setFont}
+          onResetFont={() => setFontSize(13)}
+          onResetData={() => {
+            if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
+            try {
+              localStorage.removeItem(CURRENT_KEY);
+              localStorage.removeItem(FONT_KEY);
+            } catch {
+              /* ignore */
+            }
+            location.reload();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -446,5 +472,124 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         </div>
       </div>
     </div>
+  );
+}
+
+
+function ModalShell({ title, subtitle, onClose, children, footer }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-6 pt-5 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h2 className="text-[16px] font-semibold leading-tight">{title}</h2>
+            {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
+          </div>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="px-6 py-4 overflow-y-auto text-[13px] leading-relaxed text-foreground/85">{children}</div>
+        {footer && <div className="px-6 py-3 border-t border-border">{footer}</div>}
+      </div>
+    </div>
+  );
+}
+
+
+function HelpModal({ onClose }: { onClose: () => void }) {
+  const Key = ({ children }: { children: React.ReactNode }) => (
+    <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted text-[11px] font-mono">{children}</kbd>
+  );
+  return (
+    <ModalShell title="Help" subtitle="How to use Source Variorum" onClose={onClose}>
+      <div className="space-y-4">
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">The braid</h3>
+          <p>Two witnesses sit side by side with a central <strong>braid</strong> of ribbons connecting matching passages, including text that has <strong>moved</strong> between them. The left panel is the <strong>base</strong> (copy-text). Click any passage or ribbon to highlight the shared reading in both panels and fade the rest; click empty space to clear.</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two modes</h3>
+          <p><strong>Code</strong> is line- and token-aware in monospace; <strong>Text</strong> is sentence- and word-aware in proportional type. Switch with the <strong>Code / Text</strong> toggle (top right) or in the source actions.</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Add sources from the <strong>Sources</strong> sidebar (one, several files at once, or a sample), file them into folders, rename, or send to trash.</li>
+            <li>Click a source to open it in the right panel against the left; the per-panel dropdowns set either side explicitly.</li>
+            <li><strong>Edit witness text</strong> (Edit menu) to correct or normalise; every source keeps its pristine <strong>original</strong> and can be <strong>reverted</strong> or <strong>duplicated</strong> as a working copy.</li>
+          </ul>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Auto &amp; Advanced</h3>
+          <p>The collation is computed live. In <strong>Advanced</strong> mode you hand-braid: pick a passage on the left and one on the right, then choose substitution / transposition / addition / omission / match. Hand-made links override the auto braid and are marked in the apparatus.</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Apparatus, notes &amp; export</h3>
+          <p>Every divergence is gathered into an editable <strong>critical apparatus</strong>. <Key>⌘</Key>/<Key>Ctrl</Key>-click any passage to attach a marginal note. Save / open projects as <code>.svar</code>, or export to Markdown, PDF, or JSON (File menu).</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Shortcuts</h3>
+          <ul className="space-y-1">
+            <li><Key>⌘Z</Key> / <Key>⌘⇧Z</Key> — undo / redo</li>
+            <li><Key>?</Key> — open this help</li>
+            <li><Key>Esc</Key> — close a dialog or clear a selection</li>
+          </ul>
+        </section>
+      </div>
+    </ModalShell>
+  );
+}
+
+
+function SettingsModal({
+  onClose,
+  isDark,
+  onToggleDark,
+  fontSize,
+  onFont,
+  onResetFont,
+  onResetData,
+}: {
+  onClose: () => void;
+  isDark: boolean;
+  onToggleDark: () => void;
+  fontSize: number;
+  onFont: (delta: number) => void;
+  onResetFont: () => void;
+  onResetData: () => void;
+}) {
+  const Row = ({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) => (
+    <div className="flex items-center gap-4 py-2.5">
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-medium">{label}</div>
+        {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+      </div>
+      <div className="shrink-0 flex items-center gap-2">{children}</div>
+    </div>
+  );
+  return (
+    <ModalShell title="Settings" subtitle="Preferences are stored in this browser" onClose={onClose}>
+      <div className="divide-y divide-border">
+        <Row label="Appearance" hint="Light or dark theme">
+          <button onClick={onToggleDark} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-border bg-card hover:bg-muted text-[12px]">
+            {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {isDark ? "Dark" : "Light"}
+          </button>
+        </Row>
+        <Row label="Panel text size" hint={`Reading panels · ${fontSize}px`}>
+          <button onClick={() => onFont(-1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Smaller">A−</button>
+          <span className="w-9 text-center tabular-nums text-[12px]">{fontSize}px</span>
+          <button onClick={() => onFont(1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Larger">A+</button>
+          <button onClick={onResetFont} className="ml-1 px-2 h-7 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Reset to 13px">Reset</button>
+        </Row>
+        <Row label="Saved data" hint="The autosaved working project and your preferences">
+          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px]">Clear &amp; reload…</button>
+        </Row>
+      </div>
+    </ModalShell>
   );
 }

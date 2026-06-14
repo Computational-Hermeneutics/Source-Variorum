@@ -200,7 +200,7 @@ export function CollationView({
       {/* Three-column braid. Clicking the background (not a span or ribbon)
           clears the current selection. */}
       <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid" style={{ gridTemplateColumns: "1fr 120px 1fr" }}>
-        <div className="border-r border-border min-w-0">
+        <div className="border-r border-border min-w-0 bg-card">
           <WitnessHeader witness={witnessA} side="A" project={project} which="left" annCount={annotationsFor(witnessA.id).length} />
           <WitnessPanel
             side="a"
@@ -240,7 +240,7 @@ export function CollationView({
           )}
         </div>
 
-        <div className="border-l border-border min-w-0">
+        <div className="border-l border-border min-w-0 bg-card">
           <WitnessHeader witness={witnessB} side="B" project={project} which="right" annCount={annotationsFor(witnessB.id).length} />
           <WitnessPanel
             side="b"
