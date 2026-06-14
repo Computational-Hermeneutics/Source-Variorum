@@ -5,6 +5,7 @@ import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
   MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy, Info, FileText,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { MarkdownPad } from "./MarkdownPad";
 
 function uid(): string {
@@ -370,8 +371,9 @@ function SourceViewerModal({ witness, onClose, onSave }: { witness: Witness; onC
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-16" onClick={onClose}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 p-4 pt-16" onClick={onClose}>
       <div className="bg-card border border-border rounded-lg w-full max-w-3xl shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
           <div className="min-w-0">
@@ -388,7 +390,8 @@ function SourceViewerModal({ witness, onClose, onSave }: { witness: Witness; onC
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -425,8 +428,9 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
     </label>
   );
   const inputCls = "flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-[12px]";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
           <h2 className="text-[15px] font-semibold leading-tight">Source details</h2>
@@ -460,7 +464,8 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
           <button onClick={save} className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-[12px] font-medium">Save</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

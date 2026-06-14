@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
@@ -454,9 +454,14 @@ export function CollationView({
             {/* Always visible: braid-analysis toggle (also collapses/opens) + lock.
                 Sits on a translucent panel so it reads as a floating toolbar. */}
             <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 p-1 rounded-lg bg-card/70 backdrop-blur border border-border/60 shadow-sm">
-              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Hide braid analysis (ribbons + tints) and collapse the panel" : "Show braid analysis and open the panel"} className={"p-0.5 rounded border hover:bg-muted shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary" : "bg-card/90 border-border text-muted-foreground")}>
+              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Hide braid analysis (ribbons + tints) and collapse the panel" : "Show braid analysis and open the panel"} className={"p-0.5 rounded border shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" : "bg-card/90 border-border text-muted-foreground hover:bg-muted")}>
                 <Spline className="w-3 h-3" />
               </button>
+              {selectedId && (
+                <button onClick={(e) => { e.stopPropagation(); onSelect(null); }} title="A locus is selected — click to clear (or click empty space)" className="p-0.5 rounded border shadow-sm bg-card/90 hover:bg-muted" style={{ color: "var(--sv-variation)", borderColor: "var(--sv-variation)" }}>
+                  <XCircle className="w-3 h-3" />
+                </button>
+              )}
               <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
                 {([
                   ["one", <Lock className="w-3 h-3" key="l" />, "Lock 1:1 — both panels start at line 1"],

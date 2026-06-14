@@ -93,23 +93,32 @@ export function OverviewStrip({
   const lenB = Math.max(1, lengthB);
   const showHeat = colHotspots && hotspots != null && hotspots.others >= 2 && hotspots.baseLength > 0;
 
-  // ----- Code minimap: per-(sampled)-line shape of the base text -----
+  // ----- Panel minimap: a per-(sampled)-line shape of the base text, rendered as
+  // word-blocks with gaps so it reads like rows of text rather than a grey mush. -----
   const mini = useMemo(() => {
-    if (!colMinimap) return { rows: [] as { y: number; x: number; w: number }[], h: 1 };
+    if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number }[], h: 1 };
     const lines = baseText.split("\n");
     const n = lines.length || 1;
-    const ROWS = Math.min(n, 480);
+    const ROWS = Math.min(n, 440);
     let maxLen = 24;
-    for (const l of lines) maxLen = Math.max(maxLen, l.trim().length);
-    const rows: { y: number; x: number; w: number }[] = [];
+    for (const l of lines) maxLen = Math.max(maxLen, l.length);
+    const rowStep = VH / ROWS;
+    const barH = Math.max(0.7, rowStep * 0.58); // leave a gap between lines
+    const blocks: { y: number; x: number; w: number }[] = [];
     for (let r = 0; r < ROWS; r++) {
       const line = lines[Math.floor((r / ROWS) * n)] ?? "";
-      const tl = line.trim().length;
-      if (tl === 0) continue; // blank line → a gap in the map
-      const indent = Math.min(0.45, (line.length - line.trimStart().length) / 50);
-      rows.push({ y: (r / ROWS) * VH, x: indent, w: Math.min(1 - indent, (tl / maxLen) * (1 - indent)) });
+      if (!line.trim()) continue; // blank line → an empty row
+      const y = (r / ROWS) * VH;
+      // One small block per whitespace-run (a "word"), at its column position.
+      const re = /\S+/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line))) {
+        const x = m.index / maxLen;
+        if (x >= 0.99) break;
+        blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen) });
+      }
     }
-    return { rows, h: VH / ROWS + 0.5 };
+    return { blocks, h: barH };
   }, [colMinimap, baseText]);
 
   // ----- Variant map: bucketed, bar length ∝ change density -----
@@ -188,10 +197,9 @@ export function OverviewStrip({
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           {hasMain && <rect x={mainX} y={0} width={mainW} height={VH} className="fill-card/40" />}
-          {/* Panel minimap — a faint code-shape texture for orientation only, so
-              it sits quietly behind the variant signal. */}
-          {colMinimap && mini.rows.map((r, i) => (
-            <rect key={`m${i}`} x={mainX + r.x * mainW} y={r.y} width={Math.max(0.25, r.w * mainW)} height={mini.h} className="fill-foreground" opacity={colVariants ? 0.14 : 0.26} />
+          {/* Panel minimap — word-blocks with line gaps, so it reads as text. */}
+          {colMinimap && mini.blocks.map((b, i) => (
+            <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.h} rx={0.15} className="fill-foreground" opacity={colVariants ? 0.2 : 0.32} />
           ))}
           {/* Variant map — thin coloured ticks growing from the right edge, so the
               change signal reads as its own histogram beside the faint minimap. */}

@@ -26,9 +26,10 @@ export interface DemoWitness {
   file?: string;
 }
 
-/** A read-me reference witness for a sample (opens in the reader modal). */
+/** A read-me reference witness for a sample. Sits at the top level (no folder),
+ *  outside the Witnesses working set; opens in the reader modal on click. */
 function readme(title: string, file: string): DemoWitness {
-  return { siglum: "ℹ", title, folder: "Read me", reference: true, file };
+  return { siglum: "ℹ", title, reference: true, file };
 }
 
 export interface Demo {
