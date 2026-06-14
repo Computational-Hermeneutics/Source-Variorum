@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -660,7 +660,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two modes</h3>
-          <p><strong>Code</strong> is line- and token-aware in monospace; <strong>Text</strong> is sentence- and word-aware in proportional type. Switch with the <strong>Code / Text</strong> toggle (top right) or in the source actions.</p>
+          <p><strong>Code</strong> is line- and token-aware in monospace; <strong>Text</strong> is sentence- and word-aware in proportional type. Switch in the <strong>View</strong> menu or <strong>Settings</strong>.</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
@@ -685,6 +685,23 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <li><Key>?</Key> — open this help</li>
             <li><Key>Esc</Key> — close a dialog or clear a selection</li>
           </ul>
+        </section>
+        <section>
+          <details className="group">
+            <summary className="flex items-center gap-1.5 cursor-pointer list-none text-[12px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
+              <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
+              Eddy &amp; Viv — version-divergence metrics
+            </summary>
+            <div className="mt-2 space-y-2">
+              <p>Two measures from the <strong>Version Variation Visualization (VVV)</strong> project for reasoning about how a set of versions diverge.</p>
+              <p><strong>Eddy</strong> — a single <em>version&apos;s</em> distinctiveness at a passage: the average distance between that version and all the others of the same passage. A high Eddy marks an <em>outlier</em> — the version whose wording diverges most from the rest.<br />
+                <span className="font-mono text-[12px]">Eddy(D&#x2c7;) = (1/n) &Sigma;<sub>k</sub> &#8741;D&#x2c7; &minus; D<sub>k</sub>&#8741;</span></p>
+              <p><strong>Viv</strong> (vivacity) — a <em>passage&apos;s</em> overall instability: the average of all the Eddy values for that passage (its &ldquo;diameter&rdquo;). A high Viv marks a <em>hotspot</em> where the versions most disagree.<br />
+                <span className="font-mono text-[12px]">Viv(i) = (1/n) &Sigma;<sub>k</sub> Eddy(D<sub>k</sub><sup>i</sup>)</span></p>
+              <p className="text-[12px] text-muted-foreground">In Source Variorum the <strong>Version hotspots</strong> overview is a simplified <em>Viv</em>: at each point in the base text it counts how many of the other witnesses diverge there (rather than vector-space distance). Per-version <em>Eddy</em> ranking is a planned addition.</p>
+              <p className="text-[9px] leading-snug text-muted-foreground/80">Eddy &amp; Viv were defined by the VVV / Translation Arrays team (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry); see ShakerVis (Geng, Cheesman, Laramee, Flanagan &amp; Thiel, <em>Information Visualization</em> 14(4), 2013) and Cheesman et al., delightedbeauty.org/vvv.</p>
+            </div>
+          </details>
         </section>
       </div>
     </ModalShell>
