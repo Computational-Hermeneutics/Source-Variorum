@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { StickyNote } from "lucide-react";
 import type { CollationMode, Variant, Witness, WordRun } from "@/types/collation";
 import { VARIANT_TYPE_COLORS } from "@/types/collation";
 import { highlightRanges, tokenStyle, type HToken } from "@/lib/highlight";
@@ -158,6 +159,9 @@ export function WitnessPanel({
   lang,
   isDark,
   search,
+  analysis = true,
+  annotatedLines,
+  onOpenAnnotation,
 }: {
   side: Side;
   witness: Witness;
@@ -184,6 +188,12 @@ export function WitnessPanel({
   isDark: boolean;
   /** Active search query — matching substrings are marked. */
   search?: string;
+  /** When false, drop variant tints + word-runs for plain reading. */
+  analysis?: boolean;
+  /** 1-based line numbers carrying an annotation (for the margin marker). */
+  annotatedLines?: Set<number>;
+  /** Open the annotation(s) on a line (click the margin marker). */
+  onOpenAnnotation?: (line: number) => void;
 }) {
   const isMono = mode === "source";
   const anySelected = selectedId !== null;
@@ -350,7 +360,7 @@ export function WitnessPanel({
   return (
     <div className="py-2" style={{ fontFamily, fontSize: `${fontSize}px`, lineHeight }} onMouseUp={onMouseUp}>
       {rows.map((row) => (
-        <div key={row.n} className="flex">
+        <div key={row.n} className="flex group/row">
           <span
             className="shrink-0 select-none text-right pr-3 pl-2 text-muted-foreground/45 tabular-nums"
             style={{ minWidth: `${gutterCh}ch`, fontFamily: "var(--code-font-family)", fontSize: `${Math.max(9, fontSize - 2)}px` }}
@@ -359,9 +369,9 @@ export function WitnessPanel({
             {row.n}
           </span>
           <span
-            className={"flex-1 pr-4 min-w-0" + (annotateMode ? " cursor-text" : "")}
+            className={"flex-1 pr-1 min-w-0" + (annotateMode ? " cursor-text" : "")}
             style={{ whiteSpace: isMono ? "pre-wrap" : "pre-wrap", wordBreak: isMono ? "break-word" : "normal" }}
-            onClick={annotateMode ? () => onAnnotate(row.n) : undefined}
+            onClick={(e) => { if (e.metaKey || e.ctrlKey || annotateMode) onAnnotate(row.n); }}
           >
             {row.segs.length === 0 ? (
               "​"
@@ -380,14 +390,16 @@ export function WitnessPanel({
                 const runs = wordRunsByVid.get(seg.vid);
                 // Word-level tinting applies at rest (auto mode, not selected); a
                 // selected locus reverts to whole-span tint to show the full reading.
-                const useWordTint = !advancedMode && !selected && !!runs;
-                const style = advancedMode
-                  ? tintStyle(seg.type, false, hovered, false)
-                  : useWordTint
-                    ? hovered
-                      ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
-                      : { opacity: anySelected ? 0.55 : 1 }
-                    : tintStyle(seg.type, selected, hovered, anySelected);
+                const useWordTint = analysis && !advancedMode && !selected && !!runs;
+                const style = !analysis
+                  ? (selected ? tintStyle(seg.type, true, hovered, false) : undefined)
+                  : advancedMode
+                    ? tintStyle(seg.type, false, hovered, false)
+                    : useWordTint
+                      ? hovered
+                        ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
+                        : { opacity: anySelected ? 0.55 : 1 }
+                      : tintStyle(seg.type, selected, hovered, anySelected);
                 return (
                   <span
                     key={k}
@@ -436,6 +448,17 @@ export function WitnessPanel({
               })
             )}
           </span>
+          {annotatedLines?.has(row.n) ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenAnnotation?.(row.n); }}
+              title="Annotation on this line — click to view/edit"
+              className="shrink-0 self-start mt-[1px] mr-1 text-amber-600 dark:text-amber-400 hover:text-amber-700"
+            >
+              <StickyNote className="w-3 h-3" />
+            </button>
+          ) : (
+            <span className="shrink-0 w-4 mr-1" aria-hidden />
+          )}
         </div>
       ))}
     </div>

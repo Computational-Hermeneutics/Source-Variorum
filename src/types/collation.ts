@@ -32,6 +32,10 @@ export interface Witness {
   metadata?: Record<string, string>;
   /** Optional folder this witness is filed under in the Sources organiser. */
   folder?: string;
+  /** Reference-only: kept in the project for reading in the viewer modal, but
+   *  excluded from the compare panels (the working set draws from non-reference
+   *  witnesses only). */
+  reference?: boolean;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */
   text: string;
   /** Immutable original text, snapshotted on creation/import. Editing changes

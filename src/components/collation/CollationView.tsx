@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Highlighter, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair, Diff as DiffIcon } from "lucide-react";
-import { diffLines } from "diff";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, ChevronsLeftRight, ChevronsRightLeft, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download } from "lucide-react";
+import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
@@ -99,9 +99,13 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
+  const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
+  // Braid-analysis = the ribbons + the variant tints. Toggle off for plain reading.
+  const [showAnalysis, setShowAnalysis] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem("source-variorum-analysis") === "0") setShowAnalysis(false); } catch { /* ignore */ } }, []);
+  const toggleAnalysis = () => setShowAnalysis((v) => { const n = !v; try { localStorage.setItem("source-variorum-analysis", n ? "1" : "0"); } catch { /* ignore */ } return n; });
   // Per-panel "expand": focus one panel, hiding the other column + the gutter.
   const [focusSide, setFocusSide] = useState<Side | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
@@ -284,7 +288,12 @@ export function CollationView({
 
   const annotationsFor = (id: string): LineAnnotation[] => collation.annotations[id] ?? [];
 
-  const requestAnnotate = (witnessId: string) => (line: number) => setPendingAnn({ witnessId, line });
+  const requestAnnotate = (witnessId: string) => (line: number) => {
+    const existing = annotationsFor(witnessId).find((a) => a.lineNumber === line);
+    setPendingAnn({ witnessId, line, editId: existing?.id, initial: existing?.content });
+  };
+  const annLinesA = useMemo(() => new Set(annotationsFor(witnessA.id).map((a) => a.lineNumber)), [collation.annotations, witnessA.id]);
+  const annLinesB = useMemo(() => new Set(annotationsFor(witnessB.id).map((a) => a.lineNumber)), [collation.annotations, witnessB.id]);
 
   return (
     <div className="flex flex-1 min-h-0">
@@ -396,13 +405,16 @@ export function CollationView({
               lang={langA}
               isDark={isDark}
               search={search}
+              analysis={showAnalysis}
+              annotatedLines={annLinesA}
+              onOpenAnnotation={requestAnnotate(witnessA.id)}
             />
           </div>
         )}
 
         {!focusSide && (
           <div ref={gutterRef} className="relative bg-muted/10">
-            {braidOpen && !editMode && (
+            {braidOpen && !editMode && showAnalysis && (
               <div className="absolute inset-0">
                 <BraidLayer
                   variants={variants}
@@ -451,6 +463,12 @@ export function CollationView({
                   </button>
                 ))}
               </div>
+              <button onClick={(e) => { e.stopPropagation(); project.swapSides(); }} title="Swap the two panels (A ⇄ B)" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
+                <ArrowLeftRight className="w-3 h-3" />
+              </button>
+              <button onClick={(e) => { e.stopPropagation(); toggleAnalysis(); }} title={showAnalysis ? "Hide braid analysis (ribbons + variant tints) for plain reading" : "Show braid analysis (ribbons + variant tints)"} className={"p-0.5 rounded bg-card/90 border hover:bg-muted shadow-sm " + (showAnalysis ? "border-primary/50 text-primary" : "border-border text-muted-foreground")}>
+                <Spline className="w-3 h-3" />
+              </button>
               <button onClick={(e) => { e.stopPropagation(); setShowDiff(true); }} title="Standard diff — unified +/− line view of the two witnesses" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
                 <DiffIcon className="w-3 h-3" />
               </button>
@@ -490,6 +508,9 @@ export function CollationView({
               lang={langB}
               isDark={isDark}
               search={search}
+              analysis={showAnalysis}
+              annotatedLines={annLinesB}
+              onOpenAnnotation={requestAnnotate(witnessB.id)}
             />
           </div>
         )}
@@ -498,7 +519,7 @@ export function CollationView({
       {/* Apparatus + annotations live in a modal (View ▸ Critical apparatus, or
           the toolbar) so the two text panels keep the full height. */}
       {showApparatus && (
-        <ModalCard title="Critical apparatus & notes" subtitle={`${apparatus.length} ${apparatus.length === 1 ? "entry" : "entries"} · notebook in Markdown`} onClose={onCloseApparatus}>
+        <ModalCard title="Annotations" subtitle={`${apparatus.length} apparatus ${apparatus.length === 1 ? "entry" : "entries"} · line notes · Markdown notebook`} onClose={onCloseApparatus}>
           <div className="flex rounded border border-border overflow-hidden text-[11px] w-max mb-3">
             <button onClick={() => setApparatusTab("apparatus")} className={"px-2.5 py-1 " + (apparatusTab === "apparatus" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>Apparatus ({apparatus.length})</button>
             <button onClick={() => setApparatusTab("notebook")} className={"px-2.5 py-1 " + (apparatusTab === "notebook" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}>Notebook</button>
@@ -545,8 +566,13 @@ export function CollationView({
       {pendingAnn && (
         <AnnotationPopover
           line={pendingAnn.line}
+          initial={pendingAnn.initial}
+          canDelete={!!pendingAnn.editId}
           onCancel={() => setPendingAnn(null)}
+          onDelete={() => { if (pendingAnn.editId) project.removeAnnotation(pendingAnn.witnessId, pendingAnn.editId); setPendingAnn(null); }}
           onSave={(content) => {
+            // Editing replaces the existing note on this line.
+            if (pendingAnn.editId) project.removeAnnotation(pendingAnn.witnessId, pendingAnn.editId);
             const ann: LineAnnotation = {
               id: uid(),
               outputId: pendingAnn.witnessId,
@@ -624,9 +650,24 @@ function DiffModal({ witnessA, witnessB, mode, lang, isDark, onClose }: { witnes
   const adds = rows.filter((r) => r.kind === "add").length;
   const dels = rows.filter((r) => r.kind === "del").length;
   const mono = mode === "source";
+  const patch = useMemo(() => createTwoFilesPatch(witnessA.siglum || "A", witnessB.siglum || "B", witnessA.text, witnessB.text, witnessA.title, witnessB.title), [witnessA, witnessB]);
+  const [copied, setCopied] = useState(false);
+  const copy = () => { navigator.clipboard?.writeText(patch).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }).catch(() => {}); };
+  const dl = () => {
+    const blob = new Blob([patch], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${(witnessA.siglum || "A")}-${(witnessB.siglum || "B")}.diff`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   return (
     <ModalCard title="Standard diff" subtitle={`${witnessA.siglum} → ${witnessB.siglum} · ${dels} removed, ${adds} added`} onClose={onClose}>
-      <div className="-mx-4 -mb-4 max-h-[72vh] overflow-auto">
+      <div className="flex items-center gap-1.5 mb-2 -mt-1">
+        <button onClick={copy} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] hover:bg-muted">{copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copied ? "Copied" : "Copy diff"}</button>
+        <button onClick={dl} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] hover:bg-muted"><Download className="w-3 h-3" /> Download .diff</button>
+      </div>
+      <div className="-mx-4 -mb-4 max-h-[68vh] overflow-auto">
         <table className="w-full border-collapse" style={{ fontFamily: mono ? "var(--code-font-family)" : "inherit", fontSize: "11.5px" }}>
           <tbody>
             {rows.map((r, i) => {
@@ -873,7 +914,7 @@ function WitnessHeader({
         className="text-[10px] bg-transparent border border-border rounded px-1 py-0.5 min-w-[5rem] max-w-[42%] truncate"
         title={witness.title}
       >
-        {witnesses.map((w) => (
+        {witnesses.filter((w) => !w.reference || w.id === witness.id).map((w) => (
           <option key={w.id} value={w.id}>
             {w.title}
           </option>
@@ -945,7 +986,6 @@ function PanelToolbar({
   return (
     <div className="flex items-center gap-0.5" data-panel={panel}>
       <Tb on={editing} onClick={onToggleEdit} title="Edit this witness text"><Pencil className="w-3 h-3" /></Tb>
-      <Tb on={annotating} onClick={onToggleAnnotate} title="Annotate: click a line to add a note"><Highlighter className="w-3 h-3" /></Tb>
       {mode === "source" && (
         <select
           value={lang ?? "none"}
@@ -976,12 +1016,12 @@ function PanelToolbar({
   );
 }
 
-function AnnotationPopover({ line, onCancel, onSave }: { line: number; onCancel: () => void; onSave: (content: string) => void }) {
-  const [text, setText] = useState("");
+function AnnotationPopover({ line, initial, canDelete, onCancel, onSave, onDelete }: { line: number; initial?: string; canDelete?: boolean; onCancel: () => void; onSave: (content: string) => void; onDelete?: () => void }) {
+  const [text, setText] = useState(initial ?? "");
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onCancel}>
       <div className="bg-card border border-border rounded-lg w-full max-w-sm p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="text-[12px] font-semibold mb-2">Annotate line {line}</div>
+        <div className="text-[12px] font-semibold mb-2">{canDelete ? "Edit note" : "Annotate"} · line {line}</div>
         <textarea
           autoFocus
           value={text}
@@ -994,6 +1034,7 @@ function AnnotationPopover({ line, onCancel, onSave }: { line: number; onCancel:
           className="w-full h-24 bg-background border border-border rounded px-2 py-1.5 text-[12px] resize-y"
         />
         <div className="flex justify-end gap-2 mt-2">
+          {canDelete && <button onClick={onDelete} className="mr-auto px-3 py-1 rounded border border-border text-[12px] text-destructive hover:bg-muted">Delete</button>}
           <button onClick={onCancel} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Cancel</button>
           <button onClick={() => text.trim() && onSave(text.trim())} disabled={!text.trim()} className="px-3 py-1 rounded bg-primary text-primary-foreground text-[12px] disabled:opacity-50">Save</button>
         </div>

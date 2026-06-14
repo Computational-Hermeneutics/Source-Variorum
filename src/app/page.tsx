@@ -338,7 +338,7 @@ export default function Home() {
         { kind: "checkbox", label: "Variant map", checked: stripCols.variants, onToggle: () => setStripCol("variants", !stripCols.variants) },
         { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
         { kind: "separator" },
-        { kind: "action", label: "Critical apparatus & notes…", onClick: () => setShowApparatus(true) },
+        { kind: "action", label: "Annotations & apparatus…", onClick: () => setShowApparatus(true) },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
         { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
@@ -398,7 +398,7 @@ export default function Home() {
               <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
             </div>
 
-            <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Critical apparatus & notes"><ListTree className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
 
             <button onClick={() => setShowOverview(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Change overview"><BarChart3 className="w-3.5 h-3.5" /></button>
 

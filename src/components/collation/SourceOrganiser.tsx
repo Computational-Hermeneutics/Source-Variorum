@@ -284,19 +284,20 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
 
   return (
     <div
-      onClick={() => project.setRight(w.id)}
-      title={`${w.title}${w.author ? ` — ${w.author}` : ""}${w.date ? ` (${w.date})` : ""}\nClick to compare on the right; ⋮ for more`}
+      onClick={() => (w.reference ? setViewing(true) : project.setRight(w.id))}
+      title={w.reference ? `${w.title} — reference only (click to open in viewer)` : `${w.title}${w.author ? ` — ${w.author}` : ""}${w.date ? ` (${w.date})` : ""}\nClick to compare on the right; ⋮ for more`}
       className={
         "group flex items-center gap-1.5 pr-1.5 py-1 cursor-pointer border-l-2 " +
         (indent ? "pl-4 " : "pl-2 ") +
-        (isRight ? "bg-primary/10 border-primary " : isLeft ? "border-primary/50 " : "border-transparent hover:bg-muted/50 ")
+        (w.reference ? "opacity-70 border-transparent hover:bg-muted/40 " : isRight ? "bg-primary/10 border-primary " : isLeft ? "border-primary/50 " : "border-transparent hover:bg-muted/50 ")
       }
     >
-      <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+      {w.reference ? <BookOpen className="w-3.5 h-3.5 shrink-0 text-muted-foreground" /> : <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
       <div className="flex-1 min-w-0">
         <div className={"truncate " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</div>
         {(w.author || w.date) && <div className="truncate text-[8px] leading-tight text-muted-foreground">{[w.date, w.author && (w.author.length > 18 ? w.author.slice(0, 18) + "…" : w.author)].filter(Boolean).join(" · ")}</div>}
       </div>
+      {w.reference && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Reference only — not loaded into the compare panels">ref</span>}
       {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
       {edited && <span className="text-[8px] uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Edited — differs from the original; revert via ⋮">edited</span>}
       {annCount > 0 && <span className="text-[9px] px-1 rounded bg-secondary/30 text-secondary-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
@@ -313,6 +314,9 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setViewing(true); setMenu(false); }}>
                 <FileText className="w-3 h-3 text-muted-foreground" /> Open in viewer…
+              </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.toggleReference(w.id); setMenu(false); }}>
+                <BookOpen className="w-3 h-3 text-muted-foreground" /> {w.reference ? "Use for comparison" : "Reference only (viewer)"}
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setDetails(true); setMenu(false); }}>
                 <Info className="w-3 h-3 text-muted-foreground" /> Details &amp; metadata…
