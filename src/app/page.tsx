@@ -1,11 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Moon, Sun, X, Info, FileText, FilePlus, FolderOpen, Save, Download,
-  ChevronDown, Undo2, Redo2, RotateCcw, Pencil, Type, Spline,
-} from "lucide-react";
-import type { Collation, CollationMode, Witness } from "@/types/collation";
+import { Moon, Sun, X, RotateCcw, Spline } from "lucide-react";
+import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
+import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel } from "@/types/collation";
+import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
 import { CollationView } from "@/components/collation/CollationView";
 import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
@@ -102,6 +101,8 @@ export default function Home() {
   const [editMode, setEditMode] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
+  const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
+  const [showDeepDive, setShowDeepDive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const scrollTop = () => mainRef.current?.scrollTo({ top: 0 });
@@ -185,6 +186,69 @@ export default function Home() {
 
   const setFont = (delta: number) => setFontSize((s) => Math.min(22, Math.max(9, s + delta)));
 
+  const toggleType = (t: VariantType) =>
+    setVisibleTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+
+  const menus: Menu[] = [
+    {
+      label: "File",
+      entries: [
+        { kind: "action", label: "New collation…", onClick: () => project.load(blankCollation(collation.mode)) },
+        { kind: "action", label: "Rename collation…", onClick: () => { const n = prompt("Collation name:", collation.name)?.trim(); if (n) project.rename(n); } },
+        { kind: "separator" },
+        { kind: "action", label: "Open project…", shortcut: ".svar", onClick: () => fileInputRef.current?.click() },
+        { kind: "action", label: "Save project", shortcut: ".svar", onClick: saveProject },
+        { kind: "separator" },
+        { kind: "header", label: "Export" },
+        { kind: "action", label: "Markdown (.md)", onClick: () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown") },
+        { kind: "action", label: "PDF (.pdf)", onClick: () => toPDF(collation).save(`${slugify(collation.name)}.pdf`) },
+        { kind: "action", label: "JSON (.json)", onClick: () => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json") },
+      ],
+    },
+    {
+      label: "Edit",
+      entries: [
+        { kind: "action", label: "Undo", shortcut: "⌘Z", onClick: project.undo, disabled: !project.canUndo },
+        { kind: "action", label: "Redo", shortcut: "⌘⇧Z", onClick: project.redo, disabled: !project.canRedo },
+        { kind: "separator" },
+        { kind: "checkbox", label: "Edit witness text", checked: editMode, onToggle: () => { setEditMode((v) => !v); setAdvancedMode(false); } },
+        { kind: "checkbox", label: "Advanced hand-braiding", checked: advancedMode, onToggle: () => { setAdvancedMode((v) => !v); setEditMode(false); } },
+        { kind: "separator" },
+        { kind: "action", label: "Revert to last saved", onClick: () => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }, disabled: !project.isDirty },
+      ],
+    },
+    {
+      label: "View",
+      entries: [
+        { kind: "header", label: "Text size" },
+        { kind: "action", label: "Larger", shortcut: "A+", onClick: () => setFont(1) },
+        { kind: "action", label: "Smaller", shortcut: "A−", onClick: () => setFont(-1) },
+        { kind: "action", label: "Reset", onClick: () => setFontSize(13) },
+        { kind: "separator" },
+        { kind: "header", label: "Show" },
+        ...VARIANT_TYPES.map((t): MenuEntry => ({
+          kind: "checkbox",
+          label: variantLabel(t, collation.mode),
+          checked: visibleTypes.has(t),
+          onToggle: () => toggleType(t),
+          color: VARIANT_TYPE_COLORS[t],
+        })),
+        { kind: "separator" },
+        { kind: "checkbox", label: "Deep-dive panel", checked: showDeepDive, onToggle: () => setShowDeepDive((v) => !v) },
+        { kind: "checkbox", label: "Dark mode", checked: isDark, onToggle: () => setIsDark((v) => !v) },
+      ],
+    },
+    {
+      label: "Help",
+      entries: [{ kind: "action", label: "About Source Variorum", onClick: () => setShowAbout(true) }],
+    },
+  ];
+
   const importSources = useCallback(
     (sources: { siglum: string; title: string; text: string }[]) => {
       project.addWitnesses(sources.map((s) => ({ id: uid(), siglum: s.siglum, title: s.title, text: normalizeNewlines(s.text) })));
@@ -211,51 +275,28 @@ export default function Home() {
             </div>
           </div>
 
-          <FileMenu
-            name={collation.name}
-            onRename={project.rename}
-            onNew={() => project.load(blankCollation(collation.mode))}
-            onLoad={() => fileInputRef.current?.click()}
-            onSave={saveProject}
-            onExportMd={() => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown")}
-            onExportJson={() => download(`${slugify(collation.name)}.json`, toJSON(collation), "application/json")}
-            onExportPdf={() => toPDF(collation).save(`${slugify(collation.name)}.pdf`)}
-          />
-
-          {/* Undo / redo / revert */}
-          <div className="flex items-center rounded border border-border overflow-hidden">
-            <IconBtn title="Undo (⌘Z)" disabled={!project.canUndo} onClick={project.undo}><Undo2 className="w-3.5 h-3.5" /></IconBtn>
-            <IconBtn title="Redo (⌘⇧Z)" disabled={!project.canRedo} onClick={project.redo}><Redo2 className="w-3.5 h-3.5" /></IconBtn>
-          </div>
-          {project.isDirty && (
-            <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
-              <RotateCcw className="w-3.5 h-3.5" /> Revert
-            </button>
-          )}
+          <MenuBar menus={menus} />
 
           <div className="flex items-center gap-2 ml-auto flex-wrap">
-            <button onClick={() => { setEditMode((v) => !v); setAdvancedMode(false); }} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (editMode ? "bg-amber-500/20 border-amber-500 text-amber-800 dark:text-amber-300" : "border-border bg-card hover:bg-muted")} title="Edit witness text">
-              <Pencil className="w-3.5 h-3.5" /> {editMode ? "Editing" : "Edit"}
-            </button>
-
-            <button onClick={() => { setAdvancedMode((v) => !v); setEditMode(false); }} className={"inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-[12px] " + (advancedMode ? "bg-primary/15 border-primary text-primary" : "border-border bg-card hover:bg-muted")} title="Advanced: hand-edit the braid links">
-              <Spline className="w-3.5 h-3.5" /> {advancedMode ? "Advanced" : "Auto"}
-            </button>
-
-            {/* Font size */}
-            <div className="flex items-center rounded border border-border overflow-hidden">
-              <IconBtn title="Smaller text" onClick={() => setFont(-1)}><span className="text-[11px]">A−</span></IconBtn>
-              <span className="px-1 text-[10px] text-muted-foreground tabular-nums w-7 text-center"><Type className="w-3 h-3 inline -mt-0.5" /></span>
-              <IconBtn title="Larger text" onClick={() => setFont(1)}><span className="text-[14px]">A+</span></IconBtn>
-            </div>
-
+            {/* Mode (Code/Text) */}
             <div className="flex rounded border border-border overflow-hidden text-[12px]">
               {(["source", "text"] as CollationMode[]).map((m) => (
                 <button key={m} onClick={() => project.setMode(m)} className={"px-2.5 py-1 transition-colors " + (collation.mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m === "source" ? "Code" : "Text"}</button>
               ))}
             </div>
 
-            <button onClick={() => setShowAbout(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="About"><Info className="w-3.5 h-3.5" /></button>
+            {/* Auto / Advanced (hand-braiding) */}
+            <div className="flex rounded border border-border overflow-hidden text-[12px]" title="Advanced: hand-edit the braid links">
+              <button onClick={() => { setAdvancedMode(false); }} className={"px-2.5 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
+              <button onClick={() => { setAdvancedMode(true); setEditMode(false); }} className={"inline-flex items-center gap-1 px-2.5 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3.5 h-3.5" /> Advanced</button>
+            </div>
+
+            {project.isDirty && (
+              <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
+                <RotateCcw className="w-3.5 h-3.5" /> Revert
+              </button>
+            )}
+
             <button onClick={() => setIsDark((v) => !v)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Toggle theme">{isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}</button>
           </div>
         </div>
@@ -275,7 +316,17 @@ export default function Home() {
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} />
         <main ref={mainRef} className="flex-1 min-w-0 overflow-y-auto">
-          <CollationView project={project} view={view} fontSize={fontSize} editMode={editMode} advancedMode={advancedMode} />
+          <CollationView
+            project={project}
+            view={view}
+            fontSize={fontSize}
+            editMode={editMode}
+            advancedMode={advancedMode}
+            visibleTypes={visibleTypes}
+            onToggleType={toggleType}
+            showDeepDive={showDeepDive}
+            onToggleDeepDive={() => setShowDeepDive((v) => !v)}
+          />
         </main>
       </div>
 
@@ -296,13 +347,6 @@ export default function Home() {
   );
 }
 
-function IconBtn({ children, title, onClick, disabled }: { children: React.ReactNode; title: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled} title={title} className="px-1.5 py-1 bg-card hover:bg-muted disabled:opacity-30 disabled:hover:bg-card flex items-center justify-center">
-      {children}
-    </button>
-  );
-}
 
 function AddSourcePanel({
   mode,
@@ -376,42 +420,6 @@ function AddSourcePanel({
   );
 }
 
-function FileMenu({
-  name, onRename, onNew, onLoad, onSave, onExportMd, onExportJson, onExportPdf,
-}: {
-  name: string; onRename: (s: string) => void; onNew: () => void; onLoad: () => void; onSave: () => void; onExportMd: () => void; onExportJson: () => void; onExportPdf: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const item = "w-full text-left px-3 py-1.5 text-[12px] hover:bg-muted flex items-center gap-2";
-  const close = (fn: () => void) => () => { fn(); setOpen(false); };
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen((v) => !v)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]">
-        <FileText className="w-3.5 h-3.5" /> File <ChevronDown className="w-3 h-3 opacity-60" />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 mt-1 w-60 z-50 bg-card border border-border rounded-md shadow-lg py-1.5">
-            <div className="px-3 pb-2 pt-1">
-              <label className="text-[10px] uppercase tracking-wide text-muted-foreground">Collation name</label>
-              <input value={name} onChange={(e) => onRename(e.target.value)} className="w-full mt-1 bg-background border border-border rounded px-2 py-1 text-[12px]" />
-            </div>
-            <div className="border-t border-border my-1" />
-            <button className={item} onClick={close(onNew)}><FilePlus className="w-3.5 h-3.5 text-muted-foreground" /> New collation…</button>
-            <button className={item} onClick={close(onLoad)}><FolderOpen className="w-3.5 h-3.5 text-muted-foreground" /> Open project (.svar)…</button>
-            <button className={item} onClick={close(onSave)}><Save className="w-3.5 h-3.5 text-muted-foreground" /> Save project (.svar)</button>
-            <div className="border-t border-border my-1" />
-            <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">Export</div>
-            <button className={item} onClick={close(onExportMd)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> Markdown (.md)</button>
-            <button className={item} onClick={close(onExportPdf)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> PDF (.pdf)</button>
-            <button className={item} onClick={close(onExportJson)}><Download className="w-3.5 h-3.5 text-muted-foreground" /> JSON (.json)</button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
 
 function AboutModal({ onClose }: { onClose: () => void }) {
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, ChevronDown, ChevronRight } from "lucide-react";
+import { X } from "lucide-react";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS, variantLabel } from "@/types/collation";
@@ -30,12 +30,20 @@ export function CollationView({
   fontSize,
   editMode,
   advancedMode,
+  visibleTypes,
+  onToggleType,
+  showDeepDive,
+  onToggleDeepDive,
 }: {
   project: Project;
   view: View;
   fontSize: number;
   editMode: boolean;
   advancedMode: boolean;
+  visibleTypes: Set<VariantType>;
+  onToggleType: (t: VariantType) => void;
+  showDeepDive: boolean;
+  onToggleDeepDive: () => void;
 }) {
   const { collation } = project;
   const { a: witnessA, b: witnessB, variants, metrics } = view;
@@ -43,9 +51,6 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
-  const [showDeepDive, setShowDeepDive] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(true);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number } | null>(null);
   // Advanced-mode hand-linking: a picked character range per side.
   const [leftPick, setLeftPick] = useState<{ start: number; end: number } | null>(null);
@@ -169,14 +174,6 @@ export function CollationView({
     [variants]
   );
 
-  const toggleType = (t: VariantType) =>
-    setVisibleTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      return next;
-    });
-
   const apparatus = useMemo(() => variants.filter((v) => v.type !== "match"), [variants]);
 
   const annotationsFor = (id: string): LineAnnotation[] => collation.annotations[id] ?? [];
@@ -185,43 +182,19 @@ export function CollationView({
 
   return (
     <div className="flex flex-col">
-      {/* Filter chips (collapsible) */}
-      <div className="flex flex-wrap items-center gap-1 px-3 py-1 border-b border-border text-[10px] bg-muted/30 sticky top-0 z-20">
-        <button
-          onClick={() => setFiltersOpen((v) => !v)}
-          className="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground mr-0.5"
-          title={filtersOpen ? "Hide filters" : "Show filters"}
-        >
-          {filtersOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          Show
-        </button>
-        {filtersOpen &&
-          VARIANT_TYPES.map((t) => {
-            const on = visibleTypes.has(t);
-            const count = metrics.counts[t];
-            return (
-              <button
-                key={t}
-                onClick={() => toggleType(t)}
-                className="inline-flex items-center gap-1 px-1.5 py-px rounded-full border transition-colors"
-                style={{
-                  borderColor: VARIANT_TYPE_COLORS[t],
-                  background: on ? `color-mix(in srgb, ${VARIANT_TYPE_COLORS[t]} 18%, transparent)` : "transparent",
-                  color: on ? "var(--foreground)" : "var(--muted-foreground)",
-                  opacity: on ? 1 : 0.5,
-                }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
-                {variantLabel(t, mode)} ({count})
-              </button>
-            );
-          })}
-        {!filtersOpen && (
-          <span className="text-muted-foreground">
-            {apparatus.length} {apparatus.length === 1 ? "variant" : "variants"}
-          </span>
-        )}
-        {editMode && <span className="ml-auto text-[10px] text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
+      {/* Read-only variant legend + counts (toggle visibility from the View menu). */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 border-b border-border text-[10px] bg-muted/30 sticky top-0 z-20 text-muted-foreground">
+        {VARIANT_TYPES.map((t) => {
+          const on = visibleTypes.has(t);
+          return (
+            <span key={t} className="inline-flex items-center gap-1" style={{ opacity: on ? 1 : 0.3 }} title={on ? `${variantLabel(t, mode)} — shown` : `${variantLabel(t, mode)} — hidden (toggle in View ▸ Show)`}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: VARIANT_TYPE_COLORS[t] }} />
+              {variantLabel(t, mode)} {metrics.counts[t]}
+            </span>
+          );
+        })}
+        {editMode && <span className="ml-auto text-amber-700 dark:text-amber-400">Editing — braid paused</span>}
+        {advancedMode && !editMode && <span className="ml-auto text-primary">Advanced — pick a passage on each side, then link</span>}
       </div>
 
       {/* Three-column braid. Clicking the background (not a span or ribbon)
@@ -313,7 +286,7 @@ export function CollationView({
         }}
       />
 
-      <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={() => setShowDeepDive((v) => !v)} witnessA={witnessA} witnessB={witnessB} />
+      <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
 
       {pendingAnn && (
         <AnnotationPopover
