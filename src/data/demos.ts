@@ -38,6 +38,7 @@ export interface Demo {
 // project so any two versions can be braided from the Sources sidebar.
 const SW = (file: string): string => `demos/spacewar-1962/${file}`;
 const SPACEWAR_CORPUS: DemoWitness[] = [
+  // Core versions (the development genealogy)
   { siglum: "1", title: "Spacewar! 1 (reconstructed)", date: "early 1962", provenance: "spacewar_1_early1962_reconstructed.txt", file: SW("spacewar_1_early1962_reconstructed.txt") },
   { siglum: "2b", title: "Spacewar! 2b (25 Mar 1962)", date: "25 Mar 1962", provenance: "spacewar_2b_25mar62.txt", file: SW("spacewar_2b_25mar62.txt") },
   { siglum: "2b′", title: "Spacewar! 2b (2 Apr 1962)", date: "2 Apr 1962", provenance: "spacewar_2b_2apr62.txt", file: SW("spacewar_2b_2apr62.txt") },
@@ -46,15 +47,35 @@ const SPACEWAR_CORPUS: DemoWitness[] = [
   { siglum: "4.2a", title: "Spacewar! 4.2a", date: "22 Feb 1963", provenance: "spacewar_4.2a.txt", file: SW("spacewar_4.2a.txt") },
   { siglum: "4.3", title: "Spacewar! 4.3 (Twin Star)", date: "17 May 1963", provenance: "spacewar_4.3f.txt", file: SW("spacewar_4.3f.txt") },
   { siglum: "4.4", title: "Spacewar! 4.4 (dual console)", date: "21 May 1963", provenance: "spacewar_4.4.txt", file: SW("spacewar_4.4.txt") },
+  { siglum: "4.4f", title: "Spacewar! 4.4f", date: "1963", provenance: "spacewar_4.4f.txt", file: SW("spacewar_4.4f.txt") },
+  { siglum: "4.8a", title: "Spacewar! 4.8 (part 1)", date: "1963", provenance: "spacewar_4.8_pt1.txt", file: SW("spacewar_4.8_pt1.txt") },
+  { siglum: "4.8b", title: "Spacewar! 4.8 (part 2)", date: "1963", provenance: "spacewar_4.8_pt2.txt", file: SW("spacewar_4.8_pt2.txt") },
+  { siglum: "4.8s", title: "Spacewar! 4.8 (scorer)", date: "1963", provenance: "spacewar_4.8_scorer.txt", file: SW("spacewar_4.8_scorer.txt") },
+  { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
+  // Modern reconstructions / re-typings
+  { siglum: "2bм", title: "Spacewar! 2b (2016 retype)", date: "2016", provenance: "spacewar_2b_m_2016.txt", file: SW("spacewar_2b_m_2016.txt") },
+  { siglum: "sw15", title: "Spacewar! (2015 retype)", date: "2015", provenance: "spacewar2015.txt", file: SW("spacewar2015.txt") },
+  // Disassemblies, patches, and supporting listings
+  { siglum: "2b·d", title: "Spacewar! 2b — disassembly", date: "—", provenance: "spacewar_2b_disassembly.txt", file: SW("spacewar_2b_disassembly.txt") },
+  { siglum: "rst·d", title: "Spacewar! restart — disassembly", date: "—", provenance: "spaceWarRstrt_disassembly.txt", file: SW("spaceWarRstrt_disassembly.txt") },
+  { siglum: "rst", title: "Spacewar! auto-restart patch", date: "—", provenance: "spacewAutoRestartPatch.txt", file: SW("spacewAutoRestartPatch.txt") },
+  { siglum: "ssw", title: "Spacewar! sense-switch settings", date: "—", provenance: "spacewar-senseswitches.txt", file: SW("spacewar-senseswitches.txt") },
+  { siglum: "fio", title: "MACRO / FIO-DEC character set", date: "—", provenance: "macro_fiodec.txt", file: SW("macro_fiodec.txt") },
+  // Related PDP-1 display programs (same milieu, in the CCS corpus)
+  { siglum: "hs85", title: "Minskytron Hyperspace (85)", date: "1962", provenance: "hyperspace85.txt", file: SW("hyperspace85.txt") },
+  { siglum: "hs·d", title: "Hyperspace 85 — disassembly", date: "—", provenance: "hyperspace85_disassembly.txt", file: SW("hyperspace85_disassembly.txt") },
+  { siglum: "hs·doc", title: "Minskytron Hyperspace — how-to", date: "—", provenance: "minskytron-hyperspace-howto.txt", file: SW("minskytron-hyperspace-howto.txt") },
+  { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
+  { siglum: "stars", title: "Expensive Planetarium (stars)", date: "1962", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
 ];
 
 export const DEMOS: Demo[] = [
   {
     id: "spacewar-corpus",
-    name: "Spacewar! corpus (1962–63, 8 versions)",
+    name: "Spacewar! corpus (1962–63, full)",
     mode: "source",
-    blurb: "Eight versions of the Spacewar! PDP-1 source as one project",
-    shows: "Whole-genealogy collation — pick any two versions from the sidebar",
+    blurb: "The full CCS Spacewar! PDP-1 corpus — versions, disassemblies, related programs",
+    shows: "Whole-genealogy collation — pick any two of 25 sources from the sidebar",
     witnessA: SPACEWAR_CORPUS[1], // 2b (25 Mar 1962)
     witnessB: SPACEWAR_CORPUS[3], // 3.1 (canonical)
     witnesses: SPACEWAR_CORPUS,

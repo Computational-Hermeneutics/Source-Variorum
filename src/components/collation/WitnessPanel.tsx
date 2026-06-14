@@ -45,12 +45,17 @@ function colorize(absStart: number, str: string, tokens: HToken[], isDark: boole
  *  what changed; when a variant is selected every other span is faded so the
  *  locus under work stands alone. */
 function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean, anySelected: boolean) {
-  // The selected locus glows in the strong version-variation yellow (VVV-style),
-  // so the active reading stands out on both panels regardless of variant type.
+  // The selected locus KEEPS its variant-type colour (so a transposition still
+  // reads as blue, an omission as red, etc.) and is framed in the strong
+  // version-variation yellow — the yellow marks "you are here", it doesn't
+  // replace the type.
   if (selected) {
+    const base = type === "match"
+      ? "color-mix(in srgb, var(--sv-match) 16%, transparent)"
+      : `color-mix(in srgb, ${VARIANT_TYPE_COLORS[type]} 42%, transparent)`;
     return {
-      background: "color-mix(in srgb, var(--sv-variation) 55%, transparent)",
-      boxShadow: "inset 0 -2px 0 0 var(--sv-variation)",
+      background: base,
+      boxShadow: "inset 0 0 0 2px var(--sv-variation)",
       opacity: 1,
     };
   }

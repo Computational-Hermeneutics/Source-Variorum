@@ -547,10 +547,8 @@ function WitnessHeader({
             </option>
           ))}
         </select>
-        {which === "left" && <span className="text-[8px] uppercase tracking-wide text-muted-foreground border border-border px-1 rounded" title="The left witness is the base / copy-text: apparatus lemmas are drawn from it">base</span>}
         {annCount > 0 && <span className="text-[10px] text-muted-foreground" title={`${annCount} annotation(s)`}>✎ {annCount}</span>}
-        {witness.date && <span className="text-[10px] text-muted-foreground truncate hidden md:inline">{witness.date}</span>}
-        <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0">{side}</span>
+        <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wide shrink-0" title={which === "left" ? "Base / copy-text" : undefined}>{side}</span>
       </div>
       {/* Row 2: per-panel toolbar */}
       <PanelToolbar
@@ -623,7 +621,7 @@ function PanelToolbar({
           value={lang ?? "none"}
           onChange={(e) => onLang(e.target.value)}
           title="Syntax highlighting for this panel"
-          className="h-6 rounded border border-border bg-card hover:bg-muted text-[10px] px-0.5 max-w-[7.5rem]"
+          className="h-6 rounded border border-border bg-card hover:bg-muted text-[10px] px-0.5 w-[5.5rem]"
         >
           <option value="none">No highlighting</option>
           <optgroup label="Modern">

@@ -356,15 +356,6 @@ export default function Home() {
           <MenuBar menus={menus} />
 
           <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {/* Compact mode pill (also in View menu + Settings). */}
-            <button
-              onClick={() => project.setMode(collation.mode === "source" ? "text" : "source")}
-              title="Toggle Code / Text mode (also in View menu and Settings)"
-              className="px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] font-medium"
-            >
-              {collation.mode === "source" ? "Code" : "Text"}
-            </button>
-
             {/* Auto / Advanced (hand-braiding) — a cross-panel mode kept global. */}
             <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Advanced: hand-edit the braid links">
               <button onClick={() => { setAdvancedMode(false); }} className={"px-2 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
@@ -601,7 +592,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <p>A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a text so a reader can track how textual decisions were made. Source Variorum brings that apparatus of textual criticism to computational close reading, in two modes — source code and prose.</p>
           <p>Load several witnesses into a project, pick any two for the left and right panels, and read the <strong>braid</strong> between them: ribbons connecting matching passages, including text that has <strong>moved</strong>. Variants are typed and gathered into an editable critical apparatus. Edit witness text to correct errors, annotate with ⌘/Ctrl-click, and save or export the project.</p>
           <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first, no model calls.</p>
-          <p className="text-[12px] text-muted-foreground"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
+          <p className="text-[9px] leading-snug text-muted-foreground/80"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
         </div>
         <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}

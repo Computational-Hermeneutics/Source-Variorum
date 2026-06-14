@@ -61,8 +61,9 @@ export function BraidGutter({
       {sorted.map((r) => {
         if (!visibleTypes.has(r.type)) return null;
         const isSelected = r.id === selectedId;
-        // Selected ribbon glows in the version-variation yellow (VVV-style).
-        const color = isSelected ? "var(--sv-variation)" : VARIANT_TYPE_COLORS[r.type];
+        // Keep the ribbon its variant-type colour; selection is shown by emphasis
+        // (thicker + full opacity) so the type stays legible.
+        const color = VARIANT_TYPE_COLORS[r.type];
         const active = isSelected || r.id === hoveredId;
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
         const cx = width / 2;

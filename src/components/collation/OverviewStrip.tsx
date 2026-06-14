@@ -57,7 +57,7 @@ export function OverviewStrip({
         id: v.id,
         y: (pos / len) * VH,
         h: Math.max(2.5, (span / len) * VH),
-        color: v.id === selectedId ? "var(--sv-variation)" : VARIANT_TYPE_COLORS[v.type],
+        color: VARIANT_TYPE_COLORS[v.type],
         selected: v.id === selectedId,
       };
     });
@@ -85,7 +85,17 @@ export function OverviewStrip({
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           <rect x={0} y={0} width={10} height={VH} className="fill-card/40" />
           {bands.map((b) => (
-            <rect key={b.id} x={b.selected ? 0 : 1.5} y={b.y} width={b.selected ? 10 : 7} height={b.h} fill={b.color} opacity={b.selected ? 1 : 0.8} />
+            <rect
+              key={b.id}
+              x={b.selected ? 0.5 : 1.5}
+              y={b.y}
+              width={b.selected ? 9 : 7}
+              height={b.h}
+              fill={b.color}
+              opacity={b.selected ? 1 : 0.8}
+              stroke={b.selected ? "var(--sv-variation)" : undefined}
+              strokeWidth={b.selected ? 1.5 : 0}
+            />
           ))}
           {/* viewport indicator */}
           <rect x={0.5} y={vp.top} width={9} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />
