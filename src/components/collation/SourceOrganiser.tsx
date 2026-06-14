@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
-  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy,
+  MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy, Info,
 } from "lucide-react";
 
 function uid(): string {
@@ -256,6 +256,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
   const edited = w.original !== undefined && w.text !== w.original;
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [details, setDetails] = useState(false);
   const [sig, setSig] = useState(w.siglum);
   const [title, setTitle] = useState(w.title);
 
@@ -280,7 +281,7 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
   return (
     <div
       onClick={() => project.setRight(w.id)}
-      title={`${w.title}${w.date ? ` (${w.date})` : ""}\nClick to compare on the right; ⋮ for more`}
+      title={`${w.title}${w.author ? ` — ${w.author}` : ""}${w.date ? ` (${w.date})` : ""}\nClick to compare on the right; ⋮ for more`}
       className={
         "group flex items-center gap-1.5 pr-1.5 py-1 cursor-pointer border-l-2 " +
         (indent ? "pl-4 " : "pl-2 ") +
@@ -288,7 +289,10 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
       }
     >
       <File className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-      <span className={"truncate flex-1 " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</span>
+      <div className="flex-1 min-w-0">
+        <div className={"truncate " + (shown ? "text-foreground" : "")} style={{ fontSize: `${fz}px` }}>{w.title}</div>
+        {(w.author || w.date) && <div className="truncate text-[8px] leading-tight text-muted-foreground">{[w.author, w.date].filter(Boolean).join(" · ")}</div>}
+      </div>
       {isLeft && <span className="text-[8px] uppercase tracking-wide text-muted-foreground" title="Base / copy-text (left panel)">base</span>}
       {edited && <span className="text-[8px] uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Edited — differs from the original; revert via ⋮">edited</span>}
       {annCount > 0 && <span className="text-[9px] px-1 rounded bg-secondary/30 text-secondary-foreground" title={`${annCount} annotation(s)`}>✎{annCount}</span>}
@@ -302,6 +306,9 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
             <div className="absolute right-0 top-full mt-1 w-44 z-50 bg-card border border-border rounded-md shadow-lg py-1 text-[12px]">
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setSig(w.siglum); setTitle(w.title); setEditing(true); setMenu(false); }}>
                 <Pencil className="w-3 h-3 text-muted-foreground" /> Rename
+              </button>
+              <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setDetails(true); setMenu(false); }}>
+                <Info className="w-3 h-3 text-muted-foreground" /> Details &amp; metadata…
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.duplicateWitness(w.id, uid()); setMenu(false); }}>
                 <Copy className="w-3 h-3 text-muted-foreground" /> Duplicate (working copy)
@@ -332,6 +339,79 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
             </div>
           </>
         )}
+      </div>
+      {details && <WitnessDetailsModal witness={w} onClose={() => setDetails(false)} onSave={(patch) => { project.updateWitness(w.id, patch); setDetails(false); }} />}
+    </div>
+  );
+}
+
+/** Edit a witness's bibliographic metadata: siglum, title, author, date, plus
+ *  arbitrary custom key/value fields. */
+function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; onClose: () => void; onSave: (patch: Partial<Witness>) => void }) {
+  const [sig, setSig] = useState(witness.siglum);
+  const [title, setTitle] = useState(witness.title);
+  const [author, setAuthor] = useState(witness.author ?? "");
+  const [date, setDate] = useState(witness.date ?? "");
+  const [provenance, setProvenance] = useState(witness.provenance ?? "");
+  const [rows, setRows] = useState<{ k: string; v: string }[]>(() => Object.entries(witness.metadata ?? {}).map(([k, v]) => ({ k, v })));
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const save = () => {
+    const metadata: Record<string, string> = {};
+    for (const r of rows) { const k = r.k.trim(); if (k) metadata[k] = r.v.trim(); }
+    onSave({
+      siglum: sig.trim() || witness.siglum,
+      title: title.trim() || witness.title,
+      author: author.trim() || undefined,
+      date: date.trim() || undefined,
+      provenance: provenance.trim() || undefined,
+      metadata: Object.keys(metadata).length ? metadata : undefined,
+    });
+  };
+  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <label className="flex items-center gap-2 text-[12px]">
+      <span className="w-20 shrink-0 text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+  const inputCls = "flex-1 min-w-0 bg-background border border-border rounded px-2 py-1 text-[12px]";
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
+          <h2 className="text-[15px] font-semibold leading-tight">Source details</h2>
+          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="px-5 py-4 space-y-2.5">
+          <Field label="Siglum"><input value={sig} onChange={(e) => setSig(e.target.value)} className={inputCls + " font-mono max-w-[6rem]"} /></Field>
+          <Field label="Title"><input value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} /></Field>
+          <Field label="Author"><input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="editor / translator" className={inputCls} /></Field>
+          <Field label="Date / year"><input value={date} onChange={(e) => setDate(e.target.value)} placeholder="e.g. 1623" className={inputCls} /></Field>
+          <label className="flex items-start gap-2 text-[12px]">
+            <span className="w-20 shrink-0 text-muted-foreground pt-1">Provenance</span>
+            <textarea value={provenance} onChange={(e) => setProvenance(e.target.value)} placeholder="where this source came from" className={inputCls + " h-14 resize-y"} />
+          </label>
+          <div className="pt-1">
+            <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Custom fields</div>
+            <div className="space-y-1.5">
+              {rows.map((r, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <input value={r.k} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, k: e.target.value } : x)))} placeholder="key" className="w-28 bg-background border border-border rounded px-1.5 py-1 text-[11px]" />
+                  <input value={r.v} onChange={(e) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, v: e.target.value } : x)))} placeholder="value" className="flex-1 min-w-0 bg-background border border-border rounded px-1.5 py-1 text-[11px]" />
+                  <button onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="p-1 rounded hover:bg-muted text-muted-foreground" title="Remove"><X className="w-3 h-3" /></button>
+                </div>
+              ))}
+              <button onClick={() => setRows((rs) => [...rs, { k: "", v: "" }])} className="text-[11px] text-primary hover:underline">+ add field</button>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 py-3 border-t border-border flex justify-end gap-2">
+          <button onClick={onClose} className="px-3 py-1.5 rounded border border-border text-[12px] hover:bg-muted">Cancel</button>
+          <button onClick={save} className="px-3 py-1.5 rounded bg-primary text-primary-foreground text-[12px] font-medium">Save</button>
+        </div>
       </div>
     </div>
   );

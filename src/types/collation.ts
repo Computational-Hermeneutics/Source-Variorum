@@ -26,6 +26,10 @@ export interface Witness {
   provenance?: string;
   /** Optional date string (free-form: "1622", "1962-04", etc.). */
   date?: string;
+  /** Optional author / editor / translator. */
+  author?: string;
+  /** Arbitrary extra metadata (key → value), editable per witness. */
+  metadata?: Record<string, string>;
   /** Optional folder this witness is filed under in the Sources organiser. */
   folder?: string;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */

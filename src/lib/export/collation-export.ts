@@ -133,7 +133,7 @@ export function toMarkdown(c: Collation): string {
   out.push("");
   for (const w of c.witnesses) {
     const base = w.id === c.leftId ? " *(base / copy-text)*" : "";
-    out.push(`- **${w.siglum}** — ${w.title}${w.date ? ` (${w.date})` : ""}${base}`);
+    out.push(`- **${w.siglum}** — ${w.title}${w.author ? `, ${w.author}` : ""}${w.date ? ` (${w.date})` : ""}${base}`);
   }
   out.push("");
 
@@ -227,7 +227,7 @@ export function toTEI(c: Collation): string {
   while (ai < adds.length) body.push(segXml(adds[ai++]));
 
   const witLine = (w: Witness, base: boolean) =>
-    `        <witness xml:id="${w.id === c.leftId ? wA : wB}"><abbr>${escXml(w.siglum)}</abbr> — ${escXml(w.title)}${w.date ? ` (${escXml(w.date)})` : ""}${base ? " [base / copy-text]" : ""}</witness>`;
+    `        <witness xml:id="${w.id === c.leftId ? wA : wB}"><abbr>${escXml(w.siglum)}</abbr> — ${escXml(w.title)}${w.author ? `, ${escXml(w.author)}` : ""}${w.date ? ` (${escXml(w.date)})` : ""}${base ? " [base / copy-text]" : ""}</witness>`;
 
   return [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -289,7 +289,7 @@ export function toPDF(c: Collation): jsPDF {
   line("Witnesses", 12, "bold");
   for (const w of c.witnesses) {
     const base = w.id === c.leftId ? " (base / copy-text)" : "";
-    line(`${w.siglum} — ${w.title}${w.date ? ` (${w.date})` : ""}${base}`, 10, "normal", 12);
+    line(`${w.siglum} — ${w.title}${w.author ? `, ${w.author}` : ""}${w.date ? ` (${w.date})` : ""}${base}`, 10, "normal", 12);
   }
   gap(10);
 
