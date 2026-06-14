@@ -123,6 +123,8 @@ export default function Home() {
   const [showOverview, setShowOverview] = useState(false);
   const [showStrip, setShowStrip] = useState(true);
   const setShowStripP = (v: boolean) => { setShowStrip(v); try { localStorage.setItem("source-variorum-strip", v ? "1" : "0"); } catch { /* ignore */ } };
+  const [stripHotspots, setStripHotspots] = useState(false);
+  const setStripHotspotsP = (v: boolean) => { setStripHotspots(v); try { localStorage.setItem("source-variorum-strip-hotspots", v ? "1" : "0"); } catch { /* ignore */ } };
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const setSidebarHiddenP = (v: boolean) => { setSidebarHidden(v); try { localStorage.setItem("source-variorum-sidebar-hidden", v ? "1" : "0"); } catch { /* ignore */ } };
   const [search, setSearch] = useState("");
@@ -152,6 +154,7 @@ export default function Home() {
       const tk = localStorage.getItem(TOKENIZER_KEY);
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
       if (localStorage.getItem("source-variorum-strip") === "0") setShowStrip(false);
+      if (localStorage.getItem("source-variorum-strip-hotspots") === "1") setStripHotspots(true);
       if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
     } catch {
       /* ignore */
@@ -210,10 +213,11 @@ export default function Home() {
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
   // don't pay for N collations on every project.
+  const needHotspots = showOverview || (showStrip && stripHotspots);
   const hotspots = useMemo(
-    () => (showOverview ? computeHotspots(collation, tokenizer) : null),
+    () => (needHotspots ? computeHotspots(collation, tokenizer) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [showOverview, collation.witnesses, collation.leftId, collation.mode, tokenizer]
+    [needHotspots, collation.witnesses, collation.leftId, collation.mode, tokenizer]
   );
 
   const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
@@ -315,6 +319,7 @@ export default function Home() {
         { kind: "separator" },
         { kind: "checkbox", label: "Sources panel", checked: !sidebarHidden, onToggle: () => setSidebarHiddenP(sidebarHidden ? false : true) },
         { kind: "checkbox", label: "Overview strip", checked: showStrip, onToggle: () => setShowStripP(!showStrip) },
+        { kind: "checkbox", label: "Strip: version hotspots", checked: stripHotspots, onToggle: () => setStripHotspotsP(!stripHotspots) },
         { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
         { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
@@ -421,6 +426,7 @@ export default function Home() {
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
             hotspots={hotspots}
+            stripHotspots={stripHotspots}
             showStrip={showStrip}
             onHideStrip={() => setShowStripP(false)}
             scrollRef={mainRef}

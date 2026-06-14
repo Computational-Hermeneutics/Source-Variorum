@@ -49,6 +49,7 @@ export function CollationView({
   showOverview,
   onCloseOverview,
   hotspots,
+  stripHotspots,
   showStrip,
   onHideStrip,
   scrollRef,
@@ -74,6 +75,7 @@ export function CollationView({
   showOverview: boolean;
   onCloseOverview: () => void;
   hotspots: Hotspots | null;
+  stripHotspots: boolean;
   showStrip: boolean;
   onHideStrip: () => void;
   scrollRef: React.RefObject<HTMLElement | null>;
@@ -242,6 +244,8 @@ export function CollationView({
           onSelect={onSelect}
           scrollRef={scrollRef}
           onHide={onHideStrip}
+          hotspots={hotspots}
+          hotspotMode={stripHotspots}
         />
       )}
       <div className="flex-1 min-w-0 flex flex-col">

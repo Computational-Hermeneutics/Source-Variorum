@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useMemo, useState, type RefObject } from "react";
 import { PanelLeftClose } from "lucide-react";
 import type { Variant, VariantType } from "@/types/collation";
 import { VARIANT_TYPE_COLORS } from "@/types/collation";
+import type { Hotspots } from "@/lib/collate/hotspots";
+import { heat } from "./HotspotBar";
 
 /**
  * VVV-style vertical overview strip (a "minimap"): a thin column down the left of
@@ -24,6 +26,8 @@ export function OverviewStrip({
   scrollRef,
   onHide,
   lengthB,
+  hotspots,
+  hotspotMode,
 }: {
   variants: Variant[];
   baseLength: number;
@@ -35,6 +39,10 @@ export function OverviewStrip({
   /** Length of witness B, to place additions (which have no base position) at
    *  their proportional point in the base coordinate space. */
   lengthB: number;
+  /** Version-hotspot data (base vs all witnesses) for the hotspot mode. */
+  hotspots: Hotspots | null;
+  /** When true, show the aggregate hotspot heat instead of the pair's variants. */
+  hotspotMode: boolean;
 }) {
   const [vp, setVp] = useState({ top: 0, h: 1 });
   const [width, setWidth] = useState(30);
@@ -88,6 +96,25 @@ export function OverviewStrip({
 
   const navPoints = bands.map((b) => ({ y: b.y, id: b.id })).sort((a, b) => a.y - b.y);
 
+  // Aggregate hotspot heat down the base: each vertical bucket coloured by how
+  // many of the other witnesses diverge there.
+  const useHeat = hotspotMode && hotspots != null && hotspots.others > 0 && hotspots.baseLength > 0;
+  const heatBuckets = useMemo(() => {
+    if (!useHeat || !hotspots) return [];
+    const N = 200;
+    const { freq, others, baseLength } = hotspots;
+    const out: { y: number; h: number; color: string }[] = [];
+    for (let i = 0; i < N; i++) {
+      const s = Math.floor((i / N) * baseLength);
+      const e = Math.max(s + 1, Math.floor(((i + 1) / N) * baseLength));
+      let sum = 0;
+      for (let j = s; j < e && j < baseLength; j++) sum += freq[j];
+      const intensity = sum / Math.max(1, e - s) / others; // 0..1
+      if (intensity > 0.01) out.push({ y: (i / N) * VH, h: VH / N + 0.5, color: heat(intensity) });
+    }
+    return out;
+  }, [useHeat, hotspots]);
+
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const y = ((e.clientY - rect.top) / rect.height) * VH;
@@ -105,22 +132,24 @@ export function OverviewStrip({
       <button onClick={onHide} title="Hide overview strip" className="h-5 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted">
         <PanelLeftClose className="w-3 h-3" />
       </button>
-      <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
+      <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title={useHeat ? "Version hotspots — click to jump" : "Overview — click to jump"}>
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           <rect x={0} y={0} width={10} height={VH} className="fill-card/40" />
-          {bands.map((b) => (
-            <rect
-              key={b.id}
-              x={b.selected ? 0.5 : 1.5}
-              y={b.y}
-              width={b.selected ? 9 : 7}
-              height={b.h}
-              fill={b.color}
-              opacity={b.selected ? 1 : 0.8}
-              stroke={b.selected ? "var(--sv-variation)" : undefined}
-              strokeWidth={b.selected ? 1.5 : 0}
-            />
-          ))}
+          {useHeat
+            ? heatBuckets.map((b, i) => <rect key={i} x={0} y={b.y} width={10} height={b.h} fill={b.color} opacity={0.9} />)
+            : bands.map((b) => (
+                <rect
+                  key={b.id}
+                  x={b.selected ? 0.5 : 1.5}
+                  y={b.y}
+                  width={b.selected ? 9 : 7}
+                  height={b.h}
+                  fill={b.color}
+                  opacity={b.selected ? 1 : 0.8}
+                  stroke={b.selected ? "var(--sv-variation)" : undefined}
+                  strokeWidth={b.selected ? 1.5 : 0}
+                />
+              ))}
           {/* viewport indicator */}
           <rect x={0.5} y={vp.top} width={9} height={vp.h} className="fill-foreground/5 stroke-foreground/40" strokeWidth={1.5} rx={1} />
         </svg>

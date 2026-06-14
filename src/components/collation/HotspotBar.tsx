@@ -13,7 +13,7 @@ const BUCKETS = 240;
 const H = 100;
 
 /** Heat ramp 0..1 → amber → orange → deep red. */
-function heat(t: number): string {
+export function heat(t: number): string {
   const stops: [number, [number, number, number]][] = [
     [0, [246, 201, 69]],
     [0.5, [232, 119, 46]],
