@@ -26,12 +26,15 @@ glance, where text has been added, deleted, substituted, or transposed.
 ## Two modes
 
 - **Source code** — line- and token-aware, monospace, for collating versions of
-  code and reading the movement of code as a cultural-textual process. Optional
-  syntax highlighting (historical assembly dialects, starting with PDP-1 MACRO
-  for the *Spacewar!* sources) colours tokens as a foreground layer over the
-  variant tints, so collation and reading legibility coexist.
+  code and reading the movement of code as a cultural-textual process. **Syntax
+  highlighting** for common modern languages (JavaScript/TS, Python, HTML, CSS,
+  C/C++, Java, Rust, Go, PHP, SQL, JSON, XML/TEI, Markdown) and historical
+  assembly dialects (PDP-1 MACRO, AGC, MAD, FORTRAN, IPL-V, BASIC), chosen
+  **per panel** and coloured as a foreground layer over the variant tints.
 - **Text** — sentence- and word-aware, proportional type, witness sigla, for
   prose witnesses, paratexts, and classical / hermeneutic comparison.
+
+The Code/Text mode lives in the **View** menu and **Settings**.
 
 ## What it shows
 
@@ -39,17 +42,23 @@ glance, where text has been added, deleted, substituted, or transposed.
   ribbons whose thickness scales with the length of the matched block.
 - Variant typing: **match**, **substitution**, **addition**, **deletion**,
   **transposition** (moved text), and near-identical **variant** (fuzzy match).
+  The variant legend + live counts sit in the **status bar** (click a type to
+  show/hide it).
 - **Word-level refinement** inside a differing sentence or line: only the words
   that actually change are tinted (a CollateX-style token alignment), so the eye
-  lands on the divergence rather than the whole locus. Selecting a locus shows
-  its full reading; the connecting ribbon stays at the sentence/line level.
+  lands on the divergence rather than the whole locus. Selecting a locus keeps
+  its variant-type colour and is framed in a strong **version-variation yellow**
+  (a VVV-style highlight); the connecting ribbon stays at the sentence/line level.
+- A vertical **overview strip** (a VVV-style minimap) down the left edge: every
+  variant as a band at its position in the base text, a viewport box that tracks
+  scroll, and click-to-jump. Draggable to widen, hideable. A horizontal
+  **change-overview** histogram is also available as a modal (View menu).
 - An auto-generated **critical apparatus** listing every locus of divergence by
-  siglum.
-- A **deep-dive** panel of quantitative summary statistics (verbatim overlap,
+  siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
-- Live filtering by variant type; click any passage or ribbon to highlight the
-  shared reading in both witnesses (and fade the rest).
-- Line numbers in both panels for reference.
+- A **find** box in the status bar marks matches across both panels with
+  next/previous navigation.
+- Line numbers in both panels, kept visible while editing.
 
 ## The project workbench
 
@@ -57,11 +66,15 @@ A project holds many sources, organised in a small file organiser:
 
 - A **Sources** sidebar with a toolbar: add a source, import several files at
   once, load a **sample** collation, create folders. Sources can be filed into
-  **collapsible folders**, renamed, moved, and sent to a **trash** (with restore
-  / empty).
+  **collapsible folders** (inline-renamed), moved, and sent to a **trash** (with
+  restore / empty). The sidebar is **resizable and hideable** (drag its edge, or
+  toggle it from the View menu).
+- Each panel has its own **toolbar** (CCS-WB style) so the two witnesses can be
+  worked on individually: **edit · annotate · language · copy · expand ·
+  undo/redo**. Edit and the syntax language are per-panel.
 - **Click a source** to open it in the right (comparison) panel against the
-  left, which acts as the **base** / copy-text; the per-panel dropdowns and each
-  source's actions menu place either side explicitly.
+  left, which acts as the **base** / copy-text; the per-panel dropdowns place
+  either side explicitly.
 - **Edit** witness text in place to correct or normalise it, with **undo/redo**.
   Every source keeps its pristine **original**, so an edited source is flagged
   and can be **reverted to original** (or **duplicated** as a working copy);
@@ -71,9 +84,15 @@ A project holds many sources, organised in a small file organiser:
   range** on each side (CollateX-style boundary setting), then choose
   substitution / transposition / addition / omission / match; hand-made links
   override the auto braid.
-- **⌘/Ctrl-click** any passage to attach a marginal annotation.
-- **New / Open / Save** projects as `.svar` files; **export** to Markdown, PDF,
-  or JSON. The working project autosaves to the browser.
+- **⌘/Ctrl-click** any passage to attach a marginal annotation; an **annotate**
+  mode (per panel) turns a plain click into a note.
+- **Settings** (Help menu) in panels — **User** (a name for signing
+  annotations), **Appearance** (mode, theme, text size), **Code** (default
+  language), **Text** (Juxta-style tokenizer toggles: ignore case / punctuation /
+  whitespace when aligning).
+- **New / Open / Save** projects as `.svar` files; **export** to Markdown, **TEI
+  P5** (parallel-segmentation `<app>/<rdg>`), PDF, or JSON. The working project
+  autosaves to the browser.
 
 ## How the collation is computed
 
