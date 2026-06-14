@@ -13,6 +13,7 @@ import { APP_VERSION } from "@/lib/version";
 import { LANGS, detectLang } from "@/lib/highlight";
 import { DEFAULT_NORMALIZE, type NormalizeOptions } from "@/lib/collate/similarity";
 import { computeHotspots } from "@/lib/collate/hotspots";
+import { computeEddy } from "@/lib/collate/eddy";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF, toTEI } from "@/lib/export/collation-export";
@@ -218,6 +219,13 @@ export default function Home() {
     () => (needHotspots ? computeHotspots(collation, tokenizer) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [needHotspots, collation.witnesses, collation.leftId, collation.mode, tokenizer]
+  );
+  // Per-version Eddy ranking (cheap text-bigram distance) — only while the
+  // overview is open.
+  const eddy = useMemo(
+    () => (showOverview ? computeEddy(collation, tokenizer) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showOverview, collation.witnesses, tokenizer]
   );
 
   const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
@@ -426,6 +434,8 @@ export default function Home() {
             showOverview={showOverview}
             onCloseOverview={() => setShowOverview(false)}
             hotspots={hotspots}
+            eddy={eddy}
+            baseId={collation.leftId}
             stripHotspots={stripHotspots}
             showStrip={showStrip}
             onHideStrip={() => setShowStripP(false)}

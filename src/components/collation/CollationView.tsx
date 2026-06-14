@@ -15,6 +15,7 @@ import { Histogram } from "./Histogram";
 import { OverviewStrip } from "./OverviewStrip";
 import { HotspotBar } from "./HotspotBar";
 import type { Hotspots } from "@/lib/collate/hotspots";
+import type { EddyRow } from "@/lib/collate/eddy";
 
 type Side = "a" | "b";
 type Project = ReturnType<typeof useProject>;
@@ -49,6 +50,8 @@ export function CollationView({
   showOverview,
   onCloseOverview,
   hotspots,
+  eddy,
+  baseId,
   stripHotspots,
   showStrip,
   onHideStrip,
@@ -75,6 +78,8 @@ export function CollationView({
   showOverview: boolean;
   onCloseOverview: () => void;
   hotspots: Hotspots | null;
+  eddy: EddyRow[];
+  baseId: string;
   stripHotspots: boolean;
   showStrip: boolean;
   onHideStrip: () => void;
@@ -261,6 +266,28 @@ export function CollationView({
       {/* Global change-overview (Juxta-style histogram), opened from the toolbar. */}
       {showOverview && (
         <ModalCard title="Change overview" subtitle="Where the witnesses diverge across the base text — click to jump" onClose={onCloseOverview}>
+          {eddy.length >= 3 && (
+            <div className="mb-4">
+              <div className="text-[11px] text-muted-foreground mb-1.5">
+                <strong>Version distinctiveness (Eddy)</strong> — each witness&apos;s mean lexical distance from all the others. Longest bar = the outlier.
+              </div>
+              <div className="space-y-1">
+                {(() => {
+                  const max = Math.max(...eddy.map((e) => e.eddy), 0.001);
+                  return eddy.map((e, i) => (
+                    <div key={e.id} className="flex items-center gap-2 text-[12px]">
+                      <span className="w-6 shrink-0 text-right tabular-nums text-muted-foreground">{i + 1}.</span>
+                      <span className="w-44 shrink-0 truncate" title={e.title}>{e.title}{e.id === baseId ? " (base)" : ""}</span>
+                      <span className="flex-1 min-w-0 h-3 rounded bg-muted/50 overflow-hidden">
+                        <span className="block h-full rounded" style={{ width: `${(e.eddy / max) * 100}%`, background: i === 0 ? "var(--sv-variation)" : "var(--sv-match)" }} />
+                      </span>
+                      <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">{e.eddy.toFixed(2)}</span>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
           {hotspots && hotspots.others >= 2 && (
             <div className="mb-4">
               <div className="text-[11px] text-muted-foreground mb-1">
