@@ -34,6 +34,8 @@ export function CollationView({
   onToggleType,
   showDeepDive,
   onToggleDeepDive,
+  lang,
+  isDark,
 }: {
   project: Project;
   view: View;
@@ -44,6 +46,8 @@ export function CollationView({
   onToggleType: (t: VariantType) => void;
   showDeepDive: boolean;
   onToggleDeepDive: () => void;
+  lang?: string;
+  isDark: boolean;
 }) {
   const { collation } = project;
   const { a: witnessA, b: witnessB, variants, metrics } = view;
@@ -219,6 +223,8 @@ export function CollationView({
             advancedMode={advancedMode}
             pick={leftPick}
             onPick={onPick}
+            lang={lang}
+            isDark={isDark}
           />
         </div>
 
@@ -259,6 +265,8 @@ export function CollationView({
             advancedMode={advancedMode}
             pick={rightPick}
             onPick={onPick}
+            lang={lang}
+            isDark={isDark}
           />
         </div>
       </div>

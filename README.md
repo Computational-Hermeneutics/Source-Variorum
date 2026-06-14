@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.3 |
+| **Version** | 0.5.4 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -26,7 +26,10 @@ glance, where text has been added, deleted, substituted, or transposed.
 ## Two modes
 
 - **Source code** — line- and token-aware, monospace, for collating versions of
-  code and reading the movement of code as a cultural-textual process.
+  code and reading the movement of code as a cultural-textual process. Optional
+  syntax highlighting (historical assembly dialects, starting with PDP-1 MACRO
+  for the *Spacewar!* sources) colours tokens as a foreground layer over the
+  variant tints, so collation and reading legibility coexist.
 - **Text** — sentence- and word-aware, proportional type, witness sigla, for
   prose witnesses, paratexts, and classical / hermeneutic comparison.
 

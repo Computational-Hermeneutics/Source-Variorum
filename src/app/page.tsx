@@ -10,11 +10,13 @@ import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
 import { APP_VERSION } from "@/lib/version";
+import { LANGS, detectLang } from "@/lib/highlight";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toPDF } from "@/lib/export/collation-export";
 
 const CURRENT_KEY = "source-variorum-current";
 const FONT_KEY = "source-variorum-fontsize";
+const LANG_KEY = "source-variorum-lang";
 
 function uid(): string {
   try {
@@ -103,6 +105,8 @@ export default function Home() {
   const [editMode, setEditMode] = useState(false);
   const [advancedMode, setAdvancedMode] = useState(false);
   const [fontSize, setFontSize] = useState(13);
+  const [lang, setLang] = useState<string>("none");
+  const langTouched = useRef(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,6 +128,8 @@ export default function Home() {
       }
       const fs = localStorage.getItem(FONT_KEY);
       if (fs) setFontSize(Math.min(22, Math.max(9, parseInt(fs, 10) || 13)));
+      const lg = localStorage.getItem(LANG_KEY);
+      if (lg) { setLang(lg); langTouched.current = true; }
     } catch {
       /* ignore */
     }
@@ -150,6 +156,16 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
+
+  // Auto-detect the code language from the witness filenames the first time we
+  // see a collation, unless the user has already chosen one.
+  useEffect(() => {
+    if (langTouched.current) return;
+    const detected = collation.witnesses.map((w) => detectLang(w.title)).find(Boolean);
+    if (detected) setLang(detected);
+  }, [collation.witnesses]);
+
+  const chooseLang = (id: string) => { langTouched.current = true; setLang(id); try { localStorage.setItem(LANG_KEY, id); } catch { /* ignore */ } };
 
   // Undo/redo keyboard shortcuts (skip when typing in a field — let native undo work).
   useEffect(() => {
@@ -290,6 +306,21 @@ export default function Home() {
               ))}
             </div>
 
+            {/* Syntax language (code mode only) */}
+            {collation.mode === "source" && (
+              <select
+                value={lang}
+                onChange={(e) => chooseLang(e.target.value)}
+                title="Syntax highlighting for code"
+                className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[9rem]"
+              >
+                <option value="none">No highlighting</option>
+                {LANGS.map((l) => (
+                  <option key={l.id} value={l.id}>{l.label}</option>
+                ))}
+              </select>
+            )}
+
             {/* Auto / Advanced (hand-braiding) */}
             <div className="flex rounded border border-border overflow-hidden text-[12px]" title="Advanced: hand-edit the braid links">
               <button onClick={() => { setAdvancedMode(false); }} className={"px-2.5 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
@@ -331,6 +362,8 @@ export default function Home() {
             onToggleType={toggleType}
             showDeepDive={showDeepDive}
             onToggleDeepDive={() => setShowDeepDive((v) => !v)}
+            lang={lang}
+            isDark={isDark}
           />
         </main>
       </div>

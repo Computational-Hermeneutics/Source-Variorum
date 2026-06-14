@@ -1,10 +1,45 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type { CollationMode, Variant, Witness } from "@/types/collation";
 import { VARIANT_TYPE_COLORS } from "@/types/collation";
+import { highlightRanges, tokenStyle, type HToken } from "@/lib/highlight";
 
 type Side = "a" | "b";
+
+/** Split a segment's text into syntax-coloured runs using absolute token ranges.
+ *  Foreground only — the caller keeps any variant background tint. */
+function colorize(absStart: number, str: string, tokens: HToken[], isDark: boolean): ReactNode {
+  if (!tokens.length || !str) return str;
+  const absEnd = absStart + str.length;
+  // First token whose end is past absStart (tokens are sorted, non-overlapping).
+  let lo = 0, hi = tokens.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (tokens[mid].to <= absStart) lo = mid + 1;
+    else hi = mid;
+  }
+  const out: ReactNode[] = [];
+  let cursor = absStart;
+  let i = lo;
+  let key = 0;
+  while (cursor < absEnd && i < tokens.length && tokens[i].from < absEnd) {
+    const tk = tokens[i];
+    const s = Math.max(tk.from, cursor);
+    const e = Math.min(tk.to, absEnd);
+    if (s > cursor) out.push(str.slice(cursor - absStart, s - absStart));
+    if (e > s) {
+      const sub = str.slice(s - absStart, e - absStart);
+      const st = tokenStyle(tk.tag, isDark);
+      out.push(st ? <span key={key++} style={st}>{sub}</span> : sub);
+      cursor = e;
+    }
+    i++;
+  }
+  if (cursor < absEnd) out.push(str.slice(cursor - absStart));
+  return out.length ? out : str;
+}
 
 /** Background tint for a variant span. Matches stay untinted so the eye rests on
  *  what changed; when a variant is selected every other span is faded so the
@@ -26,6 +61,8 @@ interface LineSeg {
   vid: string;
   type: Variant["type"];
   text: string;
+  /** Absolute character offset of this segment's first character in the witness. */
+  start: number;
   /** True on the segment where this variant first appears (the braid anchor). */
   anchor: boolean;
 }
@@ -60,18 +97,18 @@ function buildRows(text: string, variants: Variant[], side: Side): Row[] {
       const s = spans[j];
       const from = Math.max(s.start, ls, pos);
       const to = Math.min(s.end, le);
-      if (from > pos) segs.push({ vid: "", type: "match", text: text.slice(pos, from), anchor: false });
+      if (from > pos) segs.push({ vid: "", type: "match", text: text.slice(pos, from), start: pos, anchor: false });
       if (to > from) {
         const anchor = !seen.has(s.vid) && s.start >= ls && s.start < le;
         if (anchor) seen.add(s.vid);
-        segs.push({ vid: s.vid, type: s.type, text: text.slice(from, to), anchor });
+        segs.push({ vid: s.vid, type: s.type, text: text.slice(from, to), start: from, anchor });
         pos = to;
       }
       j++;
     }
     // Trailing uncovered text on this line (e.g. when a manual link reassigned a
     // partner): render it plain rather than dropping it.
-    if (pos < le) segs.push({ vid: "", type: "match", text: text.slice(pos, le), anchor: false });
+    if (pos < le) segs.push({ vid: "", type: "match", text: text.slice(pos, le), start: pos, anchor: false });
     rows.push({ n, segs });
     n++;
   };
@@ -103,6 +140,8 @@ export function WitnessPanel({
   advancedMode,
   pick,
   onPick,
+  lang,
+  isDark,
 }: {
   side: Side;
   witness: Witness;
@@ -120,6 +159,9 @@ export function WitnessPanel({
   advancedMode: boolean;
   pick: { start: number; end: number } | null;
   onPick: (side: Side, vid: string, shift: boolean) => void;
+  /** Syntax-highlighting language id for code mode; undefined / "none" = off. */
+  lang?: string;
+  isDark: boolean;
 }) {
   const isMono = mode === "source";
   const anySelected = selectedId !== null;
@@ -141,6 +183,13 @@ export function WitnessPanel({
 
   const rows = useMemo(() => buildRows(witness.text, variants, side), [witness.text, variants, side]);
   const gutterCh = String(rows.length).length + 1;
+
+  // Syntax tokens (foreground colour), only in code mode with a language chosen.
+  const htokens = useMemo(
+    () => (isMono && lang && lang !== "none" ? highlightRanges(witness.text, lang) : []),
+    [isMono, lang, witness.text]
+  );
+  const hl = (start: number, str: string): ReactNode => (htokens.length ? colorize(start, str, htokens, isDark) : str);
 
   if (editMode) {
     return (
@@ -185,7 +234,7 @@ export function WitnessPanel({
             ) : (
               row.segs.map((seg, k) => {
                 // Plain (uncollated) text: render statically, no tint/handlers.
-                if (!seg.vid) return <span key={k}>{seg.text}</span>;
+                if (!seg.vid) return <span key={k}>{hl(seg.start, seg.text)}</span>;
                 const selected = seg.vid === selectedId;
                 const hovered = seg.vid === hoveredId;
                 const picked = pickedVids.has(seg.vid);
@@ -221,7 +270,7 @@ export function WitnessPanel({
                     className="rounded-[2px] cursor-pointer transition-colors duration-100"
                     style={style}
                   >
-                    {seg.text}
+                    {hl(seg.start, seg.text)}
                   </span>
                 );
               })
