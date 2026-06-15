@@ -194,11 +194,17 @@ export function OverviewStrip({
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const y = ((e.clientY - rect.top) / rect.height) * VH;
-    let best: string | null = null;
-    let bd = Infinity;
+    const frac = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    // The strip is a proportional map of the base text, so scroll the base panel
+    // to the clicked fraction (centred) — NOT to a variant's char-offset position,
+    // which used to land somewhere else.
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: Math.max(0, frac * el.scrollHeight - el.clientHeight / 2), behavior: "smooth" });
+    // Highlight the nearest variant in place (no second, conflicting scroll).
+    const y = frac * VH;
+    let best: string | null = null, bd = Infinity;
     for (const p of navPoints) { const d = Math.abs(p.y - y); if (d < bd) { bd = d; best = p.id; } }
-    if (best) onSelect(best, true);
+    if (best) onSelect(best, false);
   };
 
   return (

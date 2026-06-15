@@ -1321,8 +1321,22 @@ function WitnessStatsModal({ witnesses, mode, onClose }: { witnesses: Witness[];
   // Highlight the max in each column to make outliers pop.
   const maxOf = (k: keyof WStat) => Math.max(...rows.map((r) => r[k] as number));
 
+  const grid = () => [["Witness", ...cols.map((c) => c.label)], ...rows.map((r) => [`${r.siglum} ${r.title}`, ...cols.map((c) => c.fmt(r[c.key] as number))])];
+  const [copied, setCopied] = useState(false);
+  const copy = () => { navigator.clipboard?.writeText(grid().map((r) => r.join("\t")).join("\n")).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1400); }).catch(() => {}); };
+  const dl = () => {
+    const csv = grid().map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    const a = document.createElement("a"); a.href = url; a.download = "witness-statistics.csv"; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   return (
     <ModalCard title="Witness statistics" subtitle={`Descriptive profile of all ${rows.length} comparable witnesses · ${mode} mode · hover a column for what it means`} onClose={onClose}>
+      <div className="flex items-center gap-1.5 mb-2 -mt-1">
+        <button onClick={copy} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] hover:bg-muted">{copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copied ? "Copied" : "Copy"}</button>
+        <button onClick={dl} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border text-[11px] hover:bg-muted"><Download className="w-3 h-3" /> Download CSV</button>
+      </div>
       <div className="-mx-1 overflow-x-auto">
         <table className="w-full border-collapse text-[12px]">
           <thead>

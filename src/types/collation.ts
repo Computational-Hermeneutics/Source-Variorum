@@ -44,6 +44,8 @@ export interface Witness {
   /** Syntax-highlight language id (e.g. "pdp1", "markdown") — tells the viewer
    *  this is code, how to colour it, and which view to open by default. */
   lang?: string;
+  /** Natural-language tag (e.g. "en", "grc", "de") — descriptive metadata. */
+  language?: string;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */
   text: string;
   /** Immutable original text, snapshotted on creation/import. Editing changes

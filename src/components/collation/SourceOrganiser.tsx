@@ -17,6 +17,7 @@ function uid(): string {
 }
 import type { Witness } from "@/types/collation";
 import { isComparable, WITNESS_FOLDER } from "@/types/collation";
+import { LANGS } from "@/lib/highlight";
 import type { Demo } from "@/data/demos";
 import type { useProject } from "@/hooks/useProject";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
@@ -403,6 +404,9 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
   const [author, setAuthor] = useState(witness.author ?? "");
   const [date, setDate] = useState(witness.date ?? "");
   const [provenance, setProvenance] = useState(witness.provenance ?? "");
+  const [lang, setLang] = useState(witness.lang ?? "none");
+  const [language, setLanguage] = useState(witness.language ?? "");
+  const [reference, setReference] = useState(witness.reference === true || (!!witness.folder && witness.folder !== WITNESS_FOLDER));
   const [rows, setRows] = useState<{ k: string; v: string }[]>(() => Object.entries(witness.metadata ?? {}).map(([k, v]) => ({ k, v })));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -418,6 +422,12 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
       author: author.trim() || undefined,
       date: date.trim() || undefined,
       provenance: provenance.trim() || undefined,
+      lang: lang === "none" ? undefined : lang,
+      language: language.trim() || undefined,
+      reference: reference || undefined,
+      // In = the Witnesses (comparable) folder; reference keeps its own folder or
+      // drops to the top level.
+      folder: reference ? (witness.folder && witness.folder !== WITNESS_FOLDER ? witness.folder : undefined) : WITNESS_FOLDER,
       metadata: Object.keys(metadata).length ? metadata : undefined,
     });
   };
@@ -444,6 +454,19 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
           <label className="flex items-start gap-2 text-[12px]">
             <span className="w-20 shrink-0 text-muted-foreground pt-1">Provenance</span>
             <textarea value={provenance} onChange={(e) => setProvenance(e.target.value)} placeholder="where this source came from" className={inputCls + " h-14 resize-y"} />
+          </label>
+          <Field label="Code lang">
+            <select value={lang} onChange={(e) => setLang(e.target.value)} title="Syntax-highlighting language (set this if the source is code)" className={inputCls}>
+              <option value="none">— not code / plain —</option>
+              <optgroup label="Modern">{LANGS.filter((l) => l.group === "modern").map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</optgroup>
+              <optgroup label="Historical">{LANGS.filter((l) => l.group === "historical").map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}</optgroup>
+            </select>
+          </Field>
+          <Field label="Language"><input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="natural language, e.g. en · grc · de" className={inputCls + " max-w-[10rem]"} /></Field>
+          <label className="flex items-center gap-2 text-[12px]">
+            <span className="w-20 shrink-0 text-muted-foreground">Reference</span>
+            <input type="checkbox" checked={reference} onChange={(e) => setReference(e.target.checked)} className="accent-primary" />
+            <span className="text-[11px] text-muted-foreground">reader only — not loaded into a compare panel</span>
           </label>
           <div className="pt-1">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Custom fields</div>
