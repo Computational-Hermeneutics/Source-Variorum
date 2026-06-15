@@ -8,30 +8,32 @@ import { poolFor, HACKERMAN } from "@/data/assistant-messages";
 type Persona = "clippy" | "hacker";
 
 /** A friendly (or hacked) paperclip — the Clippy homage, ported from LLMbench.
- *  The doubled wire (two long verticals turning back at top and bottom) is the
- *  body; the eyes and brows sit on the upper bend. */
-function ClipGlyph({ hacker, className = "w-10 h-16" }: { hacker?: boolean; className?: string }) {
+ *  A clean bent-paperclip body (outer wire doubling back inside) with a face
+ *  sitting in the upper bend. */
+function ClipGlyph({ hacker, className = "w-11 h-16" }: { hacker?: boolean; className?: string }) {
   const wire = hacker ? "#00ff00" : "var(--primary)";
+  const ink = hacker ? "#00ff00" : "#2a2a2a";
   return (
-    <svg viewBox="0 0 56 80" className={className} aria-hidden="true">
-      {/* the classic bent-paperclip body: outer hairpin doubling back inside */}
-      <path d="M21 18 C21 7, 43 7, 43 19 L43 62 C43 75, 17 77, 13 63 L13 27 C13 18, 33 16, 33 25 L33 58 C33 65, 23 65, 23 58 L23 30"
-        fill="none" stroke={wire} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 60 88" className={className} aria-hidden="true">
+      {/* the classic bent paperclip: an outer hairpin doubling back inside */}
+      <path d="M21 24 C21 11, 45 11, 45 24 L45 66 C45 80, 17 82, 13 66 L13 30 C13 21, 35 19, 35 30 L35 60"
+        fill="none" stroke={wire} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* eyebrows */}
+      <path d="M19 30 q5 -3.5 10 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M31 30 q5 -3.5 10 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
       {hacker ? (
         <>
-          <rect x="18" y="26" width="9" height="4.5" rx="1" fill="#00ff00" />
-          <rect x="31" y="26" width="9" height="4.5" rx="1" fill="#00ff00" />
-          <path d="M22 39 Q29 43, 36 39" fill="none" stroke="#00ff00" strokeWidth="1.8" strokeLinecap="round" />
+          <rect x="19" y="35" width="9" height="4.5" rx="1" fill="#00ff00" />
+          <rect x="32" y="35" width="9" height="4.5" rx="1" fill="#00ff00" />
+          <path d="M23 47 Q30 51, 37 47" fill="none" stroke="#00ff00" strokeWidth="1.8" strokeLinecap="round" />
         </>
       ) : (
         <>
-          <path d="M18 23 q4 -3 8 0" fill="none" stroke="#2a2a2a" strokeWidth="1.4" strokeLinecap="round" />
-          <path d="M30 23 q4 -3 8 0" fill="none" stroke="#2a2a2a" strokeWidth="1.4" strokeLinecap="round" />
-          <circle cx="22" cy="30" r="3.6" fill="#fff" stroke="#2a2a2a" strokeWidth="1.4" />
-          <circle cx="34" cy="30" r="3.6" fill="#fff" stroke="#2a2a2a" strokeWidth="1.4" />
-          <circle cx="23" cy="30.5" r="1.5" fill="#2a2a2a" />
-          <circle cx="35" cy="30.5" r="1.5" fill="#2a2a2a" />
-          <path d="M23 40 Q29 44, 35 40" fill="none" stroke="#2a2a2a" strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="24" cy="38" r="4" fill="#fff" stroke={ink} strokeWidth="1.5" />
+          <circle cx="36" cy="38" r="4" fill="#fff" stroke={ink} strokeWidth="1.5" />
+          <circle cx="25" cy="38.5" r="1.7" fill={ink} />
+          <circle cx="37" cy="38.5" r="1.7" fill={ink} />
+          <path d="M24 47 Q30 52, 36 47" fill="none" stroke={ink} strokeWidth="1.9" strokeLinecap="round" />
         </>
       )}
     </svg>
@@ -105,9 +107,12 @@ export function Assistant({ mode, enabled }: { mode: CollationMode; enabled: boo
   if (!enabled || !open) return null;
 
   const hacker = persona === "hacker";
+  // The wrapper is pointer-events-none so it never blocks the status bar, the
+  // find box, or anything behind it; only the bubble and the glyph are clickable.
+  // Sits above the status bar (bottom-10).
   return (
-    <div className="fixed bottom-3 right-4 z-40 flex flex-col items-end w-[280px] max-w-[80vw]">
-      <div className={"relative w-full rounded-xl rounded-br-md shadow-lg pl-3 pr-7 py-2 border " + (hacker ? "bg-black border-green-500 text-green-400 font-mono" : "bg-card border-border")}>
+    <div className="fixed bottom-10 right-4 z-40 flex flex-col items-end w-[260px] max-w-[70vw] pointer-events-none">
+      <div className={"relative w-full rounded-xl rounded-br-md shadow-lg pl-3 pr-7 py-2 border pointer-events-auto " + (hacker ? "bg-black border-green-500 text-green-400 font-mono" : "bg-card border-border")}>
         <p className={"text-[12px] leading-snug " + (hacker ? "" : "text-foreground/90")}>{msg}</p>
         {hacker && <p className="mt-1 text-[9px] text-green-600">type “clippy” to downgrade · h4x0r</p>}
         <div className="absolute top-1 right-1 flex flex-col gap-0.5">
@@ -115,7 +120,7 @@ export function Assistant({ mode, enabled }: { mode: CollationMode; enabled: boo
           <button onClick={() => setOpen(false)} title="Dismiss (type ‘clippy’ or ‘hacker’ to summon him back)" className={"p-0.5 rounded " + (hacker ? "text-green-500 hover:bg-green-900/40" : "text-muted-foreground hover:text-foreground hover:bg-muted")}><X className="w-3 h-3" /></button>
         </div>
       </div>
-      <button onClick={next} title="Tell me another" className="mr-5 -mt-0.5 hover:scale-110 active:scale-95 transition-transform">
+      <button onClick={next} title="Tell me another" className="mr-5 -mt-0.5 pointer-events-auto hover:scale-110 active:scale-95 transition-transform">
         <ClipGlyph hacker={hacker} className="w-11 h-16" />
       </button>
     </div>

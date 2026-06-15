@@ -207,3 +207,7 @@
 /* Indeterminate "analysing" bar in the panel toolbar */
 @keyframes sv-load { 0% { transform: translateX(-110%); } 100% { transform: translateX(360%); } }
 .animate-sv-load { animation: sv-load 0.85s ease-in-out infinite; }
+
+/* Brief highlight when jumping to a definition (right-click ▸ jump). */
+@keyframes sv-flash { 0%, 100% { background: transparent; } 25% { background: color-mix(in srgb, var(--sv-variation) 38%, transparent); } }
+.sv-flash { animation: sv-flash 1.2s ease-in-out; border-radius: 3px; }

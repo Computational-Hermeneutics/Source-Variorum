@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FilePlus, Upload, FolderPlus, Folder, File, BookOpen, ChevronRight, ChevronDown,
   MoreVertical, Pencil, Trash2, RotateCcw, X, Check, Copy, Info, FileText,
+  Database, Braces, MessageSquareText,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { MarkdownPad } from "./MarkdownPad";
@@ -239,6 +240,7 @@ export function SourceOrganiser({
         })}
       </div>
 
+      <DataSection project={project} fz={fz} />
       <TrashSection trash={trash} project={project} />
     </aside>
   );
@@ -388,6 +390,119 @@ function SourceViewerModal({ witness, onClose, onSave }: { witness: Witness; onC
           <div className="flex justify-end gap-2 mt-3">
             <button onClick={onClose} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Close</button>
             <button onClick={() => { onSave(draft); onClose(); }} disabled={!dirty} className="px-3 py-1 rounded bg-primary text-primary-foreground text-[12px] disabled:opacity-50">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/** The DATA folder: the project's non-witness data made visible — the editorial
+ *  layer (braid overrides + manual links), the annotations, and the dictionary.
+ *  All are saved with the project; each opens in a read-only viewer. */
+function DataSection({ project, fz }: { project: Project; fz: number }) {
+  const c = project.collation;
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<{ title: string; subtitle: string; text: string; lang?: string } | null>(null);
+
+  const overrides = c.variantOverrides ?? {};
+  const manual = c.manualLinks ?? {};
+  const nManual = Object.values(manual).reduce((s, a) => s + a.length, 0);
+  const nBraids = Object.keys(overrides).length + nManual;
+  const annEntries = Object.entries(c.annotations ?? {}).filter(([, a]) => a.length);
+  const nAnn = annEntries.reduce((s, [, a]) => s + a.length, 0);
+
+  const editorialText = () => {
+    const lines: string[] = ["# Editorial layer", "", "Your edits to the braid, saved with the project and keyed by the reading pair so they survive re-collation.", ""];
+    const ovs = Object.entries(overrides);
+    lines.push(`## Braid overrides (${ovs.length})`, "");
+    if (!ovs.length) lines.push("_none yet — approve / doubt / flag / swap / delete a braid to add one._");
+    for (const [sig, o] of ovs) {
+      const [a, b] = sig.split("␟");
+      const steps = o.suppress ?? (o.suppressed ? 1 : 0);
+      const tags = [o.confirmed && "approved", o.tentative && "tentative", o.deleted && "deleted", o.type && `retyped → ${o.type}`, steps && `doubt −${steps * 25}%`].filter(Boolean).join(", ");
+      lines.push(`- “${a}” ⇄ “${b}” — ${tags || "edited"}`);
+    }
+    lines.push("", `## Manual links (${nManual})`, "");
+    if (!nManual) lines.push("_none._");
+    for (const [pair, arr] of Object.entries(manual)) for (const m of arr) lines.push(`- [${pair}] ${m.type}`);
+    lines.push("", "---", "", "```json", JSON.stringify({ variantOverrides: overrides, manualLinks: manual }, null, 2), "```");
+    return lines.join("\n");
+  };
+
+  const annText = () => {
+    const lines: string[] = ["# Annotations", ""];
+    if (!annEntries.length) lines.push("_no annotations yet — ⌘/Ctrl-click a passage, or use annotate mode._");
+    for (const [wid, arr] of annEntries) {
+      const w = c.witnesses.find((x) => x.id === wid);
+      lines.push(`## ${w?.title ?? wid} (${arr.length})`, "");
+      for (const a of [...arr].sort((x, y) => x.lineNumber - y.lineNumber)) lines.push(`- **line ${a.lineNumber}** (${a.type}) — ${a.content || "_(empty)_"}`);
+      lines.push("");
+    }
+    return lines.join("\n");
+  };
+
+  const dictText = () => [
+    "# Dictionary", "",
+    c.mode === "source"
+      ? "**PDP-1 instruction set** — the bundled MACRO instruction reference. Right-click (or Alt-click) any token in a code witness for its full name, operands, octal opcode, a description and an example, with a link back to the source. If the token is a macro or label defined in the witness, you also get the defining snippet (click the header to jump to it)."
+      : "**Dictionary API** (dictionaryapi.dev) — right-click (or Alt-click) any word in a prose witness for its definition. A sandboxed browser cannot reach the OS dictionary, so SV queries this free web dictionary, degrading gracefully offline.",
+    "",
+    "Dictionary files live in `public/dictionaries/` — drop more language references there. The full PDP-1 reference is also a reading document in the Spacewar! corpus (“PDP-1 instruction set — reference”).",
+  ].join("\n");
+
+  const rows = [
+    { icon: <Braces className="w-3.5 h-3.5" />, label: "Editorial layer", count: nBraids, onClick: () => setView({ title: "Editorial layer", subtitle: `${nBraids} edit${nBraids === 1 ? "" : "s"} — braid overrides + manual links`, text: editorialText() }) },
+    { icon: <MessageSquareText className="w-3.5 h-3.5" />, label: "Annotations", count: nAnn, onClick: () => setView({ title: "Annotations", subtitle: `${nAnn} note${nAnn === 1 ? "" : "s"}`, text: annText() }) },
+    { icon: <BookOpen className="w-3.5 h-3.5" />, label: "Dictionary", count: null as number | null, onClick: () => setView({ title: "Dictionary", subtitle: c.mode === "source" ? "PDP-1 instruction set" : "Dictionary API", text: dictText() }) },
+  ];
+
+  return (
+    <div className="border-t border-border">
+      <button onClick={() => setOpen((v) => !v)} className="w-full flex items-center gap-1 px-2 py-1.5 text-muted-foreground hover:text-foreground" style={{ fontSize: `${fz}px` }} title="Project data — editorial layer, annotations, dictionary (saved with the project)">
+        {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+        <Database className="w-3.5 h-3.5" />
+        <span className="uppercase tracking-wide">Data</span>
+        <span className="ml-auto tabular-nums opacity-70">{nBraids + nAnn || ""}</span>
+      </button>
+      {open && rows.map((r) => (
+        <button key={r.label} onClick={r.onClick} className="w-full flex items-center gap-2 pl-7 pr-2 py-1 hover:bg-muted text-left" style={{ fontSize: `${fz}px` }} title={`View ${r.label}`}>
+          <span className="text-muted-foreground shrink-0">{r.icon}</span>
+          <span className="flex-1 truncate">{r.label}</span>
+          {r.count != null && <span className="tabular-nums text-[10px] text-muted-foreground">{r.count}</span>}
+        </button>
+      ))}
+      {view && <DataViewerModal title={view.title} subtitle={view.subtitle} text={view.text} lang={view.lang} onClose={() => setView(null)} />}
+    </div>
+  );
+}
+
+/** Read-only viewer for the project's data surfaces (editorial layer, annotations,
+ *  dictionary). Same modal furniture as the source viewer, with nothing to save. */
+function DataViewerModal({ title, subtitle, text, lang, onClose }: { title: string; subtitle: string; text: string; lang?: string; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  const copy = () => { try { navigator.clipboard.writeText(text); } catch { /* ignore */ } };
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 p-4 pt-16" onClick={onClose}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-3xl shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold leading-tight truncate">{title}</h2>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle} · read-only · saved with the project</p>
+          </div>
+          <button onClick={copy} className="ml-auto p-1 rounded hover:bg-muted" title="Copy"><Copy className="w-4 h-4" /></button>
+          <button onClick={onClose} className="p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-4">
+          <MarkdownPad value={text} onChange={() => { /* read-only */ }} codeMode defaultLang={lang} initialView={lang && lang !== "markdown" ? "code" : "rich"} />
+          <div className="flex justify-end mt-3">
+            <button onClick={onClose} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Close</button>
           </div>
         </div>
       </div>

@@ -533,7 +533,26 @@ export function CollationView({
                 )}
                 {dict.def.snippet && (
                   <div className="mt-2">
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Defined in this witness ({dict.def.snippetKind})</div>
+                    {dict.def.defLine ? (
+                      <button
+                        onClick={() => {
+                          const side: Side = dict.def.defSourceIndex === 1 ? "b" : "a";
+                          const panel = side === "a" ? panelARef.current : panelBRef.current;
+                          const row = panel?.querySelector(`[data-ln="${dict.def.defLine}"]`) as HTMLElement | null;
+                          if (row) { row.scrollIntoView({ block: "center", behavior: "smooth" }); row.classList.add("sv-flash"); setTimeout(() => row.classList.remove("sv-flash"), 1200); }
+                          else scrollToLine(side, dict.def.defLine!);
+                          setDict(null);
+                        }}
+                        title={`Jump to the definition (line ${dict.def.defLine})`}
+                        className="group flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground hover:text-foreground mb-0.5"
+                      >
+                        Defined in this witness ({dict.def.snippetKind})
+                        <Crosshair className="w-2.5 h-2.5 opacity-60 group-hover:opacity-100" />
+                        <span className="normal-case tracking-normal opacity-70 group-hover:opacity-100">jump ↵</span>
+                      </button>
+                    ) : (
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Defined in this witness ({dict.def.snippetKind})</div>
+                    )}
                     <pre className="px-2 py-1.5 rounded bg-muted/60 border border-border text-[11px] font-mono whitespace-pre-wrap overflow-x-auto max-h-40 overflow-y-auto">{dict.def.snippet}</pre>
                   </div>
                 )}

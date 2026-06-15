@@ -38,6 +38,10 @@ export interface Definition {
   snippet?: string;
   /** What kind of definition the snippet is. */
   snippetKind?: "macro" | "label" | "symbol";
+  /** 1-based line where the definition starts (for jump-to-definition). */
+  defLine?: number;
+  /** Which source it was found in (index into the `sources` array → side). */
+  defSourceIndex?: number;
 }
 
 interface RawEntry { name?: string; params?: string; octal?: string; description?: string; example?: string }
@@ -68,7 +72,7 @@ async function loadPdp1(): Promise<RawDict> {
  * term`), a label (`word, …`), or a constant assignment (`word=…`). Returns the
  * defining snippet so the reader can see the function it calls.
  */
-export function findCodeDefinition(word: string, text: string): { snippet: string; kind: Definition["snippetKind"] } | null {
+export function findCodeDefinition(word: string, text: string): { snippet: string; kind: Definition["snippetKind"]; line: number } | null {
   if (!text) return null;
   const lines = text.split("\n");
   const esc = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -92,7 +96,7 @@ export function findCodeDefinition(word: string, text: string): { snippet: strin
       body.push(lines[j]);
       if (j > nameLine && /^\s*term\b/i.test(lines[j])) break;
     }
-    return { snippet: body.join("\n").trimEnd(), kind: "macro" };
+    return { snippet: body.join("\n").trimEnd(), kind: "macro", line: i + 1 };
   }
   // Label: a line beginning "<word>," (a code location / data cell).
   const labelRe = new RegExp(`^\\s*${esc}\\s*,`, "i");
@@ -104,13 +108,13 @@ export function findCodeDefinition(word: string, text: string): { snippet: strin
         if (/^\s*\w+\s*,/.test(lines[j]) || /^\s*(?:define|macro|term)\b/i.test(lines[j]) || lines[j].trim() === "") break;
         body.push(lines[j].replace(/\s+$/, ""));
       }
-      return { snippet: body.join("\n"), kind: "label" };
+      return { snippet: body.join("\n"), kind: "label", line: i + 1 };
     }
   }
   // Constant / parameter assignment: "<word>=…".
   const eqRe = new RegExp(`^\\s*${esc}\\s*=`, "i");
-  for (const ln of lines) {
-    if (eqRe.test(ln)) return { snippet: ln.trim(), kind: "symbol" };
+  for (let i = 0; i < lines.length; i++) {
+    if (eqRe.test(lines[i])) return { snippet: lines[i].trim(), kind: "symbol", line: i + 1 };
   }
   return null;
 }
@@ -120,8 +124,9 @@ async function lookupCode(word: string, sources: string[]): Promise<Definition> 
   const w = word.toLowerCase();
   const raw = dict.entries[w] ?? dict.entries[mnemonic(word)];
   // Is it defined in one of the witnesses? (a macro / label / symbol)
-  let def: { snippet: string; kind: Definition["snippetKind"] } | null = null;
-  for (const src of sources) { def = findCodeDefinition(word, src); if (def) break; }
+  let def: { snippet: string; kind: Definition["snippetKind"]; line: number } | null = null;
+  let defIdx = -1;
+  for (let k = 0; k < sources.length; k++) { def = findCodeDefinition(word, sources[k]); if (def) { defIdx = k; break; } }
   const out: Definition = {
     word,
     name: raw?.name,
@@ -133,7 +138,7 @@ async function lookupCode(word: string, sources: string[]): Promise<Definition> 
     ref: dict.ref,
     url: dict.url,
   };
-  if (def) { out.snippet = def.snippet; out.snippetKind = def.kind; }
+  if (def) { out.snippet = def.snippet; out.snippetKind = def.kind; out.defLine = def.line; out.defSourceIndex = defIdx; }
   return out;
 }
 

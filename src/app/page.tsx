@@ -148,7 +148,8 @@ export default function Home() {
   // witness can be edited while the other is read). null = neither.
   const [editSide, setEditSide] = useState<"a" | "b" | null>(null);
   const [annotateSide, setAnnotateSide] = useState<"a" | "b" | null>(null);
-  const [advancedMode, setAdvancedMode] = useState(false);
+  // Advanced hand-braiding was removed along with the Auto/User/Advanced switch.
+  const advancedMode = false;
   const [fontSize, setFontSize] = useState(13);
   // `lang` is the default code language (Settings). Per-panel language is derived
   // during render: a per-witness override (set from the panel toolbar) wins, else
@@ -283,12 +284,10 @@ export default function Home() {
   // braid without deleting your edits (Clear all braids in Settings ▸ Data does
   // delete them). -----
   const braidEditCount = Object.keys(collation.variantOverrides ?? {}).length + Object.values(collation.manualLinks ?? {}).reduce((s, a) => s + a.length, 0);
-  const [userMode, setUserMode] = useState(false);
-  useEffect(() => { if (braidEditCount > 0) setUserMode(true); }, [braidEditCount]);
-  const viewCollation = useMemo(
-    () => (userMode || braidEditCount === 0 ? collation : { ...collation, variantOverrides: {}, manualLinks: {} }),
-    [collation, userMode, braidEditCount]
-  );
+  // Always a working close read: the editorial layer (overrides + hand links) is
+  // always applied. (The old Auto/User/Advanced switch was removed — there is one
+  // mode now.) Clear all braids in Settings ▸ Data to get the pristine reading.
+  const viewCollation = collation;
 
   // ----- The derived view runs in a Web Worker so a slow recompute never freezes
   // the UI: the page stays live, a progress bar shows, and the user can CANCEL
@@ -478,8 +477,7 @@ export default function Home() {
         { kind: "action", label: "Undo", shortcut: "⌘Z", onClick: project.undo, disabled: !project.canUndo },
         { kind: "action", label: "Redo", shortcut: "⌘⇧Z", onClick: project.redo, disabled: !project.canRedo },
         { kind: "separator" },
-        { kind: "checkbox", label: "Edit base witness", checked: editSide !== null, onToggle: () => { setEditSide((v) => (v ? null : "a")); setAdvancedMode(false); } },
-        { kind: "checkbox", label: "Advanced hand-braiding", checked: advancedMode, onToggle: () => { setAdvancedMode((v) => !v); setEditSide(null); } },
+        { kind: "checkbox", label: "Edit base witness", checked: editSide !== null, onToggle: () => { setEditSide((v) => (v ? null : "a")); } },
         { kind: "separator" },
         { kind: "action", label: "Revert to last saved", onClick: () => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }, disabled: !project.isDirty },
       ],
@@ -555,13 +553,13 @@ export default function Home() {
           <MenuBar menus={menus} />
 
           <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {/* Auto / User / Advanced — Auto = the pristine engine braid; User =
-                your edited working close read (edits applied); Advanced = hand-link. */}
-            <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Auto: the engine's braid · User: your edited close read · Advanced: hand-link the braid">
-              <button onClick={() => { setAdvancedMode(false); setUserMode(false); }} className={"px-2 py-1 " + (!advancedMode && !userMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
-              <button onClick={() => { setAdvancedMode(false); setUserMode(true); }} title={braidEditCount ? `Your working close read — ${braidEditCount} edit${braidEditCount === 1 ? "" : "s"}` : "User mode — your edits will apply here"} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (!advancedMode && userMode ? "bg-[var(--sv-variation)] text-white" : "bg-card hover:bg-muted")}>User{braidEditCount > 0 && <span className="tabular-nums opacity-80">{braidEditCount}</span>}</button>
-              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
-            </div>
+            {/* A working close read: your editorial layer is always applied. The
+                chip shows how many braids you've edited (no mode switching). */}
+            {braidEditCount > 0 && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-[var(--sv-variation)] text-white text-[11px]" title={`Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"}`}>
+                <Spline className="w-3 h-3" />{braidEditCount} edit{braidEditCount === 1 ? "" : "s"}
+              </span>
+            )}
 
             <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
 
@@ -1046,8 +1044,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </ul>
         </section>
         <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Auto &amp; Advanced</h3>
-          <p>The collation is computed live. In <strong>Advanced</strong> mode you hand-braid: pick a passage on the left and one on the right, then choose substitution / transposition / addition / omission / match. Hand-made links override the auto braid and are marked in the apparatus.</p>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">A working close read</h3>
+          <p>The collation is computed live, and your editorial edits (approve / doubt / flag / swap / delete a braid) are always applied on top — this is a working close read, not a frozen machine reading. Clear all braids in <strong>Settings ▸ Data</strong> to return to the pristine auto-collation.</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Apparatus, notes &amp; export</h3>

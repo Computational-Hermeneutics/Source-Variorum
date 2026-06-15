@@ -414,7 +414,7 @@ export function WitnessPanel({
   return (
     <div className="py-2" style={{ fontFamily, fontSize: `${fontSize}px`, lineHeight }} onMouseUp={onMouseUp}>
       {rows.map((row) => (
-        <div key={row.n} className="flex group/row">
+        <div key={row.n} data-ln={row.n} className="flex group/row">
           <span
             className="shrink-0 select-none text-right pr-3 pl-2 text-muted-foreground/45 tabular-nums"
             style={{ minWidth: `${gutterCh}ch`, fontFamily: "var(--code-font-family)", fontSize: `${Math.max(9, fontSize - 2)}px` }}

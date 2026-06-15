@@ -80,7 +80,7 @@ configures each.
   word (or code token) natively; a **right-click** (or **Alt/Option-click**, a
   backup since macOS can intercept the context menu) looks the word up in the
   **dictionary** (see below).
-- A **braid editor** for curating the auto-collation (Auto mode): select a braid
+- A **braid editor** for curating the collation: select a braid
   for a compact editor (it sits in the margin by the braid, hides while scrolling,
   is draggable aside) to **approve 👍** (full confidence; the locus becomes an
   **underline**, the settled state), **doubt 👎** (graduated, −25% per click), flag
@@ -99,7 +99,12 @@ configures each.
   [Dictionary API](https://dictionaryapi.dev) (a sandboxed browser cannot reach
   the OS dictionary, so SV queries this instead, degrading gracefully offline).
   The same PDP-1 reference is also a reading document in the Spacewar! corpus
-  (*PDP-1 instruction set — reference*).
+  (*PDP-1 instruction set — reference*). When the popup shows a witness
+  definition, **click the header to jump** the panel to where it is defined.
+- A **Data** folder at the foot of the sidebar makes the project's non-witness
+  data visible: the **editorial layer** (your braid overrides + manual links),
+  the **annotations**, and the **dictionary** — each opens in a read-only viewer.
+  Everything here is saved with the project.
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
@@ -126,11 +131,6 @@ A project holds many sources, organised in a small file organiser:
   Every source keeps its pristine **original**, so an edited source is flagged
   and can be **reverted to original** (or **duplicated** as a working copy);
   the whole project can also be reverted to the last saved state.
-- **Auto / Advanced** modes: auto-collate, then in Advanced mode **hand-link**
-  passages — click a whole passage, or **drag to select an exact character
-  range** on each side (CollateX-style boundary setting), then choose
-  substitution / transposition / addition / omission / match; hand-made links
-  override the auto braid.
 - **⌘/Ctrl-click** any passage to attach a marginal annotation; an **annotate**
   mode (per panel) turns a plain click into a note.
 - **Settings** (Help menu) — **User**, **Appearance** (mode, theme, text size),
@@ -138,12 +138,15 @@ A project holds many sources, organised in a small file organiser:
   long-distance hiding, cable sag), **CodeX** / **TextX** (per-engine matching
   options), and **Data** (editorial-layer counts + a Danger zone: *re-run auto
   collation* and *clear all braids*).
-- **Auto / User / Advanced modes:** **Auto** shows the pristine engine braid;
-  **User** applies your editorial layer (a working close read) — editing any braid
-  flips you into User mode automatically, and toggling back to Auto previews the
-  pristine braid without deleting your edits; **Advanced** is hand-linking.
+- **One mode — a working close read.** The collation is computed live and your
+  editorial layer (overrides + hand links) is always applied on top: this is a
+  working close read, not a frozen machine reading. (The old Auto/User/Advanced
+  switch was removed.) A chip shows how many braids you have edited; *Clear all
+  braids* in Settings ▸ Data returns the pristine auto-collation.
 - An on-screen **assistant** (a paperclip with opinions) offers witty, mode-aware
-  tips and the occasional quotation — different banter for CodeX and TextX.
+  tips and the occasional quotation — different banter for CodeX and TextX. It
+  never blocks the page (the find box, the status bar, controls behind it stay
+  clickable).
   Dismiss with the ✕ and he returns at a random moment; type **"clippy"** to
   summon him, or **"hacker"** for **Hackerman**, a green-terminal h4x0r alarmed by
   what he found inside the collation engine. Off switch in Settings ▸ Appearance.
