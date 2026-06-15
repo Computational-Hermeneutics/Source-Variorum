@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.9.0 |
+| **Version** | 0.9.1 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -108,6 +108,10 @@ configures each.
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
+- A **stemma (distance tree)** (Analyse menu): a computational *stemma codicum*
+  over all comparable witnesses — a UPGMA dendrogram clustering them by pairwise
+  dissimilarity (1 − Sørensen–Dice), with a distance-matrix heatmap. For an
+  ordered version lineage it approximates the descent of the text.
 - A **find** box in the status bar marks matches across both panels with
   next/previous navigation.
 - Line numbers in both panels, kept visible while editing.
