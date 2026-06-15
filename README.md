@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.9.1 |
+| **Version** | 0.9.2 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -112,6 +112,10 @@ configures each.
   over all comparable witnesses — a UPGMA dendrogram clustering them by pairwise
   dissimilarity (1 − Sørensen–Dice), with a distance-matrix heatmap. For an
   ordered version lineage it approximates the descent of the text.
+- A **dotplot (A × B)** (Analyse menu): a self-similarity matrix of the two shown
+  witnesses — a point wherever a line (code) or sentence (prose) matches. The
+  diagonal is shared text in order; off-diagonal streaks are moved blocks or
+  repeats; gaps are additions/deletions. Common units can be filtered out.
 - A **find** box in the status bar marks matches across both panels with
   next/previous navigation.
 - Line numbers in both panels, kept visible while editing.

@@ -13,7 +13,10 @@ export function StemmaTree({ stemma }: { stemma: Stemma }) {
 
   const layout = useMemo(() => {
     if (!root) return null;
-    const ROW = 24, PADX = 12, PADY = 14, TREE_W = 300, LABEL_W = 230;
+    // Size the label gutter to the (truncated) titles so nothing is clipped.
+    const trunc = (s: string, n = 30) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+    const maxChars = Math.max(8, ...labels.map((l) => l.siglum.length + 2 + trunc(l.title).length));
+    const ROW = 24, PADX = 12, PADY = 14, TREE_W = 280, LABEL_W = Math.min(360, Math.round(maxChars * 6.6) + 24);
     // leaf order (DFS) → y rows
     const leaves: { node: Extract<StemmaNode, { kind: "leaf" }>; y: number }[] = [];
     const collect = (n: StemmaNode) => {
@@ -61,10 +64,11 @@ export function StemmaTree({ stemma }: { stemma: Stemma }) {
           ))}
           {layout.leaves.map((l) => (
             <g key={l.node.id}>
+              <title>{l.node.siglum} — {l.node.title}</title>
               <circle cx={layout.xRight} cy={l.y} r={3} fill="hsl(var(--primary))" />
               <text x={layout.xRight + 8} y={l.y + 3.5} fontSize={12} fill="currentColor">
                 <tspan fontWeight={600}>{l.node.siglum}</tspan>
-                <tspan dx={6} className="opacity-70" fillOpacity={0.7}>{l.node.title}</tspan>
+                <tspan dx={6} fillOpacity={0.7}>{l.node.title.length > 30 ? l.node.title.slice(0, 29) + "…" : l.node.title}</tspan>
               </text>
             </g>
           ))}

@@ -18,6 +18,7 @@ import { computeHotspots } from "@/lib/collate/hotspots";
 import { computeEddy } from "@/lib/collate/eddy";
 import { computeStemma } from "@/lib/collate/stemma";
 import { StemmaTree } from "@/components/collation/StemmaTree";
+import { Dotplot } from "@/components/collation/Dotplot";
 import { looksLikeXml, teiToPlainText } from "@/lib/import/tei";
 import { normalizeNewlines } from "@/lib/utils";
 import { deriveView, download, parseProjectFile, slugify, toJSON, toMarkdown, toAnnotationsMarkdown, toPDF, toBraidPDF, toTEI } from "@/lib/export/collation-export";
@@ -173,6 +174,7 @@ export default function Home() {
   const [showApparatus, setShowApparatus] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showStemma, setShowStemma] = useState(false);
+  const [showDotplot, setShowDotplot] = useState(false);
   // The overview strip can show any combination of three columns (or none).
   const [stripCols, setStripCols] = useState({ minimap: true, variants: true, hotspots: false });
   const setStripCol = (k: "minimap" | "variants" | "hotspots", v: boolean) =>
@@ -539,6 +541,7 @@ export default function Home() {
         { kind: "action", label: "Deep dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
         { kind: "action", label: "Stemma (distance tree)…", onClick: () => setShowStemma(true) },
+        { kind: "action", label: "Dotplot (A × B)…", onClick: () => setShowDotplot(true) },
         { kind: "action", label: "Witness statistics…", onClick: () => setShowStats(true) },
         { kind: "separator" },
         { kind: "action", label: "Engines (CX · TX)…", onClick: () => setShowEngines(true) },
@@ -710,6 +713,7 @@ export default function Home() {
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {showStemma && <StemmaModal collation={collation} tokenizer={tokenizer} onClose={() => setShowStemma(false)} />}
+      {showDotplot && <DotplotModal collation={collation} tokenizer={tokenizer} onClose={() => setShowDotplot(false)} />}
       {showEngines && (
         <EnginesModal
           mode={collation.mode}
@@ -882,6 +886,17 @@ function StemmaModal({ collation, tokenizer, onClose }: { collation: Collation; 
   return (
     <ModalShell title="Stemma — distance tree" subtitle="A computational stemma codicum: which witnesses read alike" onClose={onClose}>
       <StemmaTree stemma={stemma} />
+    </ModalShell>
+  );
+}
+
+function DotplotModal({ collation, tokenizer, onClose }: { collation: Collation; tokenizer: NormalizeOptions; onClose: () => void }) {
+  const a = collation.witnesses.find((w) => w.id === collation.leftId);
+  const b = collation.witnesses.find((w) => w.id === collation.rightId);
+  return (
+    <ModalShell title="Dotplot — A × B" subtitle="Self-similarity matrix of the two shown witnesses" onClose={onClose}>
+      {a && b ? <Dotplot a={a} b={b} mode={collation.mode} normOpts={tokenizer} />
+        : <p className="text-[12px] text-muted-foreground">Open two witnesses in the panels to plot them.</p>}
     </ModalShell>
   );
 }
