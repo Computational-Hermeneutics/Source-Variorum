@@ -244,7 +244,7 @@ export default function Home() {
 
   // Per-panel code language (derived): a per-witness override wins, else the
   // filename's auto-detected language, else the Settings default.
-  const langFor = (w: Witness | undefined): string => (w ? langOverrides[w.id] ?? detectLang(w.title) ?? lang : lang);
+  const langFor = (w: Witness | undefined): string => (w ? langOverrides[w.id] ?? w.lang ?? detectLang(w.title) ?? lang : lang);
   const langA = langFor(view.a);
   const langB = langFor(view.b);
   const chooseLangA = (id: string) => { if (view.a) setLangOverrides((o) => ({ ...o, [view.a!.id]: id })); };
