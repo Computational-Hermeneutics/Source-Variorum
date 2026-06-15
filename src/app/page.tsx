@@ -578,7 +578,7 @@ export default function Home() {
                 (edits applied). Editing a braid flips you to User automatically. */}
             <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Auto: the engine's braid · User: your edited close read (your edits applied)">
               <button onClick={() => setUserMode(false)} className={"px-2 py-1 " + (!userMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
-              <button onClick={() => setUserMode(true)} title={braidEditCount ? `Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"}` : "User mode — your edits apply here"} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (userMode ? "bg-[var(--sv-variation)] text-white" : "bg-card hover:bg-muted")}>User{braidEditCount > 0 && <span className="tabular-nums opacity-80">{braidEditCount}</span>}</button>
+              <button onClick={() => setUserMode(true)} title={braidEditCount ? `Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"}` : "User mode — your edits apply here"} className={"px-2 py-1 border-l border-border " + (userMode ? "bg-[var(--sv-variation)] text-white" : "bg-card hover:bg-muted")}>User</button>
             </div>
 
             <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
