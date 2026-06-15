@@ -108,40 +108,58 @@ export function OverviewStrip({
     return m;
   }, [colMinimap, variants, visibleTypes]);
 
+  // A faithful miniature ("snapshot") of the base panel: the vertical axis is
+  // proportional to RENDERED height, so we soft-wrap each source line to an
+  // approximate panel width (CPR chars per row) and emit one mini-row per wrapped
+  // row. A long prose paragraph (one source line) therefore occupies many rows
+  // and reads as a tall block — the same shape it has in the panel — rather than
+  // a single thin bar. Code keeps word-blocks per wrapped row so indentation and
+  // structure stay legible.
   const mini = useMemo(() => {
-    if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number; line: number }[], h: 1 };
+    if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number; line: number }[], rowH: 1 };
+    const CPR = mode === "text" ? 46 : 40; // approx chars per wrapped row
+    const MAX_ROWS = 2400; // hard cap on rendered rows (perf); downsampled past this
     const lines = baseText.split("\n");
-    const n = lines.length || 1;
-    const ROWS = Math.min(n, 440);
-    let maxLen = 24;
-    for (const l of lines) maxLen = Math.max(maxLen, l.length);
-    const rowStep = VH / ROWS;
-    const barH = Math.max(0.7, rowStep * 0.58); // leave a gap between lines
-    const blocks: { y: number; x: number; w: number; line: number }[] = [];
-    for (let r = 0; r < ROWS; r++) {
-      const idx = Math.floor((r / ROWS) * n);
-      const line = lines[idx] ?? "";
-      if (!line.trim()) continue; // blank line → an empty row
-      const y = (r / ROWS) * VH;
+    // Pass 1: soft-wrap every line into mini-rows (each row = one or more segments).
+    const rows: { line: number; segs: { x: number; w: number }[] }[] = [];
+    for (let i = 0; i < lines.length && rows.length < 8000; i++) {
+      const line = lines[i].replace(/\t/g, "    ");
+      const trimmed = line.trim();
+      if (!trimmed) { rows.push({ line: i + 1, segs: [] }); continue; } // blank → empty row
+      const nrows = Math.max(1, Math.ceil(line.length / CPR));
       if (mode === "text") {
-        // Prose: one solid block per line (its length), so a paragraph reads as a
-        // block — a simple summary of the panel rather than word-by-word noise.
-        const indent = Math.min(0.4, (line.length - line.trimStart().length) / 60);
-        const w = Math.min(0.99 - indent, line.trim().length / maxLen);
-        blocks.push({ y, x: indent, w, line: idx + 1 });
-      } else {
-        // Code: one block per whitespace-run (a "word"), so indentation/structure
-        // shows in the shape.
-        const re = /\S+/g;
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(line))) {
-          const x = m.index / maxLen;
-          if (x >= 0.99) break;
-          blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen), line: idx + 1 });
+        // Prose: each wrapped row is a solid bar (full width except the ragged
+        // last line of the paragraph), so the paragraph fills as a block.
+        const indent = Math.min(0.32, (line.length - line.trimStart().length) / 90);
+        for (let r = 0; r < nrows; r++) {
+          const segLen = r === nrows - 1 ? line.length - r * CPR : CPR;
+          const x = r === 0 ? indent : 0;
+          rows.push({ line: i + 1, segs: [{ x, w: Math.min(0.97 - x, Math.max(0.05, (segLen / CPR) * 0.97)) }] });
         }
+      } else {
+        // Code: place each whitespace-run on its wrapped row by char column.
+        const byRow: { x: number; w: number }[][] = Array.from({ length: nrows }, () => []);
+        const re = /\S+/g; let m: RegExpExecArray | null;
+        while ((m = re.exec(line))) {
+          const r = Math.floor(m.index / CPR);
+          const col = (m.index % CPR) / CPR;
+          const w = Math.min(0.97 - col, m[0].length / CPR);
+          if (r < nrows && w > 0) byRow[r].push({ x: col, w });
+        }
+        for (let r = 0; r < nrows; r++) rows.push({ line: i + 1, segs: byRow[r] });
       }
     }
-    return { blocks, h: barH };
+    // Pass 2: emit, downsampling by stride if we blew past MAX_ROWS.
+    const total = Math.max(1, rows.length);
+    const stride = Math.max(1, Math.ceil(total / MAX_ROWS));
+    const rowStep = (VH / total) * stride;
+    const rowH = Math.max(0.6, rowStep * (mode === "text" ? 0.95 : 0.7));
+    const blocks: { y: number; x: number; w: number; line: number }[] = [];
+    for (let idx = 0; idx < total; idx += stride) {
+      const y = (idx / total) * VH;
+      for (const s of rows[idx].segs) blocks.push({ y, x: s.x, w: s.w, line: rows[idx].line });
+    }
+    return { blocks, rowH };
   }, [colMinimap, baseText, mode]);
 
   // ----- Variant map: bucketed, bar length ∝ change density -----
@@ -231,7 +249,7 @@ export function OverviewStrip({
               shows IN the text shape rather than as a separate signal. */}
           {colMinimap && mini.blocks.map((b, i) => {
             const t = colVariants ? lineType.get(b.line) : undefined;
-            return <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.h} rx={0.15} fill={t ? VARIANT_TYPE_COLORS[t] : "var(--foreground)"} opacity={t ? 0.85 : 0.22} />;
+            return <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.rowH} rx={0.15} fill={t ? VARIANT_TYPE_COLORS[t] : "var(--foreground)"} opacity={t ? 0.85 : 0.22} />;
           })}
           {/* Variant map — only as standalone ticks when there is no minimap to
               colour; otherwise the colour lives in the minimap above. */}

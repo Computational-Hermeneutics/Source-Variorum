@@ -99,7 +99,8 @@ const OTHELLO_PROJECT: DemoWitness[] = [...OTHELLO_EDITIONS, readme("Othello —
 const PHAEDRUS: DemoWitness[] = [
   { siglum: "J", title: "Plato, Phaedrus — trans. Benjamin Jowett", date: "1892", provenance: "Jowett translation, full dialogue (public domain; via Project Gutenberg)", file: "demos/phaedrus_jowett.txt" },
   { siglum: "F", title: "Plato, Phaedrus — trans. Harold N. Fowler", date: "1925", provenance: "Fowler translation, Loeb, full dialogue (public domain; via Perseus / PerseusDL)", file: "demos/phaedrus_fowler.txt" },
-].map((w) => ({ ...w, folder: WITNESS_FOLDER }));
+  { siglum: "W", title: "Plato, Phaedrus — trans. J. Wright (OCR)", date: "1888", provenance: "Wright literal translation (public domain; via Internet Archive, phaedruslysisand02platuoft). UNCORRECTED OCR: patterned de-noise only (headers/page-numbers stripped, hyphenation rejoined, Phaedrus spelling and standalone '1'→'I' fixed). Residual scan errors remain — notably left-margin letter-clipping (e.g. 'the ps walls', 'the vise man') — and may surface as spurious variants. Illustrative third witness, not a proofed edition.", file: "demos/phaedrus_wright.txt" },
+].map((w) => ({ ...w, folder: WITNESS_FOLDER, language: "en" }));
 const PHAEDRUS_PROJECT: DemoWitness[] = [...PHAEDRUS, readme("Phaedrus — read me", "demos/phaedrus.README.md")];
 
 export const DEMOS: Demo[] = [
@@ -125,10 +126,10 @@ export const DEMOS: Demo[] = [
   },
   {
     id: "phaedrus",
-    name: "Plato, Phaedrus (Jowett / Fowler)",
+    name: "Plato, Phaedrus (Jowett / Fowler / Wright)",
     mode: "text",
-    blurb: "The dialogue on writing, in a free and a literal translation",
-    shows: "Strong translation divergence — free literary vs literal renderings",
+    blurb: "The dialogue on writing, in three translations — free, literal, and a third (OCR)",
+    shows: "Strong translation divergence across three witnesses — enough to light up version hotspots (where all three diverge), not just pairwise variants",
     witnessA: PHAEDRUS[0],
     witnessB: PHAEDRUS[1],
     witnesses: PHAEDRUS_PROJECT,
