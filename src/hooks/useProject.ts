@@ -312,6 +312,13 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
+  // DANGER: drop the whole editorial layer (every braid override + manual link),
+  // returning the collation to the pristine auto-collation. Undoable via commit.
+  const clearAllBraidEdits = useCallback(
+    () => commit((c) => ({ ...c, variantOverrides: {}, manualLinks: {} })),
+    [commit]
+  );
+
   const editNote = useCallback(
     (variantId: string, note: string) =>
       commit((c) => ({
@@ -398,6 +405,7 @@ export function useProject(initial: Collation) {
     removeManualLink,
     editNote,
     setVariantOverride,
+    clearAllBraidEdits,
     addAnnotation,
     removeAnnotation,
   };

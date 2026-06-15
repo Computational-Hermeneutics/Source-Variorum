@@ -327,6 +327,16 @@ export default function Home() {
     setComputing(false);
   }, []);
 
+  // Force a fresh auto-collation recompute (DANGER ▸ Re-run auto), bypassing the
+  // "inputs unchanged" skip — useful to refresh after anything stale.
+  const rerunAuto = useCallback(() => {
+    const w = workerRef.current;
+    if (!w) { setView(deriveView(collation, tokenizer, detectMoves, extra)); appliedRef.current = inputsRef.current; return; }
+    const id = ++jobIdRef.current;
+    setComputing(true);
+    w.postMessage({ id, collation, normalize: tokenizer, detectMoves, extra });
+  }, [collation, tokenizer, detectMoves, extra]);
+
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
   // don't pay for N collations on every project.
@@ -696,6 +706,10 @@ export default function Home() {
           onEngineOpt={setEngineOpt}
           braidViz={braidViz}
           onBraidVizOpt={setBraidVizOpt}
+          braidEditCount={Object.keys(collation.variantOverrides ?? {}).length + Object.values(collation.manualLinks ?? {}).reduce((s, a) => s + a.length, 0)}
+          annotationCount={Object.values(collation.annotations ?? {}).reduce((s, a) => s + a.length, 0)}
+          onClearBraidEdits={project.clearAllBraidEdits}
+          onRerunAuto={rerunAuto}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -979,6 +993,26 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <p className="mt-1.5">Confidence shows in the braid as <strong>line texture</strong> (and tone): a <strong>solid</strong> ribbon is a firm correspondence, a <strong>dashed</strong>, slightly-faded one is medium, and a <strong>dotted</strong>, fainter one is the engine&rsquo;s loose guess — hover any ribbon to read its exact %. The band cut-offs are yours to set in <strong>Settings ▸ Braid</strong>, where you can also <em>hide</em> braids below a confidence you choose (which also drops their panel highlighting), fade the ribbons, or drop long-distance ones. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
         </section>
         <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Variant types</h3>
+          <p>Every locus is typed by what kind of difference it records, relative to the base (left) witness. The legend in the status bar colours and counts them; click a type there to show/hide it.</p>
+          <ul className="space-y-1 mt-1.5">
+            {[
+              ["match", "Match", "Verbatim — the same reading in the same place. Untinted, so the eye rests on what changed."],
+              ["substitution", "Substitution", "The workhorse: both witnesses have text at this locus but the reading DIFFERS — a genuinely different wording (a reworded sentence, a renamed label). Word-level tinting marks just the words that differ."],
+              ["variant", "Variant", "A near-identical substitution (above the variant threshold) — a small or fuzzy difference (a spelling, a single word, an inflection) rather than a full rewording. The quiet cousin of Substitution."],
+              ["addition", "Addition", "Text present only in the RIGHT (B) witness — added relative to the base."],
+              ["deletion", "Omission / Deletion", "Text present only in the BASE (A) and absent from B — dropped. Shown as “Omission” in TextX (the apparatus term) and “Deletion” in CodeX (the version-diff term)."],
+              ["transposition", "Transposition", "The same (or near-identical) text MOVED to a different position — a relocated block, drawn as a crossing ribbon. The analytical payload: it shows reordering, not just change."],
+            ].map(([t, label, desc]) => (
+              <li key={t} className="flex gap-2">
+                <span className="shrink-0 w-2 h-2 rounded-full mt-1.5" style={{ background: VARIANT_TYPE_COLORS[t as VariantType] }} />
+                <span><strong>{label}.</strong> {desc}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[12px] text-muted-foreground mt-1.5">So <strong>Substitution</strong> vs the rest: Substitution and Variant are <em>two-sided</em> (both witnesses read here, differently); Addition and Omission are <em>one-sided</em> (text exists on only one side); Transposition is <em>two-sided but displaced</em> (same text, moved); Match is <em>two-sided and identical</em>. Substitution is simply the case where the readings correspond but the words differ — the most common thing in translations and revisions.</p>
+        </section>
+        <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
           <ul className="list-disc pl-5 space-y-1">
             <li>Add sources from the <strong>Sources</strong> sidebar (one, several files at once, or a sample), file them into folders, rename, or send to trash.</li>
@@ -1029,13 +1063,14 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 }
 
 
-type SettingsTab = "user" | "appearance" | "braid" | "code" | "text";
+type SettingsTab = "user" | "appearance" | "braid" | "code" | "text" | "data";
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "user", label: "User" },
   { id: "appearance", label: "Appearance" },
   { id: "braid", label: "Braid" },
   { id: "code", label: "CodeX" },
   { id: "text", label: "TextX" },
+  { id: "data", label: "Data" },
 ];
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -1084,6 +1119,10 @@ function SettingsModal({
   onEngineOpt,
   braidViz,
   onBraidVizOpt,
+  braidEditCount,
+  annotationCount,
+  onClearBraidEdits,
+  onRerunAuto,
   onResetData,
 }: {
   onClose: () => void;
@@ -1106,6 +1145,10 @@ function SettingsModal({
   onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
   braidViz: BraidViz;
   onBraidVizOpt: (key: keyof BraidViz, val: number) => void;
+  braidEditCount: number;
+  annotationCount: number;
+  onClearBraidEdits: () => void;
+  onRerunAuto: () => void;
   onResetData: () => void;
 }) {
   const [tab, setTab] = useState<SettingsTab>("user");
@@ -1285,6 +1328,31 @@ function SettingsModal({
               <SettingsRow label="Ignore whitespace" hint="Reflow / indentation / extra spaces don’t count.">
                 <Toggle on={tokenizer.ignoreWhitespace} onClick={() => onTokenizer("ignoreWhitespace", !tokenizer.ignoreWhitespace)} />
               </SettingsRow>
+            </div>
+          )}
+
+          {tab === "data" && (
+            <div className="space-y-3">
+              <div className="text-[11px] text-muted-foreground">Your <strong>editorial layer</strong> — the braid edits (approve / doubt / re-type / delete / tentative + hand links) and marginal annotations — rides on top of the live auto-collation and is <strong>saved with the project</strong> (in the <code>.svar</code> file, human-readable JSON under <code>variantOverrides</code> / <code>annotations</code>). It reloads on top of the auto braid, so a project with edits opens in your edited state.</div>
+              <div className="flex gap-2">
+                <div className="flex-1 rounded border border-border bg-muted/20 px-3 py-2">
+                  <div className="text-[18px] font-semibold tabular-nums">{braidEditCount}</div>
+                  <div className="text-[11px] text-muted-foreground">braid edit{braidEditCount === 1 ? "" : "s"}</div>
+                </div>
+                <div className="flex-1 rounded border border-border bg-muted/20 px-3 py-2">
+                  <div className="text-[18px] font-semibold tabular-nums">{annotationCount}</div>
+                  <div className="text-[11px] text-muted-foreground">annotation{annotationCount === 1 ? "" : "s"}</div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-destructive/40 p-3 space-y-2.5">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-destructive">Danger zone</div>
+                <SettingsRow label="Re-run auto collation" hint="Recompute the braid from the engine (your edits are kept and re-applied on top).">
+                  <button onClick={onRerunAuto} className="px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]">Re-run</button>
+                </SettingsRow>
+                <SettingsRow label="Clear all braids" hint={`Remove every braid edit and hand link (${braidEditCount}) — back to pristine auto. Undoable.`}>
+                  <button onClick={() => { if (braidEditCount === 0 || confirm(`Clear all ${braidEditCount} braid edit(s) and return to the auto-collation? (Undoable.)`)) onClearBraidEdits(); }} className="px-2.5 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] disabled:opacity-40" disabled={braidEditCount === 0}>Clear braids…</button>
+                </SettingsRow>
+              </div>
             </div>
           )}
         </div>
