@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree, Code2, Type } from "lucide-react";
+import { Moon, Sun, X, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree, Code2, Type, Maximize2, Minimize2 } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -893,29 +893,44 @@ function StemmaModal({ collation, tokenizer, onClose }: { collation: Collation; 
 function DotplotModal({ collation, tokenizer, onClose }: { collation: Collation; tokenizer: NormalizeOptions; onClose: () => void }) {
   const a = collation.witnesses.find((w) => w.id === collation.leftId);
   const b = collation.witnesses.find((w) => w.id === collation.rightId);
+  const [expanded, setExpanded] = useState(false);
   return (
-    <ModalShell title="Dotplot — A × B" subtitle="Self-similarity matrix of the two shown witnesses" onClose={onClose}>
-      {a && b ? <Dotplot a={a} b={b} mode={collation.mode} normOpts={tokenizer} />
+    <ModalShell
+      title="Dotplot — A × B"
+      subtitle="Self-similarity matrix of the two shown witnesses"
+      onClose={onClose}
+      size={expanded ? "full" : "wide"}
+      headerExtra={
+        <button onClick={() => setExpanded((v) => !v)} className="p-1 rounded hover:bg-muted" title={expanded ? "Shrink" : "Expand"}>
+          {expanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
+      }
+    >
+      {a && b ? <Dotplot a={a} b={b} mode={collation.mode} normOpts={tokenizer} expanded={expanded} />
         : <p className="text-[12px] text-muted-foreground">Open two witnesses in the panels to plot them.</p>}
     </ModalShell>
   );
 }
 
-function ModalShell({ title, subtitle, onClose, children, footer }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode }) {
+function ModalShell({ title, subtitle, onClose, children, footer, size = "default", headerExtra }: { title: string; subtitle?: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; size?: "default" | "wide" | "full"; headerExtra?: React.ReactNode }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  const widthCls = size === "full" ? "max-w-[96vw]" : size === "wide" ? "max-w-4xl" : "max-w-lg";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="bg-card border border-border rounded-lg max-w-lg w-full max-h-[85vh] flex flex-col shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className={`bg-card border border-border rounded-lg ${widthCls} w-full max-h-[92vh] flex flex-col shadow-xl`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 px-6 pt-5 pb-3 border-b border-border">
           <div className="min-w-0">
             <h2 className="text-[16px] font-semibold leading-tight">{title}</h2>
             {subtitle && <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
-          <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+          <div className="ml-auto flex items-center gap-1">
+            {headerExtra}
+            <button onClick={onClose} className="p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
+          </div>
         </div>
         <div className="px-6 py-4 overflow-y-auto text-[13px] leading-relaxed text-foreground/85">{children}</div>
         {footer && <div className="px-6 py-3 border-t border-border">{footer}</div>}

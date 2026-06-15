@@ -5,21 +5,36 @@ import type { CollationMode, Witness } from "@/types/collation";
 import type { NormalizeOptions } from "@/lib/collate/similarity";
 import { computeDotplot } from "@/lib/collate/dotplot";
 
-const SIZE = 540;
-
 /**
  * Dotplot of witness A (x, top) against witness B (y, left): a point wherever a
  * unit (line/sentence) matches. Diagonals = shared runs; off-diagonal streaks =
- * moved blocks or repeats; gaps = added/dropped text.
+ * moved blocks or repeats; gaps = added/dropped text. The square plot scales to
+ * the modal width (and grows when the modal is expanded).
  */
-export function Dotplot({ a, b, mode, normOpts }: { a: Witness; b: Witness; mode: CollationMode; normOpts: NormalizeOptions }) {
+export function Dotplot({ a, b, mode, normOpts, expanded = false }: { a: Witness; b: Witness; mode: CollationMode; normOpts: NormalizeOptions; expanded?: boolean }) {
   const [hideCommon, setHideCommon] = useState(true);
   const data = useMemo(() => computeDotplot(a, b, mode, normOpts, hideCommon), [a, b, mode, normOpts, hideCommon]);
   const ref = useRef<HTMLCanvasElement>(null);
+  const [size, setSize] = useState(540);
+
+  // Square plot scaled to the modal width: max-w-4xl (896px) normally, 96vw when
+  // expanded. Recomputes on expand and on window resize. Clamped, kept square.
+  useEffect(() => {
+    const measure = () => {
+      const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
+      const modalW = expanded ? vw * 0.96 : Math.min(896, vw - 32);
+      const inner = modalW - 48 /* px-6 padding */ - 28 /* B-axis gutter + gaps */;
+      setSize(Math.max(280, Math.min(1200, Math.round(inner))));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [expanded]);
 
   useEffect(() => {
     const cv = ref.current; if (!cv) return;
     const ctx = cv.getContext("2d"); if (!ctx) return;
+    const SIZE = size;
     const dpr = Math.min(2, typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1);
     cv.width = SIZE * dpr; cv.height = SIZE * dpr; ctx.scale(dpr, dpr);
     const primary = `hsl(${getComputedStyle(document.documentElement).getPropertyValue("--primary").trim() || "352 47% 33%"})`;
@@ -39,7 +54,7 @@ export function Dotplot({ a, b, mode, normOpts }: { a: Witness; b: Witness; mode
       }
       ctx.globalAlpha = 1;
     }
-  }, [data]);
+  }, [data, size]);
 
   return (
     <div className="space-y-3">
@@ -55,9 +70,9 @@ export function Dotplot({ a, b, mode, normOpts }: { a: Witness; b: Witness; mode
       </div>
       <div className="flex gap-1.5">
         <div className="flex items-center"><span className="text-[10px] text-muted-foreground [writing-mode:vertical-lr] rotate-180" title={b.title}>B · {b.siglum} →</span></div>
-        <div>
+        <div className="min-w-0">
           <div className="text-[10px] text-muted-foreground mb-0.5" title={a.title}>A · {a.siglum} →</div>
-          <canvas ref={ref} style={{ width: SIZE, height: SIZE }} className="rounded border border-border bg-card" />
+          <canvas ref={ref} style={{ width: size, height: size }} className="rounded border border-border bg-card" />
         </div>
       </div>
       <p className="text-[11px] text-muted-foreground">
