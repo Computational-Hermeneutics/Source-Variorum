@@ -20,6 +20,8 @@ export interface DemoWitness {
   folder?: string;
   /** Reference-only: read in the viewer, never loaded into a compare panel. */
   reference?: boolean;
+  /** Syntax-highlight language id (so the viewer knows it is code). */
+  lang?: string;
   /** Inline witness text (for short demos). */
   text?: string;
   /** Path under /public to fetch the witness text from (for large real sources). */
@@ -69,10 +71,10 @@ const SPACEWAR_VERSIONS: DemoWitness[] = [
   { siglum: "41d", title: "Spacewar! 4.1d (combined)", date: "1963", author: "“dfw”", provenance: "sw41d_combined.txt", file: SW("sw41d_combined.txt") },
   { siglum: "2bм", title: "Spacewar! 2b (2016 retype)", date: "2016", author: "retype (Norbert Landsteiner)", provenance: "spacewar_2b_m_2016.txt", file: SW("spacewar_2b_m_2016.txt") },
   { siglum: "sw15", title: "Spacewar! (2015 retype)", date: "2015", author: "Norbert Landsteiner", provenance: "spacewar2015.txt", file: SW("spacewar2015.txt") },
-].map((w) => ({ ...w, folder: WITNESS_FOLDER }));
+].map((w) => ({ ...w, folder: WITNESS_FOLDER, lang: "pdp1" }));
 
 // Supplementary listings + related programs — reference (their own folders).
-const SPACEWAR_EXTRAS: DemoWitness[] = [
+const SPACEWAR_EXTRAS: DemoWitness[] = ([
   { siglum: "2b·d", title: "Spacewar! 2b — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spacewar_2b_disassembly.txt", file: SW("spacewar_2b_disassembly.txt") },
   { siglum: "rst·d", title: "Spacewar! restart — disassembly", date: "—", folder: "Disassemblies & listings", provenance: "spaceWarRstrt_disassembly.txt", file: SW("spaceWarRstrt_disassembly.txt") },
   { siglum: "rst", title: "Spacewar! auto-restart patch", date: "—", folder: "Disassemblies & listings", provenance: "spacewAutoRestartPatch.txt", file: SW("spacewAutoRestartPatch.txt") },
@@ -83,7 +85,7 @@ const SPACEWAR_EXTRAS: DemoWitness[] = [
   { siglum: "hs·doc", title: "Minskytron Hyperspace — how-to", date: "—", folder: "Related PDP-1 programs", provenance: "minskytron-hyperspace-howto.txt", file: SW("minskytron-hyperspace-howto.txt") },
   { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", folder: "Related PDP-1 programs", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
   { siglum: "stars", title: "Expensive Planetarium (stars)", date: "13 Mar 1962", author: "Peter Samson", folder: "Related PDP-1 programs", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
-];
+] as DemoWitness[]).map((w) => ({ ...w, lang: "pdp1" }));
 const SPACEWAR_CORPUS: DemoWitness[] = [...SPACEWAR_VERSIONS, ...SPACEWAR_EXTRAS, readme("Spacewar! corpus — read me", SW("README.md"))];
 
 const OTHELLO_EDITIONS: DemoWitness[] = [

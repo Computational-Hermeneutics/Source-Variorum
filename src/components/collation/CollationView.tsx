@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
@@ -911,6 +911,8 @@ function WitnessHeader({
   const c = project.collation;
   const witnesses = c.witnesses;
   const [copied, setCopied] = useState(false);
+  const [confirmRevert, setConfirmRevert] = useState(false);
+  const edited = witness.original !== undefined && witness.text !== witness.original;
   const copy = () => {
     navigator.clipboard?.writeText(witness.text).then(() => {
       setCopied(true);
@@ -949,8 +951,40 @@ function WitnessHeader({
         onLang={onLang}
         copied={copied}
         onCopy={copy}
+        edited={edited}
+        onRevert={() => setConfirmRevert(true)}
         project={project}
       />
+      {confirmRevert && (
+        <ConfirmModal
+          title={`Revert ${witness.siglum}?`}
+          body={`Discard your edits to “${witness.title}” and restore its original text? This cannot be undone.`}
+          confirmLabel="Revert"
+          onCancel={() => setConfirmRevert(false)}
+          onConfirm={() => { project.revertWitness(witness.id); setConfirmRevert(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** A small destructive-action confirmation modal. */
+function ConfirmModal({ title, body, confirmLabel, onCancel, onConfirm }: { title: string; body: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+      <div className="bg-card border border-border rounded-lg w-full max-w-sm p-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="text-[14px] font-semibold mb-1.5">{title}</div>
+        <p className="text-[12.5px] text-muted-foreground leading-relaxed">{body}</p>
+        <div className="flex justify-end gap-2 mt-4">
+          <button onClick={onCancel} className="px-3 py-1.5 rounded border border-border text-[12px] hover:bg-muted">Cancel</button>
+          <button onClick={onConfirm} className="px-3 py-1.5 rounded bg-amber-600 text-white text-[12px] font-medium hover:bg-amber-700">{confirmLabel}</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -970,6 +1004,8 @@ function PanelToolbar({
   onLang,
   copied,
   onCopy,
+  edited,
+  onRevert,
   project,
 }: {
   panel: Side;
@@ -984,6 +1020,8 @@ function PanelToolbar({
   onLang: (id: string) => void;
   copied: boolean;
   onCopy: () => void;
+  edited?: boolean;
+  onRevert?: () => void;
   project: Project;
 }) {
   const Tb = ({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
@@ -1026,6 +1064,11 @@ function PanelToolbar({
       <Sep />
       <Tb onClick={project.undo} title="Undo"><Undo2 className="w-3 h-3" /></Tb>
       <Tb onClick={project.redo} title="Redo"><Redo2 className="w-3 h-3" /></Tb>
+      {edited && (
+        <button onClick={onRevert} title="Revert this witness to its original text" className="inline-flex items-center justify-center w-6 h-6 rounded transition-colors text-amber-600 dark:text-amber-400 hover:bg-muted">
+          <RotateCcw className="w-3 h-3" />
+        </button>
+      )}
     </div>
   );
 }

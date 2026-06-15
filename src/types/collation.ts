@@ -41,6 +41,9 @@ export interface Witness {
    *  excluded from the compare panels (the working set draws from non-reference
    *  witnesses only). */
   reference?: boolean;
+  /** Syntax-highlight language id (e.g. "pdp1", "markdown") — tells the viewer
+   *  this is code, how to colour it, and which view to open by default. */
+  lang?: string;
   /** The raw text. Kept verbatim; annotations and variants reference offsets into it. */
   text: string;
   /** Immutable original text, snapshotted on creation/import. Editing changes

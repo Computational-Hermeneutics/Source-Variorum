@@ -46,53 +46,30 @@ This is rich material for critical close reading along several axes:
   central star pulls everything inward. Read the code as a war game and
   the constants take on a different cast.
 
-## A note on this folder on disk
-
-When you open this sample inside CCS-WB, the workbench loads
-everything — every source listing, the README you are reading,
-the annotations — from a single self-contained project file
-[`spacewar-1962.ccs`](spacewar-1962.ccs). That `.ccs` is JSON
-with the file metadata in `codeFiles[]` and the actual file
-bodies inlined in `codeContents{}`; nothing in it points at
-the loose files sitting next to it.
-
-The 26 loose `.txt` files (and the on-disk copy of this
-README) in this directory are **external copies of what is
-already inlined in the `.ccs`**. They exist so the corpus is
-directly browsable and greppable on GitHub, downloadable
-individually, and usable outside the workbench — they have no
-role in how the workbench loads the project. Most other
-samples in the library are shipped *only* as a `.ccs` for that
-reason (see e.g. [`adventure-1977/`](../adventure-1977/),
-[`git-stash-2007/`](../git-stash-2007/)); Spacewar! keeps both
-because its corpus is a primary scholarly object that benefits
-from external readability. If a loose file disappears, nothing
-in CCS-WB breaks; if the `.ccs` disappears, the project does.
-
 ## The versions in this project
 
 This sample ships **every recoverable version of the Spacewar! source
 code** — every release linked from
 [spacewar1962.github.io/spacewar/code.html](https://spacewar1962.github.io/spacewar/code.html)
 for which a text listing survives. Versions for which only paper-tape
-binaries or no copy at all exist are noted in the "Versions not included
-here" section below.
+binaries or no copy at all exist are noted in the per-version notes below.
 
-## How the files are organised in the workbench
+## How the sources are organised in Source Variorum
 
-The 26 files are split across the **root** and three subfolders so
-the files pane stays navigable. You can collapse any subfolder by
-clicking its header (state is remembered across reloads):
+The corpus loads as one project of **24 sources**. They are split between the
+comparable working set and reference material so the Sources sidebar stays
+navigable; only sources in the **Witnesses** folder can be loaded into the two
+compare panels, while everything else opens in the reader modal (click it).
 
-| Level | What lives there | Files |
-|---|---|---|
-| **root** | This README + every real Spacewar! game source listing, chronological from v1 to v4.8 (15 sources). The root is the canonical reading list. | README.md, the 11 game versions, the three v4.8 paper-tape segments |
-| **`supporting/`** | Source files the game itself depends on or relates to but which aren't game versions: the MACRO assembler definitions, Peter Samson's actual star catalogue data, a later hyperspace patch, the sibling Snowflake program. | 4 files |
-| **`docs/`** | Patches and documentation describing how to use or modify the program — sense-switch settings, the auto-restart patch, the Minskytron hyperspace how-to. | 3 files |
-| **`disassemblies/`** | Scholarly recovery from paper-tape binaries for which no text source survives. Reading these *alongside* the corresponding game-version listings shows what disassembly recovers and what it cannot — comments, names, authorial intent. | 3 files |
+| Folder | What lives there |
+|---|---|
+| **Witnesses** | Every real Spacewar! game source listing, chronological from v1 to v4.8 — the **14 comparable versions** (v4.8 part 1 + part 2 are combined into one `spacewar_4.8.txt`; the score routine ships separately as `4.8 (scorer)`). Pick any two to braid. |
+| **Disassemblies & listings** | Patches, sense-switch settings, the MACRO/FIO-DEC definitions, and scholarly disassemblies recovered from paper-tape binaries for which no text source survives — reference reading. |
+| **Related PDP-1 programs** | The sibling display programs of the same milieu: Minskytron Hyperspace (+ how-to + disassembly), Snowflake, and Peter Samson's Expensive Planetarium starfield — reference reading. |
+| *(top level)* | This **read me**. |
 
-This layout follows a simple rule used across the sample library:
-**real source code at the root, supporting material in subfolders.**
+The simple rule: **comparable source code in the Witnesses folder, supporting and
+related material as reference.**
 
 ### `spacewar_1_early1962_reconstructed.txt` — Version 1 (early 1962)
 
@@ -198,15 +175,16 @@ Companion listing to 4.4 with the "f" annotations (provenance unclear
 in the surviving record). Worth comparing against `4.4` to see what
 the "f" suffix marks across the 4.x family.
 
-#### `spacewar_4.8_pt1.txt` + `spacewar_4.8_pt2.txt` + `spacewar_4.8_scorer.txt` — Version 4.8 (24 July 1963)
+#### `spacewar_4.8.txt` (+ `spacewar_4.8_scorer.txt`) — Version 4.8 (24 July 1963)
 
 The **apparently final MIT version**. Polished on-screen score
 display by Peter Samson, signed by "dfw". Distributed historically as
-three paper-tape segments — *part 1* (main game), *part 2*
-(continuation), and *scorer* (the score display routine, isolable as
-a separate listing because it was a later addition). Reading all
-three together yields the program as last left at MIT before the
-public PDP-1 sites took over development.
+paper-tape segments — *part 1* (main game) and *part 2* (continuation),
+here **combined into one listing** (`spacewar_4.8.txt`) so it reads as a
+single witness — plus the *scorer* (`4.8 (scorer)`), the score-display
+routine kept separate because it was a later addition. Together they are
+the program as last left at MIT before the public PDP-1 sites took over
+development.
 
 ### `spacewar2015.txt` — Spacewar! 2015 (Landsteiner)
 
@@ -396,8 +374,7 @@ When close-reading these programs, consider:
 - `spacewar_4.3f.txt` — Version 4.3 *Twin Star* subjective view, 17 May 1963.
 - `spacewar_4.4.txt` — Version 4.4 dual-console, 21 May 1963.
 - `spacewar_4.4f.txt` — Version 4.4 variant.
-- `spacewar_4.8_pt1.txt` — Version 4.8, part 1 (main game), 24 July 1963.
-- `spacewar_4.8_pt2.txt` — Version 4.8, part 2 (continuation).
+- `spacewar_4.8.txt` — Version 4.8 (parts 1 + 2 combined), 24 July 1963.
 - `spacewar_4.8_scorer.txt` — Version 4.8, score display routine.
 - `spacewar2015.txt` — Landsteiner's new PDP-1 program (2015).
 

@@ -33,7 +33,7 @@ function uid(): string {
 }
 
 function witnessFrom(w: DemoWitness, id: string, text: string): Witness {
-  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, author: w.author, folder: w.folder, reference: w.reference, text, original: text };
+  return { id, siglum: w.siglum, title: w.title, provenance: w.provenance, date: w.date, author: w.author, folder: w.folder, reference: w.reference, lang: w.lang, text, original: text };
 }
 
 async function resolveWitnessText(w: DemoWitness): Promise<string> {

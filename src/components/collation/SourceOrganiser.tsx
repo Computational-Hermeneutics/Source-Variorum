@@ -383,7 +383,7 @@ function SourceViewerModal({ witness, onClose, onSave }: { witness: Witness; onC
           <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
         </div>
         <div className="p-4">
-          <MarkdownPad value={draft} onChange={setDraft} codeMode />
+          <MarkdownPad value={draft} onChange={setDraft} codeMode defaultLang={witness.lang} initialView={witness.lang ? "code" : "rich"} />
           <div className="flex justify-end gap-2 mt-3">
             <button onClick={onClose} className="px-3 py-1 rounded border border-border text-[12px] hover:bg-muted">Close</button>
             <button onClick={() => { onSave(draft); onClose(); }} disabled={!dirty} className="px-3 py-1 rounded bg-primary text-primary-foreground text-[12px] disabled:opacity-50">Save changes</button>

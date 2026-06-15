@@ -95,8 +95,19 @@ export function OverviewStrip({
 
   // ----- Panel minimap: a per-(sampled)-line shape of the base text, rendered as
   // word-blocks with gaps so it reads like rows of text rather than a grey mush. -----
+  // Line → dominant variant-type, so the minimap blocks can be tinted by change.
+  const lineType = useMemo(() => {
+    const m = new Map<number, VariantType>();
+    if (!colMinimap) return m;
+    for (const v of variants) {
+      if (v.type === "match" || !visibleTypes.has(v.type) || !v.a) continue;
+      for (let ln = v.a.startLine; ln <= v.a.endLine; ln++) if (!m.has(ln)) m.set(ln, v.type);
+    }
+    return m;
+  }, [colMinimap, variants, visibleTypes]);
+
   const mini = useMemo(() => {
-    if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number }[], h: 1 };
+    if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number; line: number }[], h: 1 };
     const lines = baseText.split("\n");
     const n = lines.length || 1;
     const ROWS = Math.min(n, 440);
@@ -104,9 +115,10 @@ export function OverviewStrip({
     for (const l of lines) maxLen = Math.max(maxLen, l.length);
     const rowStep = VH / ROWS;
     const barH = Math.max(0.7, rowStep * 0.58); // leave a gap between lines
-    const blocks: { y: number; x: number; w: number }[] = [];
+    const blocks: { y: number; x: number; w: number; line: number }[] = [];
     for (let r = 0; r < ROWS; r++) {
-      const line = lines[Math.floor((r / ROWS) * n)] ?? "";
+      const idx = Math.floor((r / ROWS) * n);
+      const line = lines[idx] ?? "";
       if (!line.trim()) continue; // blank line → an empty row
       const y = (r / ROWS) * VH;
       // One small block per whitespace-run (a "word"), at its column position.
@@ -115,7 +127,7 @@ export function OverviewStrip({
       while ((m = re.exec(line))) {
         const x = m.index / maxLen;
         if (x >= 0.99) break;
-        blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen) });
+        blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen), line: idx + 1 });
       }
     }
     return { blocks, h: barH };
@@ -197,14 +209,17 @@ export function OverviewStrip({
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           {hasMain && <rect x={mainX} y={0} width={mainW} height={VH} className="fill-card/40" />}
-          {/* Panel minimap — word-blocks with line gaps, so it reads as text. */}
-          {colMinimap && mini.blocks.map((b, i) => (
-            <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.h} rx={0.15} className="fill-foreground" opacity={colVariants ? 0.2 : 0.32} />
-          ))}
-          {/* Variant map — very subtle coloured ticks at the right edge, a faded
-              hint of where the change is, not a loud signal. */}
-          {colVariants && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.4} rx={0.15} />
+          {/* Panel minimap — word-blocks (reads as text). When the variant map is
+              on, blocks on a changed line are tinted by variant type, so the change
+              shows IN the text shape rather than as a separate signal. */}
+          {colMinimap && mini.blocks.map((b, i) => {
+            const t = colVariants ? lineType.get(b.line) : undefined;
+            return <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.h} rx={0.15} fill={t ? VARIANT_TYPE_COLORS[t] : "var(--foreground)"} opacity={t ? 0.85 : 0.22} />;
+          })}
+          {/* Variant map — only as standalone ticks when there is no minimap to
+              colour; otherwise the colour lives in the minimap above. */}
+          {colVariants && !colMinimap && vbands.map((b, i) => (
+            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.7} rx={0.15} />
           ))}
           {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
           {/* Version hotspots — a thin heat line on the left, before the minimap. */}

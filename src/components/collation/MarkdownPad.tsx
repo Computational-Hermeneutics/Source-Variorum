@@ -91,7 +91,7 @@ export function renderMarkdown(md: string): string {
 
 /** A notepad with Markdown / Rich-text and (optionally) a syntax-highlighted
  *  Code view. Edits flow up via onChange. */
-export function MarkdownPad({ value, onChange, placeholder, autoFocus, readOnly, codeMode, defaultLang }: {
+export function MarkdownPad({ value, onChange, placeholder, autoFocus, readOnly, codeMode, defaultLang, initialView }: {
   value: string;
   onChange?: (v: string) => void;
   placeholder?: string;
@@ -100,8 +100,10 @@ export function MarkdownPad({ value, onChange, placeholder, autoFocus, readOnly,
   /** Enable the syntax-highlighted Code view (with a language picker). */
   codeMode?: boolean;
   defaultLang?: string;
+  /** Which view to open on first render (default: the editable Markdown source). */
+  initialView?: "edit" | "rich" | "code";
 }) {
-  const [view, setView] = useState<"edit" | "rich" | "code">("edit");
+  const [view, setView] = useState<"edit" | "rich" | "code">(initialView ?? "edit");
   const [lang, setLang] = useState(defaultLang ?? "none");
   const box = "min-h-[44vh] max-h-[62vh] overflow-auto";
   const tab = (v: "edit" | "rich" | "code", icon: ReactNode, label: string) => (

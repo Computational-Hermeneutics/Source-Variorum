@@ -1,11 +1,13 @@
-# _Othello_ — Globe (1866) vs Craig / Oxford (1914)
+# _Othello_ — four editions (First Folio 1623 → World Library)
 
-A two-witness **Text**-mode collation of Shakespeare's *Othello* in two
-public-domain critical editions printed about fifty years apart. Unlike the
-*Phaedrus* sample (two translations), here both witnesses descend from the same
-early texts (the 1622 Quarto and 1623 First Folio), so the differences are
-**editorial**: how two editors normalised spelling, repunctuated, relineated
-verse, and placed stage directions and act/scene headings.
+A **four-edition** Text-mode collation of Shakespeare's *Othello* spanning some
+370 years. The default braid pairs the **Globe (1866)** edition (the modern
+base) against the original-spelling **First Folio (1623)**; open any two of the
+four from the Sources sidebar. Unlike the *Phaedrus* sample (two independent
+translations), these editions descend from the same early texts (the 1622 Quarto
+and 1623 First Folio), so the differences are **editorial**: how editors
+normalised spelling, repunctuated, relineated verse, and placed stage directions
+and act/scene headings.
 
 ## Witnesses
 
