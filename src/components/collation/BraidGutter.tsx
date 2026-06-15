@@ -119,13 +119,15 @@ export function BraidGutter({
         // boost opacity with vertical distance so long-range correspondences read
         // through the busier short ones.
         const distBoost = Math.min(0.26, span * 0.5);
-        // When a variant is selected, fade everything else right back so the one
-        // being worked on stands alone. When nothing is selected, show ALL braids
-        // (matches a touch lighter than changes so the eye still reads the changes).
+        // When a variant is selected, dim the others so the one being worked on
+        // stands out — but keep them clearly visible as context (don't fade them
+        // to nothing, or the braid looks like it vanished). When nothing is
+        // selected, show ALL braids (matches a touch lighter than changes so the
+        // eye still reads the changes).
         const baseOp = anySelected
           ? active
-            ? 0.95
-            : 0.05
+            ? 1
+            : r.type === "match" ? 0.16 : 0.28
           : active
             ? 0.95
             : Math.min(0.95, (r.type === "match" ? 0.34 : 0.72) + distBoost);
