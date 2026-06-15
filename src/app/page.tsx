@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree, Code2, Type } from "lucide-react";
+import { Moon, Sun, X, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree, Code2, Type } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -481,6 +481,7 @@ export default function Home() {
         { kind: "separator" },
         { kind: "action", label: "Open project…", shortcut: ".svar", onClick: () => fileInputRef.current?.click() },
         { kind: "action", label: "Save project", shortcut: ".svar", onClick: saveProject },
+        { kind: "action", label: "Revert to Last Saved…", onClick: () => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }, disabled: !project.isDirty },
         { kind: "separator" },
         { kind: "header", label: "Export" },
         { kind: "action", label: "Markdown (.md)", onClick: () => download(`${slugify(collation.name)}.md`, toMarkdown(collation), "text/markdown") },
@@ -498,8 +499,6 @@ export default function Home() {
         { kind: "action", label: "Redo", shortcut: "⌘⇧Z", onClick: project.redo, disabled: !project.canRedo },
         { kind: "separator" },
         { kind: "checkbox", label: "Edit base witness", checked: editSide !== null, onToggle: () => { setEditSide((v) => (v ? null : "a")); } },
-        { kind: "separator" },
-        { kind: "action", label: "Revert to last saved", onClick: () => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }, disabled: !project.isDirty },
       ],
     },
     {
@@ -584,12 +583,6 @@ export default function Home() {
             <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
 
             <button onClick={() => setShowOverview(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Change overview"><BarChart3 className="w-3.5 h-3.5" /></button>
-
-            {project.isDirty && (
-              <button onClick={() => { if (confirm("Revert to last saved/loaded state? Unsaved changes will be lost.")) project.revert(); }} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Revert to last saved project">
-                <RotateCcw className="w-3.5 h-3.5" /> Revert
-              </button>
-            )}
 
             <button onClick={() => setIsDark((v) => !v)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Toggle theme">{isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}</button>
           </div>

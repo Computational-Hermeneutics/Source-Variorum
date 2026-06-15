@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Author** | David M. Berry ([@dmberry](https://github.com/dmberry), University of Sussex, [ORCID 0000-0002-2147-1366](https://orcid.org/0000-0002-2147-1366)) |
-| **Version** | 0.5.30 |
+| **Version** | 0.8.10 |
 | **Date** | June 2026 |
 | **Licence** | MIT |
 | **Summary** | A side-by-side textual collation workbench: collate two or more witnesses of a text — code or prose — and read additions, omissions, substitutions, and transpositions in a braided variorum view, with auto-collation plus hand-correction. |
@@ -138,11 +138,12 @@ A project holds many sources, organised in a small file organiser:
   long-distance hiding, cable sag), **CodeX** / **TextX** (per-engine matching
   options), and **Data** (editorial-layer counts + a Danger zone: *re-run auto
   collation* and *clear all braids*).
-- **One mode — a working close read.** The collation is computed live and your
-  editorial layer (overrides + hand links) is always applied on top: this is a
-  working close read, not a frozen machine reading. (The old Auto/User/Advanced
-  switch was removed.) A chip shows how many braids you have edited; *Clear all
-  braids* in Settings ▸ Data returns the pristine auto-collation.
+- **Auto | User** (top-right toggle): **User** (default) applies your editorial
+  layer (overrides + hand links) — a working close read; **Auto** previews the
+  pristine engine braid without deleting your edits. Editing a braid flips you to
+  User automatically. *Clear all braids* in Settings ▸ Data returns the pristine
+  auto-collation for good. If braids ever look missing, **View ▸ Show my braids**
+  (or Settings ▸ Braid) resets the braid view to defaults.
 - An on-screen **assistant** (a paperclip with opinions) offers witty, mode-aware
   tips and the occasional quotation — different banter for CodeX and TextX. It
   never blocks the page (the find box, the status bar, controls behind it stay
