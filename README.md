@@ -119,6 +119,13 @@ A project holds many sources, organised in a small file organiser:
   long-distance hiding, cable sag), **CodeX** / **TextX** (per-engine matching
   options), and **Data** (editorial-layer counts + a Danger zone: *re-run auto
   collation* and *clear all braids*).
+- **Auto / User / Advanced modes:** **Auto** shows the pristine engine braid;
+  **User** applies your editorial layer (a working close read) — editing any braid
+  flips you into User mode automatically, and toggling back to Auto previews the
+  pristine braid without deleting your edits; **Advanced** is hand-linking.
+- An on-screen **assistant** (a paperclip with opinions) offers witty, mode-aware
+  tips and the occasional quotation — different banter for CodeX and TextX. Off
+  switch in Settings ▸ Appearance.
 - **Storage / "user mode":** the collation is never stored as a frozen braid.
   Source witnesses plus an **editorial layer** (braid overrides + hand links,
   keyed by the reading pair) live on the project; on load the auto braid is

@@ -6,6 +6,7 @@ import type { Collation, CollationMode, VariantType, Witness } from "@/types/col
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
 import { CollationView } from "@/components/collation/CollationView";
+import { Assistant } from "@/components/Assistant";
 import { type BraidViz, DEFAULT_BRAID_VIZ } from "@/components/collation/BraidGutter";
 import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
@@ -26,6 +27,7 @@ const USER_KEY = "source-variorum-user";
 const TOKENIZER_KEY = "source-variorum-tokenizer";
 const DETECT_MOVES_KEY = "source-variorum-detect-moves";
 const BRAID_VIZ_KEY = "source-variorum-braid-viz";
+const ASSISTANT_KEY = "source-variorum-assistant";
 const ENGINE_OPTS_KEY = "source-variorum-engine-opts";
 
 /** Engine-level (non-normalisation) braid options. `looseThreshold` is the
@@ -158,6 +160,8 @@ export default function Home() {
   const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
   const [detectMoves, setDetectMoves] = useState(true);
   const [braidViz, setBraidViz] = useState<BraidViz>(DEFAULT_BRAID_VIZ);
+  const [assistantOn, setAssistantOn] = useState(true);
+  const setAssistantOnP = (v: boolean) => { setAssistantOn(v); try { localStorage.setItem(ASSISTANT_KEY, v ? "1" : "0"); } catch { /* ignore */ } };
   const [engineOpts, setEngineOpts] = useState<EngineOpts>(DEFAULT_ENGINE_OPTS);
   const [showEngines, setShowEngines] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
@@ -206,6 +210,8 @@ export default function Home() {
       if (dm != null) setDetectMoves(dm === "1");
       const bv = localStorage.getItem(BRAID_VIZ_KEY);
       if (bv) setBraidViz({ ...DEFAULT_BRAID_VIZ, ...JSON.parse(bv) });
+      const as = localStorage.getItem(ASSISTANT_KEY);
+      if (as != null) setAssistantOn(as === "1");
       const eo = localStorage.getItem(ENGINE_OPTS_KEY);
       if (eo) setEngineOpts({ ...DEFAULT_ENGINE_OPTS, ...JSON.parse(eo) });
       const sc = localStorage.getItem("source-variorum-strip-cols");
@@ -270,19 +276,33 @@ export default function Home() {
     subThreshold: collation.mode === "text" ? engineOpts.looseThreshold : undefined,
   }), [engineOpts, collation.mode]);
 
+  // ----- Auto vs User mode. AUTO shows the pristine engine collation; USER shows
+  // it with your editorial layer (overrides + hand links) applied. Editing a braid
+  // (which creates an edit) flips you into User mode — you're now doing a working
+  // close read, not a machine read. Toggle back to Auto to preview the pristine
+  // braid without deleting your edits (Clear all braids in Settings ▸ Data does
+  // delete them). -----
+  const braidEditCount = Object.keys(collation.variantOverrides ?? {}).length + Object.values(collation.manualLinks ?? {}).reduce((s, a) => s + a.length, 0);
+  const [userMode, setUserMode] = useState(false);
+  useEffect(() => { if (braidEditCount > 0) setUserMode(true); }, [braidEditCount]);
+  const viewCollation = useMemo(
+    () => (userMode || braidEditCount === 0 ? collation : { ...collation, variantOverrides: {}, manualLinks: {} }),
+    [collation, userMode, braidEditCount]
+  );
+
   // ----- The derived view runs in a Web Worker so a slow recompute never freezes
   // the UI: the page stays live, a progress bar shows, and the user can CANCEL
   // mid-compute (terminating the worker). The FIRST view is computed synchronously
   // so `view` is never null and the panels have something to render immediately;
   // every later recompute is handed to the worker. Falls back to synchronous
   // compute if workers are unavailable. -----
-  const [view, setView] = useState(() => deriveView(collation, tokenizer, detectMoves, extra));
+  const [view, setView] = useState(() => deriveView(viewCollation, tokenizer, detectMoves, extra));
   const [computing, setComputing] = useState(false);
   const workerRef = useRef<Worker | null>(null);
   const jobIdRef = useRef(0);
-  const inputsRef = useRef({ collation, tokenizer, detectMoves, engineOpts });
-  const appliedRef = useRef({ collation, tokenizer, detectMoves, engineOpts });
-  inputsRef.current = { collation, tokenizer, detectMoves, engineOpts };
+  const inputsRef = useRef({ collation: viewCollation, tokenizer, detectMoves, engineOpts });
+  const appliedRef = useRef({ collation: viewCollation, tokenizer, detectMoves, engineOpts });
+  inputsRef.current = { collation: viewCollation, tokenizer, detectMoves, engineOpts };
 
   useEffect(() => {
     let w: Worker | null = null;
@@ -301,17 +321,17 @@ export default function Home() {
   // Recompute whenever the inputs change (skip when they already match the view).
   useEffect(() => {
     const ap = appliedRef.current;
-    if (collation === ap.collation && tokenizer === ap.tokenizer && detectMoves === ap.detectMoves && engineOpts === ap.engineOpts) return;
+    if (viewCollation === ap.collation && tokenizer === ap.tokenizer && detectMoves === ap.detectMoves && engineOpts === ap.engineOpts) return;
     const w = workerRef.current;
     if (!w) { // synchronous fallback (no worker support)
-      setView(deriveView(collation, tokenizer, detectMoves, extra));
+      setView(deriveView(viewCollation, tokenizer, detectMoves, extra));
       appliedRef.current = inputsRef.current;
       return;
     }
     const id = ++jobIdRef.current;
     setComputing(true);
-    w.postMessage({ id, collation, normalize: tokenizer, detectMoves, extra });
-  }, [collation, tokenizer, detectMoves, engineOpts, extra]);
+    w.postMessage({ id, collation: viewCollation, normalize: tokenizer, detectMoves, extra });
+  }, [viewCollation, tokenizer, detectMoves, engineOpts, extra]);
 
   // Cancel an in-flight recompute: kill the worker, restore a fresh one, and roll
   // the option toggles back to what produced the view on screen (ref-equal, so it
@@ -331,11 +351,11 @@ export default function Home() {
   // "inputs unchanged" skip — useful to refresh after anything stale.
   const rerunAuto = useCallback(() => {
     const w = workerRef.current;
-    if (!w) { setView(deriveView(collation, tokenizer, detectMoves, extra)); appliedRef.current = inputsRef.current; return; }
+    if (!w) { setView(deriveView(viewCollation, tokenizer, detectMoves, extra)); appliedRef.current = inputsRef.current; return; }
     const id = ++jobIdRef.current;
     setComputing(true);
-    w.postMessage({ id, collation, normalize: tokenizer, detectMoves, extra });
-  }, [collation, tokenizer, detectMoves, extra]);
+    w.postMessage({ id, collation: viewCollation, normalize: tokenizer, detectMoves, extra });
+  }, [viewCollation, tokenizer, detectMoves, extra]);
 
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
@@ -535,10 +555,12 @@ export default function Home() {
           <MenuBar menus={menus} />
 
           <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {/* Auto / Advanced (hand-braiding) — a cross-panel mode kept global. */}
-            <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Advanced: hand-edit the braid links">
-              <button onClick={() => { setAdvancedMode(false); }} className={"px-2 py-1 " + (!advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
-              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
+            {/* Auto / User / Advanced — Auto = the pristine engine braid; User =
+                your edited working close read (edits applied); Advanced = hand-link. */}
+            <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Auto: the engine's braid · User: your edited close read · Advanced: hand-link the braid">
+              <button onClick={() => { setAdvancedMode(false); setUserMode(false); }} className={"px-2 py-1 " + (!advancedMode && !userMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
+              <button onClick={() => { setAdvancedMode(false); setUserMode(true); }} title={braidEditCount ? `Your working close read — ${braidEditCount} edit${braidEditCount === 1 ? "" : "s"}` : "User mode — your edits will apply here"} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (!advancedMode && userMode ? "bg-[var(--sv-variation)] text-white" : "bg-card hover:bg-muted")}>User{braidEditCount > 0 && <span className="tabular-nums opacity-80">{braidEditCount}</span>}</button>
+              <button onClick={() => { setAdvancedMode(true); setEditSide(null); }} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (advancedMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><Spline className="w-3 h-3" /> Advanced</button>
             </div>
 
             <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
@@ -669,6 +691,7 @@ export default function Home() {
         </span>
       </footer>
 
+      <Assistant mode={collation.mode} enabled={assistantOn} onDisable={() => setAssistantOnP(false)} />
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {showEngines && (
@@ -706,7 +729,9 @@ export default function Home() {
           onEngineOpt={setEngineOpt}
           braidViz={braidViz}
           onBraidVizOpt={setBraidVizOpt}
-          braidEditCount={Object.keys(collation.variantOverrides ?? {}).length + Object.values(collation.manualLinks ?? {}).reduce((s, a) => s + a.length, 0)}
+          assistantOn={assistantOn}
+          onAssistant={setAssistantOnP}
+          braidEditCount={braidEditCount}
           annotationCount={Object.values(collation.annotations ?? {}).reduce((s, a) => s + a.length, 0)}
           onClearBraidEdits={project.clearAllBraidEdits}
           onRerunAuto={rerunAuto}
@@ -1119,6 +1144,8 @@ function SettingsModal({
   onEngineOpt,
   braidViz,
   onBraidVizOpt,
+  assistantOn,
+  onAssistant,
   braidEditCount,
   annotationCount,
   onClearBraidEdits,
@@ -1145,6 +1172,8 @@ function SettingsModal({
   onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
   braidViz: BraidViz;
   onBraidVizOpt: (key: keyof BraidViz, val: number) => void;
+  assistantOn: boolean;
+  onAssistant: (v: boolean) => void;
   braidEditCount: number;
   annotationCount: number;
   onClearBraidEdits: () => void;
@@ -1157,12 +1186,6 @@ function SettingsModal({
       title="Settings"
       subtitle="Preferences are stored in this browser"
       onClose={onClose}
-      footer={
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted-foreground flex-1"><strong className="text-foreground/80">Reset Source Variorum.</strong> Permanently delete the autosaved working project <em>and</em> every preference stored in this browser, then reload to a clean state. Export anything you want to keep first.</span>
-          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] shrink-0">Reset everything…</button>
-        </div>
-      }
     >
       <div className="flex h-[21rem]">
         {/* Left tab rail — the active tab is highlighted and runs flush to the
@@ -1218,6 +1241,9 @@ function SettingsModal({
                 <span className="w-9 text-center tabular-nums text-[12px]">{fontSize}px</span>
                 <button onClick={() => onFont(1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Larger">A+</button>
                 <button onClick={onResetFont} className="ml-1 px-2 h-7 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Reset to 13px">Reset</button>
+              </SettingsRow>
+              <SettingsRow label="Assistant" hint="The paperclip with the witty, mode-aware tips. On by default.">
+                <Toggle on={assistantOn} onClick={() => onAssistant(!assistantOn)} />
               </SettingsRow>
             </div>
           )}
@@ -1344,14 +1370,27 @@ function SettingsModal({
                   <div className="text-[11px] text-muted-foreground">annotation{annotationCount === 1 ? "" : "s"}</div>
                 </div>
               </div>
-              <div className="rounded-lg border border-destructive/40 p-3 space-y-2.5">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-destructive">Danger zone</div>
-                <SettingsRow label="Re-run auto collation" hint="Recompute the braid from the engine (your edits are kept and re-applied on top).">
-                  <button onClick={onRerunAuto} className="px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]">Re-run</button>
-                </SettingsRow>
-                <SettingsRow label="Clear all braids" hint={`Remove every braid edit and hand link (${braidEditCount}) — back to pristine auto. Undoable.`}>
-                  <button onClick={() => { if (braidEditCount === 0 || confirm(`Clear all ${braidEditCount} braid edit(s) and return to the auto-collation? (Undoable.)`)) onClearBraidEdits(); }} className="px-2.5 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] disabled:opacity-40" disabled={braidEditCount === 0}>Clear braids…</button>
-                </SettingsRow>
+              <SettingsRow label="Re-run auto collation" hint="Recompute the braid from the engine (your edits are kept and re-applied on top).">
+                <button onClick={onRerunAuto} className="px-2.5 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]">Re-run</button>
+              </SettingsRow>
+
+              {/* GitHub-style Danger Zone: a red-bordered box of destructive rows. */}
+              <div>
+                <h4 className="text-[13px] font-semibold mb-1.5">Danger zone</h4>
+                <div className="rounded-md border border-destructive/40 divide-y divide-destructive/20 overflow-hidden">
+                  {[
+                    { title: "Clear all braids", desc: `Remove every braid edit and hand link (${braidEditCount}) and return to the pristine auto-collation. Undoable.`, btn: "Clear all braids", disabled: braidEditCount === 0, onClick: () => { if (braidEditCount === 0 || confirm(`Clear all ${braidEditCount} braid edit(s) and return to the auto-collation? (Undoable.)`)) onClearBraidEdits(); } },
+                    { title: "Reset Source Variorum", desc: "Permanently delete the autosaved working project and every preference in this browser, then reload to a clean state. Export anything you want to keep first. This cannot be undone.", btn: "Reset everything", disabled: false, onClick: onResetData },
+                  ].map((row) => (
+                    <div key={row.title} className="flex items-center gap-4 px-3.5 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-semibold">{row.title}</div>
+                        <div className="text-[11px] text-muted-foreground leading-snug">{row.desc}</div>
+                      </div>
+                      <button onClick={row.onClick} disabled={row.disabled} className="shrink-0 px-3 py-1.5 rounded border border-destructive/50 text-destructive font-medium hover:bg-destructive/10 text-[12px] disabled:opacity-40 disabled:cursor-default">{row.btn}</button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

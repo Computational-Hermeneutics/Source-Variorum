@@ -120,7 +120,8 @@ export function CollationView({
   // all go through project.commit, so they undo/redo and SAVE WITH THE PROJECT
   // (the edited braid reloads in the user's edited state, not pristine Auto).
   const ovOf = (v: Variant) => collation.variantOverrides?.[variantSignature(v)] ?? {};
-  const ovBoost = (v: Variant) => project.setVariantOverride(variantSignature(v), { confirmed: !ovOf(v).confirmed, suppress: 0, suppressed: false, tentative: false });
+  // Approve 👍 → also leave selection (you've signed off; move on).
+  const ovBoost = (v: Variant) => { const approving = !ovOf(v).confirmed; project.setVariantOverride(variantSignature(v), { confirmed: approving, suppress: 0, suppressed: false, tentative: false }); if (approving) { setSelectedId(null); setCtx(null); } };
   // Graduated 👎: each click knocks 25% off; cycles 0→1→2→3→4→0.
   const ovSuppress = (v: Variant) => { const cur = suppressSteps(ovOf(v)); project.setVariantOverride(variantSignature(v), { suppress: cur >= 4 ? 0 : cur + 1, suppressed: false, confirmed: false }); };
   const ovTentative = (v: Variant) => project.setVariantOverride(variantSignature(v), { tentative: !ovOf(v).tentative, confirmed: false });
