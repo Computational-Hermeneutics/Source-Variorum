@@ -320,10 +320,10 @@ function SourceRow({ witness, project, folders, fz, indent }: { witness: Witness
                 <FileText className="w-3 h-3 text-muted-foreground" /> Open in viewer…
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.toggleReference(w.id); setMenu(false); }}>
-                <BookOpen className="w-3 h-3 text-muted-foreground" /> {isComparable(w, c.witnesses) ? "Make reference (reader only)" : "Add to Witnesses (compare)"}
+                <BookOpen className="w-3 h-3 text-muted-foreground" /> {isComparable(w, c.witnesses) ? "Remove from Witnesses" : "Add to Witnesses"}
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { setDetails(true); setMenu(false); }}>
-                <Info className="w-3 h-3 text-muted-foreground" /> Details &amp; metadata…
+                <Info className="w-3 h-3 text-muted-foreground" /> Get info…
               </button>
               <button className="w-full text-left px-3 py-1.5 hover:bg-muted flex items-center gap-2" onClick={() => { project.duplicateWitness(w.id, uid()); setMenu(false); }}>
                 <Copy className="w-3 h-3 text-muted-foreground" /> Duplicate (working copy)
@@ -406,7 +406,6 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
   const [provenance, setProvenance] = useState(witness.provenance ?? "");
   const [lang, setLang] = useState(witness.lang ?? "none");
   const [language, setLanguage] = useState(witness.language ?? "");
-  const [reference, setReference] = useState(witness.reference === true || (!!witness.folder && witness.folder !== WITNESS_FOLDER));
   const [rows, setRows] = useState<{ k: string; v: string }[]>(() => Object.entries(witness.metadata ?? {}).map(([k, v]) => ({ k, v })));
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -424,10 +423,6 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
       provenance: provenance.trim() || undefined,
       lang: lang === "none" ? undefined : lang,
       language: language.trim() || undefined,
-      reference: reference || undefined,
-      // In = the Witnesses (comparable) folder; reference keeps its own folder or
-      // drops to the top level.
-      folder: reference ? (witness.folder && witness.folder !== WITNESS_FOLDER ? witness.folder : undefined) : WITNESS_FOLDER,
       metadata: Object.keys(metadata).length ? metadata : undefined,
     });
   };
@@ -443,7 +438,7 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="bg-card border border-border rounded-lg w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start gap-3 px-5 pt-4 pb-3 border-b border-border">
-          <h2 className="text-[15px] font-semibold leading-tight">Source details</h2>
+          <h2 className="text-[15px] font-semibold leading-tight truncate" title={witness.title}>{witness.title} — Info</h2>
           <button onClick={onClose} className="ml-auto p-1 rounded hover:bg-muted" title="Close"><X className="w-4 h-4" /></button>
         </div>
         <div className="px-5 py-4 space-y-2.5">
@@ -463,11 +458,6 @@ function WitnessDetailsModal({ witness, onClose, onSave }: { witness: Witness; o
             </select>
           </Field>
           <Field label="Language"><input value={language} onChange={(e) => setLanguage(e.target.value)} placeholder="natural language, e.g. en · grc · de" className={inputCls + " max-w-[10rem]"} /></Field>
-          <label className="flex items-center gap-2 text-[12px]">
-            <span className="w-20 shrink-0 text-muted-foreground">Reference</span>
-            <input type="checkbox" checked={reference} onChange={(e) => setReference(e.target.checked)} className="accent-primary" />
-            <span className="text-[11px] text-muted-foreground">reader only — not loaded into a compare panel</span>
-          </label>
           <div className="pt-1">
             <div className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Custom fields</div>
             <div className="space-y-1.5">

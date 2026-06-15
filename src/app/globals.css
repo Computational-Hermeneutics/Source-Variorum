@@ -203,3 +203,7 @@
 .sv-markdown table { border-collapse: collapse; margin: 0.6em 0; font-size: 0.95em; display: block; overflow-x: auto; }
 .sv-markdown th, .sv-markdown td { border: 1px solid var(--border); padding: 0.3em 0.6em; text-align: left; vertical-align: top; }
 .sv-markdown th { background: var(--muted); font-weight: 600; }
+
+/* Indeterminate "analysing" bar in the panel toolbar */
+@keyframes sv-load { 0% { transform: translateX(-110%); } 100% { transform: translateX(360%); } }
+.animate-sv-load { animation: sv-load 0.85s ease-in-out infinite; }

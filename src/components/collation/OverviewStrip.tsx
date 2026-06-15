@@ -37,6 +37,7 @@ export function OverviewStrip({
   colMinimap,
   colVariants,
   colHotspots,
+  mode,
 }: {
   variants: Variant[];
   baseText: string;
@@ -51,6 +52,7 @@ export function OverviewStrip({
   colMinimap: boolean;
   colVariants: boolean;
   colHotspots: boolean;
+  mode: "source" | "text";
 }) {
   const [vp, setVp] = useState({ top: 0, h: 1 });
   const [width, setWidth] = useState(34);
@@ -121,17 +123,26 @@ export function OverviewStrip({
       const line = lines[idx] ?? "";
       if (!line.trim()) continue; // blank line → an empty row
       const y = (r / ROWS) * VH;
-      // One small block per whitespace-run (a "word"), at its column position.
-      const re = /\S+/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(line))) {
-        const x = m.index / maxLen;
-        if (x >= 0.99) break;
-        blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen), line: idx + 1 });
+      if (mode === "text") {
+        // Prose: one solid block per line (its length), so a paragraph reads as a
+        // block — a simple summary of the panel rather than word-by-word noise.
+        const indent = Math.min(0.4, (line.length - line.trimStart().length) / 60);
+        const w = Math.min(0.99 - indent, line.trim().length / maxLen);
+        blocks.push({ y, x: indent, w, line: idx + 1 });
+      } else {
+        // Code: one block per whitespace-run (a "word"), so indentation/structure
+        // shows in the shape.
+        const re = /\S+/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(line))) {
+          const x = m.index / maxLen;
+          if (x >= 0.99) break;
+          blocks.push({ y, x, w: Math.min(0.99 - x, m[0].length / maxLen), line: idx + 1 });
+        }
       }
     }
     return { blocks, h: barH };
-  }, [colMinimap, baseText]);
+  }, [colMinimap, baseText, mode]);
 
   // ----- Variant map: bucketed, bar length ∝ change density -----
   const NB = 220;

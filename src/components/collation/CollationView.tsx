@@ -325,6 +325,7 @@ export function CollationView({
           colMinimap={stripCols.minimap}
           colVariants={stripCols.variants}
           colHotspots={stripCols.hotspots}
+          mode={mode}
         />
       )}
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
@@ -923,6 +924,14 @@ function WitnessHeader({
   const [copied, setCopied] = useState(false);
   const [confirmRevert, setConfirmRevert] = useState(false);
   const edited = witness.original !== undefined && witness.text !== witness.original;
+  // Brief "analysing" indicator while a newly-selected witness re-collates and
+  // the braid/strip recompute (those run in effects after this render).
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setBusy(true);
+    const t = setTimeout(() => setBusy(false), 550);
+    return () => clearTimeout(t);
+  }, [witness.id]);
   const copy = () => {
     navigator.clipboard?.writeText(witness.text).then(() => {
       setCopied(true);
@@ -930,7 +939,12 @@ function WitnessHeader({
     }).catch(() => {});
   };
   return (
-    <div className="border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10 px-1.5 py-1 flex items-center gap-1 min-w-0">
+    <div className="relative overflow-hidden border-b border-border bg-card/70 backdrop-blur sticky top-0 z-10 px-1.5 py-1 flex items-center gap-1 min-w-0">
+      {busy && (
+        <div className="absolute left-0 bottom-0 h-[2px] w-full overflow-hidden" title="Analysing…">
+          <div className="h-full w-2/5 rounded-full animate-sv-load" style={{ background: "var(--primary)" }} />
+        </div>
+      )}
       {/* Single row: witness selector + per-panel toolbar. */}
       <select
         value={witness.id}
