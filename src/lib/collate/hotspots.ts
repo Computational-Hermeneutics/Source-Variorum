@@ -11,6 +11,7 @@
 
 import { collate } from "./collate";
 import type { Collation } from "@/types/collation";
+import { comparableWitnesses } from "@/types/collation";
 import type { NormalizeOptions } from "./similarity";
 
 export interface Hotspots {
@@ -26,7 +27,9 @@ export function computeHotspots(c: Collation, normalize: NormalizeOptions): Hots
   const baseLength = base?.text.length ?? 0;
   const freq = new Float64Array(baseLength);
   if (!base) return { freq, others: 0, baseLength };
-  const others = c.witnesses.filter((w) => w.id !== base.id);
+  // All analysis works on the Witnesses (comparable) set; reference sources are
+  // not part of the comparison and would otherwise diverge everywhere.
+  const others = comparableWitnesses(c.witnesses).filter((w) => w.id !== base.id);
   for (const w of others) {
     const variants = collate(base, w, { mode: c.mode, normalize });
     for (const v of variants) {

@@ -10,6 +10,7 @@
  */
 
 import type { Collation } from "@/types/collation";
+import { comparableWitnesses } from "@/types/collation";
 import { normalize, type NormalizeOptions } from "./similarity";
 
 export interface EddyRow {
@@ -41,7 +42,9 @@ function dice(a: Map<string, number>, sizeA: number, b: Map<string, number>, siz
 }
 
 export function computeEddy(c: Collation, normOpts: NormalizeOptions): EddyRow[] {
-  const ws = c.witnesses;
+  // All analysis works on the Witnesses (comparable) set — reference sources
+  // (read-mes, supplementary docs) are not versions of the text.
+  const ws = comparableWitnesses(c.witnesses);
   if (ws.length < 2) return [];
   const profiles = ws.map((w) => {
     const bg = bigrams(normalize(w.text, normOpts));

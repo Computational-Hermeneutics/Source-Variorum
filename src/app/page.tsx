@@ -84,10 +84,31 @@ function siglumFromName(name: string): string {
   return (m?.[1] ?? stem).slice(0, 8);
 }
 
+const STARTER_README = `# New collation
+
+A **Source Variorum** project. A few things to get started:
+
+- **Witnesses** — the texts you compare live in the **Witnesses** folder. Only
+  these appear in the two panel dropdowns. Replace *Witness A* / *Witness B* with
+  your own (paste, drop a file, or load a sample), or add more.
+- **Reference** — anything *outside* the Witnesses folder (like this read-me) is
+  reference material. Click it to open it in the reader; it never loads into a
+  compare panel.
+- **Compare** — pick any two witnesses for the left and right panels; the
+  **braid** between them shows matches, substitutions, additions, deletions, and
+  moved passages.
+- **Mode** — switch between **Code** and **Text** in the View menu: code is read
+  literally, line by line; prose is read smartly, sentence by sentence.
+- **Annotate** — ⌘/Ctrl-click a line to add a note; the **Analyse** menu has the
+  change overview, deep dive, and other statistics.
+
+Delete this read-me whenever you like.`;
+
 function blankCollation(mode: CollationMode): Collation {
   return makeCollation("Untitled collation", mode, [
     { id: uid(), siglum: "A", title: "Witness A", text: "", folder: WITNESS_FOLDER },
     { id: uid(), siglum: "B", title: "Witness B", text: "", folder: WITNESS_FOLDER },
+    { id: uid(), siglum: "ℹ", title: "Read me", reference: true, text: STARTER_README, original: STARTER_README },
   ]);
 }
 
@@ -123,6 +144,7 @@ export default function Home() {
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
   const [showApparatus, setShowApparatus] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   // The overview strip can show any combination of three columns (or none).
   const [stripCols, setStripCols] = useState({ minimap: true, variants: true, hotspots: false });
   const setStripCol = (k: "minimap" | "variants" | "hotspots", v: boolean) =>
@@ -340,8 +362,6 @@ export default function Home() {
         { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
         { kind: "separator" },
         { kind: "action", label: "Annotations & apparatus…", onClick: () => setShowApparatus(true) },
-        { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
-        { kind: "action", label: "Deep-dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
         { kind: "header", label: "Text size" },
         { kind: "action", label: "Larger", shortcut: "A+", onClick: () => setFont(1) },
@@ -358,6 +378,15 @@ export default function Home() {
         })),
         { kind: "separator" },
         { kind: "checkbox", label: "Dark mode", checked: isDark, onToggle: () => setIsDark((v) => !v) },
+      ],
+    },
+    {
+      label: "Analyse",
+      entries: [
+        { kind: "action", label: "Change overview…", onClick: () => setShowOverview(true) },
+        { kind: "action", label: "Deep dive…", onClick: () => setShowDeepDive(true) },
+        { kind: "separator" },
+        { kind: "action", label: "Witness statistics…", onClick: () => setShowStats(true) },
       ],
     },
     {
@@ -449,6 +478,8 @@ export default function Home() {
             onCloseOverview={() => setShowOverview(false)}
             showApparatus={showApparatus}
             onCloseApparatus={() => setShowApparatus(false)}
+            showStats={showStats}
+            onCloseStats={() => setShowStats(false)}
             hotspots={hotspots}
             eddy={eddy}
             baseId={collation.leftId}

@@ -54,6 +54,8 @@ export function CollationView({
   onCloseOverview,
   showApparatus,
   onCloseApparatus,
+  showStats,
+  onCloseStats,
   hotspots,
   eddy,
   baseId,
@@ -83,6 +85,8 @@ export function CollationView({
   onCloseOverview: () => void;
   showApparatus: boolean;
   onCloseApparatus: () => void;
+  showStats: boolean;
+  onCloseStats: () => void;
   hotspots: Hotspots | null;
   eddy: EddyRow[];
   baseId: string;
@@ -457,11 +461,6 @@ export function CollationView({
               <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Hide braid analysis (ribbons + tints) and collapse the panel" : "Show braid analysis and open the panel"} className={"p-0.5 rounded border shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" : "bg-card/90 border-border text-muted-foreground hover:bg-muted")}>
                 <Spline className="w-3 h-3" />
               </button>
-              {selectedId && (
-                <button onClick={(e) => { e.stopPropagation(); onSelect(null); }} title="A locus is selected — click to clear (or click empty space)" className="p-0.5 rounded border shadow-sm bg-card/90 hover:bg-muted" style={{ color: "var(--sv-variation)", borderColor: "var(--sv-variation)" }}>
-                  <XCircle className="w-3 h-3" />
-                </button>
-              )}
               <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
                 {([
                   ["one", <Lock className="w-3 h-3" key="l" />, "Lock 1:1 — both panels start at line 1"],
@@ -483,6 +482,15 @@ export function CollationView({
               </button>
               <button onClick={(e) => { e.stopPropagation(); setShowDiff(true); }} title="Standard diff — unified +/− line view of the two witnesses" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
                 <DiffIcon className="w-3 h-3" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onSelect(null); }}
+                disabled={!selectedId}
+                title={selectedId ? "Clear the selected locus (or click empty space)" : "No locus selected"}
+                className={"p-0.5 rounded border shadow-sm " + (selectedId ? "bg-card/90 hover:bg-muted" : "bg-card/60 border-border opacity-40 cursor-default")}
+                style={selectedId ? { color: "var(--sv-variation)", borderColor: "var(--sv-variation)" } : undefined}
+              >
+                <XCircle className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -574,6 +582,8 @@ export function CollationView({
       {showDiff && <DiffModal witnessA={witnessA} witnessB={witnessB} mode={mode} lang={langA} isDark={isDark} onClose={() => setShowDiff(false)} />}
 
       <DeepDivePanel metrics={metrics} open={showDeepDive} onToggle={onToggleDeepDive} witnessA={witnessA} witnessB={witnessB} />
+
+      {showStats && <WitnessStatsModal witnesses={comparableWitnesses(collation.witnesses)} mode={mode} onClose={onCloseStats} />}
 
       {pendingAnn && (
         <AnnotationPopover
@@ -1024,12 +1034,13 @@ function PanelToolbar({
   onRevert?: () => void;
   project: Project;
 }) {
-  const Tb = ({ on, onClick, title, children }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode }) => (
+  const Tb = ({ on, onClick, title, children, disabled }: { on?: boolean; onClick: () => void; title: string; children: React.ReactNode; disabled?: boolean }) => (
     <button
       onClick={onClick}
       title={title}
       aria-pressed={on}
-      className={"inline-flex items-center justify-center w-6 h-6 rounded transition-colors " + (on ? "bg-primary text-primary-foreground" : "text-foreground/75 hover:bg-muted hover:text-foreground")}
+      disabled={disabled}
+      className={"inline-flex items-center justify-center w-6 h-6 rounded transition-colors " + (disabled ? "text-foreground/25 cursor-default" : on ? "bg-primary text-primary-foreground" : "text-foreground/75 hover:bg-muted hover:text-foreground")}
     >
       {children}
     </button>
@@ -1062,8 +1073,8 @@ function PanelToolbar({
       <Tb on={copied} onClick={onCopy} title={copied ? "Copied" : "Copy this witness text"}>{copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}</Tb>
       <Tb on={focused} onClick={onToggleFocus} title={focused ? "Restore both panels" : "Expand this panel"}>{focused ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}</Tb>
       <Sep />
-      <Tb onClick={project.undo} title="Undo"><Undo2 className="w-3 h-3" /></Tb>
-      <Tb onClick={project.redo} title="Redo"><Redo2 className="w-3 h-3" /></Tb>
+      <Tb onClick={project.undo} disabled={!project.canUndo} title="Undo"><Undo2 className="w-3 h-3" /></Tb>
+      <Tb onClick={project.redo} disabled={!project.canRedo} title="Redo"><Redo2 className="w-3 h-3" /></Tb>
       {edited && (
         <button onClick={onRevert} title="Revert this witness to its original text" className="inline-flex items-center justify-center w-6 h-6 rounded transition-colors text-amber-600 dark:text-amber-400 hover:bg-muted">
           <RotateCcw className="w-3 h-3" />
@@ -1246,29 +1257,95 @@ function DeepDivePanel({
   witnessA: Witness;
   witnessB: Witness;
 }) {
-  const stat = (label: string, value: string) => (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+  const stat = (label: string, value: string, hint: string) => (
+    <div className="flex flex-col gap-0.5 cursor-help" title={hint}>
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground border-b border-dotted border-muted-foreground/40 w-max">{label}</span>
       <span className="text-[14px] font-medium tabular-nums">{value}</span>
     </div>
   );
   if (!open) return null;
   return (
-    <ModalCard title="Deep dive" subtitle="Quantitative summary of the collation" onClose={onToggle}>
-      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
-        {stat("Verbatim", `${metrics.verbatimPercent.toFixed(1)}%`)}
-        {stat("Moved blocks", String(metrics.movedBlocks))}
-        {stat("Moved length", `${metrics.movedLength} ch`)}
-        {stat("Longest move", `${metrics.longestMove} ch`)}
-        {stat("Jaccard", metrics.jaccard.toFixed(3))}
-        {stat("Dice", metrics.dice.toFixed(3))}
-        {stat("Cosine", metrics.cosine.toFixed(3))}
-        {stat("Substitutions", String(metrics.counts.substitution))}
-        {stat("Variants", String(metrics.counts.variant))}
-        {stat("Additions", String(metrics.counts.addition))}
-        {stat("Deletions", String(metrics.counts.deletion))}
-        {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`)}
+    <ModalCard title="Deep dive" subtitle="Quantitative summary of the open pair — hover any figure for what it means" onClose={onToggle}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))" }}>
+        {stat("Verbatim", `${metrics.verbatimPercent.toFixed(1)}%`, "Share of the base text that is matched verbatim (after the tokenizer's normalisation) — how much of the two readings is identical.")}
+        {stat("Moved blocks", String(metrics.movedBlocks), "Number of passages that appear in both witnesses but in a different position — transpositions, drawn as crossing ribbons.")}
+        {stat("Moved length", `${metrics.movedLength} ch`, "Total characters of base text involved in transpositions (moved passages).")}
+        {stat("Longest move", `${metrics.longestMove} ch`, "Length, in characters, of the single largest moved (transposed) passage.")}
+        {stat("Jaccard", metrics.jaccard.toFixed(3), "Jaccard similarity over shared word/character sets: |A∩B| / |A∪B|. 0 = nothing in common, 1 = identical sets. Ignores order and frequency.")}
+        {stat("Dice", metrics.dice.toFixed(3), "Sørensen–Dice similarity: 2|A∩B| / (|A|+|B|). Like Jaccard but weights the overlap more; 0–1, higher = more alike. This is the engine's core measure.")}
+        {stat("Cosine", metrics.cosine.toFixed(3), "Cosine similarity of the two word-frequency vectors: the angle between them. 1 = same proportions of words, 0 = orthogonal. Sensitive to frequency, not order.")}
+        {stat("Substitutions", String(metrics.counts.substitution), "Loci where both witnesses have text at the same place but the reading differs (a genuinely different reading).")}
+        {stat("Variants", String(metrics.counts.variant), "Near-identical loci (above the variant threshold) — a small, fuzzy difference rather than a full substitution.")}
+        {stat("Additions", String(metrics.counts.addition), "Passages present in the right (B) witness but absent from the base — text added.")}
+        {stat("Deletions", String(metrics.counts.deletion), "Passages present in the base but absent from the right (B) witness — text omitted.")}
+        {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`, "Raw character length of each witness, base (A) → right (B). A quick sense of how much each side carries.")}
       </div>
+    </ModalCard>
+  );
+}
+
+type WStat = { id: string; siglum: string; title: string; chars: number; words: number; lines: number; vocab: number; ttr: number; avgWord: number; hapax: number };
+
+/** Per-witness descriptive statistics across the whole comparable set — a
+ *  comparative profile of length and lexical richness, independent of any pair. */
+function WitnessStatsModal({ witnesses, mode, onClose }: { witnesses: Witness[]; mode: CollationMode; onClose: () => void }) {
+  const rows = useMemo<WStat[]>(() => witnesses.map((w) => {
+    const text = w.text;
+    const words = text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? [];
+    const freq = new Map<string, number>();
+    for (const t of words) freq.set(t, (freq.get(t) ?? 0) + 1);
+    const vocab = freq.size;
+    let hapax = 0; freq.forEach((n) => { if (n === 1) hapax++; });
+    const wordChars = words.reduce((s, t) => s + t.length, 0);
+    return {
+      id: w.id, siglum: w.siglum, title: w.title,
+      chars: text.length,
+      words: words.length,
+      lines: text.split("\n").length,
+      vocab,
+      ttr: words.length ? vocab / words.length : 0,
+      avgWord: words.length ? wordChars / words.length : 0,
+      hapax,
+    };
+  }), [witnesses]);
+
+  const cols: { key: keyof WStat; label: string; hint: string; fmt: (v: number) => string }[] = [
+    { key: "chars", label: "Chars", hint: "Total characters.", fmt: (v) => v.toLocaleString() },
+    { key: "words", label: "Words", hint: "Total word tokens (letters/digits runs).", fmt: (v) => v.toLocaleString() },
+    { key: "lines", label: "Lines", hint: "Newline-delimited lines.", fmt: (v) => v.toLocaleString() },
+    { key: "vocab", label: "Vocabulary", hint: "Distinct word types (unique words).", fmt: (v) => v.toLocaleString() },
+    { key: "ttr", label: "Type/token", hint: "Type–token ratio = vocabulary ÷ words. Higher = lexically more varied (but falls as a text gets longer, so compare like with like).", fmt: (v) => v.toFixed(3) },
+    { key: "hapax", label: "Hapax", hint: "Hapax legomena — words that occur exactly once. A rough index of lexical singularity.", fmt: (v) => v.toLocaleString() },
+    { key: "avgWord", label: "Avg word", hint: "Mean word length in characters.", fmt: (v) => v.toFixed(2) },
+  ];
+  // Highlight the max in each column to make outliers pop.
+  const maxOf = (k: keyof WStat) => Math.max(...rows.map((r) => r[k] as number));
+
+  return (
+    <ModalCard title="Witness statistics" subtitle={`Descriptive profile of all ${rows.length} comparable witnesses · ${mode} mode · hover a column for what it means`} onClose={onClose}>
+      <div className="-mx-1 overflow-x-auto">
+        <table className="w-full border-collapse text-[12px]">
+          <thead>
+            <tr className="border-b border-border">
+              <th className="text-left font-semibold px-2 py-1.5">Witness</th>
+              {cols.map((c) => <th key={c.key} title={c.hint} className="text-right font-semibold px-2 py-1.5 cursor-help"><span className="border-b border-dotted border-muted-foreground/40">{c.label}</span></th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-border/50 hover:bg-muted/40">
+                <td className="px-2 py-1.5"><span className="font-mono text-[11px] text-muted-foreground mr-1.5">{r.siglum}</span>{r.title}</td>
+                {cols.map((c) => {
+                  const v = r[c.key] as number;
+                  const top = v === maxOf(c.key) && rows.length > 1;
+                  return <td key={c.key} className={"text-right px-2 py-1.5 tabular-nums " + (top ? "font-semibold text-foreground" : "text-foreground/80")}>{c.fmt(v)}</td>;
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[11px] text-muted-foreground mt-3">Bold = the highest value in each column. Type–token ratio and hapax counts are length-sensitive: a longer witness will usually show a lower type–token ratio even if it is no less varied.</p>
     </ModalCard>
   );
 }
