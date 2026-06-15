@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Copy, Download, Check } from "lucide-react";
 import type { CollationMode, Witness } from "@/types/collation";
 import type { NormalizeOptions } from "@/lib/collate/similarity";
 import { computeDotplot } from "@/lib/collate/dotplot";
+import { canvasToBlob, copyImageBlob, downloadBlob } from "@/lib/export/viz";
 
 /**
  * Dotplot of witness A (x, top) against witness B (y, left): a point wherever a
@@ -13,6 +15,7 @@ import { computeDotplot } from "@/lib/collate/dotplot";
  */
 export function Dotplot({ a, b, mode, normOpts, expanded = false }: { a: Witness; b: Witness; mode: CollationMode; normOpts: NormalizeOptions; expanded?: boolean }) {
   const [hideCommon, setHideCommon] = useState(true);
+  const [copied, setCopied] = useState(false);
   const data = useMemo(() => computeDotplot(a, b, mode, normOpts, hideCommon), [a, b, mode, normOpts, hideCommon]);
   const ref = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState(540);
@@ -56,6 +59,10 @@ export function Dotplot({ a, b, mode, normOpts, expanded = false }: { a: Witness
     }
   }, [data, size]);
 
+  const name = `dotplot-${a.siglum}×${b.siglum}`.replace(/[^\w×.-]+/g, "_");
+  const copy = async () => { const blob = await canvasToBlob(ref.current!); if (blob && await copyImageBlob(blob)) { setCopied(true); setTimeout(() => setCopied(false), 1400); } };
+  const download = async () => { const blob = await canvasToBlob(ref.current!); if (blob) downloadBlob(blob, `${name}.png`); };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -63,10 +70,14 @@ export function Dotplot({ a, b, mode, normOpts, expanded = false }: { a: Witness
           <span className="font-medium text-foreground">{data.count.toLocaleString()}</span> matching {data.unitLabel}
           {data.truncated && " (capped)"} · A = <span className="font-medium">{a.siglum}</span> ({data.nA} {data.unitLabel}) across the top, B = <span className="font-medium">{b.siglum}</span> ({data.nB}) down the side.
         </div>
-        <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none">
-          <input type="checkbox" checked={hideCommon} onChange={(e) => setHideCommon(e.target.checked)} className="accent-primary" />
-          Hide common {data.unitLabel}
-        </label>
+        <div className="flex items-center gap-2">
+          <button onClick={copy} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Copy as image">{copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}{copied ? "Copied" : "Copy"}</button>
+          <button onClick={download} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Download PNG"><Download className="w-3.5 h-3.5" />PNG</button>
+          <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground cursor-pointer select-none ml-1">
+            <input type="checkbox" checked={hideCommon} onChange={(e) => setHideCommon(e.target.checked)} className="accent-primary" />
+            Hide common {data.unitLabel}
+          </label>
+        </div>
       </div>
       <div className="flex gap-1.5">
         <div className="flex items-center"><span className="text-[10px] text-muted-foreground [writing-mode:vertical-lr] rotate-180" title={b.title}>B · {b.siglum} →</span></div>

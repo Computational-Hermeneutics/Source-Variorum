@@ -1,7 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Copy, Download, Check } from "lucide-react";
 import type { Stemma, StemmaNode } from "@/lib/collate/stemma";
+import { canvasToBlob, copyImageBlob, downloadBlob, serializeSvg, svgToCanvas } from "@/lib/export/viz";
 
 /**
  * Renders a stemma as a horizontal UPGMA dendrogram (root left, witnesses right;
@@ -10,6 +12,24 @@ import type { Stemma, StemmaNode } from "@/lib/collate/stemma";
  */
 export function StemmaTree({ stemma }: { stemma: Stemma }) {
   const { root, labels, matrix } = stemma;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyPng = async () => {
+    if (!svgRef.current) return;
+    const cv = await svgToCanvas(svgRef.current);
+    const blob = await canvasToBlob(cv);
+    if (blob && await copyImageBlob(blob)) { setCopied(true); setTimeout(() => setCopied(false), 1400); }
+  };
+  const downloadPng = async () => {
+    if (!svgRef.current) return;
+    const blob = await canvasToBlob(await svgToCanvas(svgRef.current));
+    if (blob) downloadBlob(blob, "stemma.png");
+  };
+  const downloadSvg = () => {
+    if (!svgRef.current) return;
+    downloadBlob(new Blob([serializeSvg(svgRef.current)], { type: "image/svg+xml" }), "stemma.svg");
+  };
 
   const layout = useMemo(() => {
     if (!root) return null;
@@ -57,8 +77,13 @@ export function StemmaTree({ stemma }: { stemma: Stemma }) {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={copyPng} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Copy the tree as an image">{copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}{copied ? "Copied" : "Copy"}</button>
+        <button onClick={downloadPng} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Download PNG"><Download className="w-3.5 h-3.5" />PNG</button>
+        <button onClick={downloadSvg} className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Download SVG (vector)"><Download className="w-3.5 h-3.5" />SVG</button>
+      </div>
       <div className="overflow-x-auto">
-        <svg width={layout.width} height={layout.height} className="text-foreground">
+        <svg ref={svgRef} width={layout.width} height={layout.height} className="text-foreground">
           {layout.segs.map((s, i) => (
             <line key={i} x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke="hsl(var(--primary))" strokeWidth={1.5} strokeLinecap="round" />
           ))}
