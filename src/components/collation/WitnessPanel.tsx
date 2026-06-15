@@ -69,11 +69,11 @@ function tintStyle(type: Variant["type"], band: Band, selected: boolean, hovered
   // solid wash; a MEDIUM one is a fine dot screen; a LOW one a coarser, airier dot
   // screen — so an uncertain reading literally looks less solid.
   if (band !== "high" && !hovered) {
-    const dot = `color-mix(in srgb, ${color} ${Math.min(60, alpha + 28)}%, transparent)`;
-    const size = band === "low" ? 4.5 : 3;
-    const r = band === "low" ? 1 : 1.1;
+    const dot = `color-mix(in srgb, ${color} ${Math.min(38, alpha + 12)}%, transparent)`;
+    const size = band === "low" ? 4.5 : 3.5;
+    const r = band === "low" ? 0.8 : 0.9;
     return {
-      backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.5}px)`,
+      backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.6}px)`,
       backgroundSize: `${size}px ${size}px`,
       opacity: anySelected ? 0.55 : 1,
     };
@@ -173,6 +173,7 @@ export function WitnessPanel({
   hoveredId,
   onSelect,
   onHover,
+  onVariantContext,
   onEditText,
   onAnnotate,
   registerAnchor,
@@ -202,6 +203,8 @@ export function WitnessPanel({
   hoveredId: string | null;
   onSelect: (id: string | null, scroll?: boolean) => void;
   onHover: (id: string | null) => void;
+  /** Right-click on a variant span → open its quick editor at the cursor. */
+  onVariantContext: (id: string, x: number, y: number) => void;
   onEditText: (text: string) => void;
   onAnnotate: (line: number) => void;
   registerAnchor: (id: string, side: Side, el: HTMLElement | null) => void;
@@ -277,10 +280,10 @@ export function WitnessPanel({
   // the changed words echo their braid's dashed/dotted confidence texture.
   const wordTint = (color: string, band: Band): CSSProperties => {
     if (band === "high") return { background: `color-mix(in srgb, ${color} 30%, transparent)` };
-    const dot = `color-mix(in srgb, ${color} 58%, transparent)`;
-    const size = band === "low" ? 4.5 : 3;
-    const r = band === "low" ? 1 : 1.1;
-    return { backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.5}px)`, backgroundSize: `${size}px ${size}px` };
+    const dot = `color-mix(in srgb, ${color} 34%, transparent)`;
+    const size = band === "low" ? 4.5 : 3.5;
+    const r = band === "low" ? 0.8 : 0.9;
+    return { backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.6}px)`, backgroundSize: `${size}px ${size}px` };
   };
   const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode =>
     tintRuns(
@@ -444,6 +447,7 @@ export function WitnessPanel({
                     data-seg-start={seg.start}
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
+                    onContextMenu={seg.vid && seg.type !== "match" ? (e) => { e.preventDefault(); e.stopPropagation(); onVariantContext(seg.vid, e.clientX, e.clientY); } : undefined}
                     onClick={(e) => {
                       // Don't let the click reach the background.
                       e.stopPropagation();

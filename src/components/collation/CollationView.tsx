@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw, ThumbsUp, Trash2 } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw, ThumbsUp, ThumbsDown, Trash2 } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
@@ -115,15 +115,27 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  // The selected braid + its editorial-override handlers (re-type / delete /
-  // confirm). Keyed by reading-pair signature so the override survives recompute;
-  // all go through project.commit, so they undo/redo and save with the project.
+  // Editorial-override handlers (confirm 👍 / suppress 👎 / re-type / delete) for
+  // ANY braid. Keyed by reading-pair signature so the override survives recompute;
+  // all go through project.commit, so they undo/redo and SAVE WITH THE PROJECT
+  // (the edited braid reloads in the user's edited state, not pristine Auto).
+  const ovOf = (v: Variant) => collation.variantOverrides?.[variantSignature(v)] ?? {};
+  const ovBoost = (v: Variant) => { const s = variantSignature(v); project.setVariantOverride(s, { confirmed: !ovOf(v).confirmed, suppressed: false }); };
+  const ovSuppress = (v: Variant) => { const s = variantSignature(v); project.setVariantOverride(s, { suppressed: !ovOf(v).suppressed, confirmed: false }); };
+  const ovSwap = (v: Variant, t: VariantType) => project.setVariantOverride(variantSignature(v), { type: t });
+  const ovDelete = (v: Variant) => { project.setVariantOverride(variantSignature(v), { deleted: true }); setSelectedId((id) => (id === v.id ? null : id)); setCtx(null); };
   const selectedVariant = useMemo(() => variants.find((v) => v.id === selectedId) ?? null, [variants, selectedId]);
-  const selectedSig = selectedVariant ? variantSignature(selectedVariant) : null;
-  const selectedConfirmed = !!(selectedSig && collation.variantOverrides?.[selectedSig]?.confirmed);
-  const swapVariantType = (t: VariantType) => { if (selectedSig) project.setVariantOverride(selectedSig, { type: t }); };
-  const deleteSelectedBraid = () => { if (selectedSig) { project.setVariantOverride(selectedSig, { deleted: true }); setSelectedId(null); } };
-  const toggleConfirmBraid = () => { if (selectedSig) project.setVariantOverride(selectedSig, { confirmed: !selectedConfirmed }); };
+  // Right-click quick editor (context menu at the cursor).
+  const [ctx, setCtx] = useState<{ x: number; y: number; vid: string } | null>(null);
+  const ctxVariant = ctx ? variants.find((v) => v.id === ctx.vid) ?? null : null;
+  useEffect(() => {
+    if (!ctx) return;
+    const close = () => setCtx(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setCtx(null); };
+    const t = setTimeout(() => { window.addEventListener("click", close); window.addEventListener("scroll", close, true); }, 0);
+    window.addEventListener("keydown", onKey);
+    return () => { clearTimeout(t); window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("keydown", onKey); };
+  }, [ctx]);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
@@ -173,6 +185,32 @@ export function CollationView({
   const panelBRef = useRef<HTMLDivElement>(null);
   const syncingRef = useRef(false);
   const gutterRef = useRef<HTMLDivElement>(null);
+
+  // Place the selected-braid editor at the vertical position of the braid being
+  // edited (mid-point of its two anchors), centred over the gutter, and keep it
+  // there as the panels scroll — so the panel sits ON the braid, not at the foot.
+  const [barTop, setBarTop] = useState<number | null>(null);
+  const placeBar = useCallback(() => {
+    const wrap = wrapperRef.current;
+    if (!selectedId || !wrap) { setBarTop(null); return; }
+    const wr = wrap.getBoundingClientRect();
+    const ys: number[] = [];
+    for (const el of [anchorsRef.current.get(`${selectedId}:a`), anchorsRef.current.get(`${selectedId}:b`)]) {
+      if (el) { const r = el.getBoundingClientRect(); ys.push(r.top - wr.top + r.height / 2); }
+    }
+    if (!ys.length) { setBarTop(null); return; }
+    const y = ys.reduce((s, v) => s + v, 0) / ys.length;
+    setBarTop(Math.max(6, Math.min(wr.height - 46, y - 16)));
+  }, [selectedId]);
+  useLayoutEffect(() => { placeBar(); }, [placeBar, selectedVariant, variants]);
+  useEffect(() => {
+    const pa = panelARef.current, pb = panelBRef.current;
+    let raf = 0;
+    const on = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(placeBar); };
+    pa?.addEventListener("scroll", on, { passive: true });
+    pb?.addEventListener("scroll", on, { passive: true });
+    return () => { pa?.removeEventListener("scroll", on); pb?.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
+  }, [placeBar]);
 
   // Scroll lock has three modes:
   //   "one"  — both panels pinned to the same scrollTop (both start at line 1)
@@ -408,25 +446,47 @@ export function CollationView({
           clears the current selection. In focus/expand mode one panel fills the
           width and the gutter + other panel are hidden. */}
       <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid flex-1 min-h-0" style={{ gridTemplateColumns: focusSide ? "1fr" : `1fr ${braidWidth}px 1fr` }}>
-        {/* Selected-braid editor: confirm (full confidence), re-type, or delete the
-            link. All undoable and saved with the project. */}
-        {selectedVariant && !advancedMode && (
-          <div onClick={(e) => e.stopPropagation()} className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-card/95 backdrop-blur border border-border shadow-md text-[11px]">
-            <span className="inline-flex items-center gap-1 pr-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[selectedVariant.type] }} />
-              {Math.round(confidenceOf(selectedVariant) * 100)}%
-            </span>
-            <button onClick={toggleConfirmBraid} title={selectedConfirmed ? "Confirmed — full confidence (click to un-confirm)" : "Confirm — vouch this is a real correspondence (sets full confidence)"} className={"p-1 rounded border " + (selectedConfirmed ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted")}>
-              <ThumbsUp className="w-3 h-3" />
-            </button>
-            <select value={selectedVariant.type} onChange={(e) => swapVariantType(e.target.value as VariantType)} title="Swap this braid's type" className="rounded border border-border bg-card hover:bg-muted px-1 py-0.5 text-[11px]">
-              {VARIANT_TYPES.map((t) => <option key={t} value={t}>{variantLabel(t, mode)}</option>)}
-            </select>
-            <button onClick={deleteSelectedBraid} title="Delete this braid (undoable)" className="p-1 rounded border border-border bg-card hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40">
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        )}
+        {/* Selected-braid editor: boost 👍 / suppress 👎 confidence, re-type, or
+            delete. Sits ON the braid (its vertical mid-point), not at the foot.
+            All undoable and saved with the project. */}
+        {selectedVariant && !advancedMode && (() => {
+          const ov = ovOf(selectedVariant);
+          return (
+            <div onClick={(e) => e.stopPropagation()} style={{ top: barTop ?? undefined, bottom: barTop == null ? 8 : undefined }} className="absolute left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 px-2 py-1 rounded-lg bg-card/95 backdrop-blur border border-border shadow-md text-[11px]">
+              <span className="inline-flex items-center gap-1 pr-0.5">
+                <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[selectedVariant.type] }} />
+                {Math.round(confidenceOf(selectedVariant) * 100)}%
+              </span>
+              <button onClick={() => ovBoost(selectedVariant)} title={ov.confirmed ? "Confirmed — full confidence (click to undo)" : "Boost — vouch this pairing (full confidence)"} className={"p-1 rounded border " + (ov.confirmed ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted")}>
+                <ThumbsUp className="w-3 h-3" />
+              </button>
+              <button onClick={() => ovSuppress(selectedVariant)} title={ov.suppressed ? "Suppressed — low confidence (click to undo)" : "Suppress — doubt this pairing (low confidence)"} className={"p-1 rounded border " + (ov.suppressed ? "bg-destructive/80 text-white border-destructive" : "bg-card border-border hover:bg-muted")}>
+                <ThumbsDown className="w-3 h-3" />
+              </button>
+              <select value={selectedVariant.type} onChange={(e) => ovSwap(selectedVariant, e.target.value as VariantType)} title="Swap this braid's type" className="rounded border border-border bg-card hover:bg-muted px-1 py-0.5 text-[11px]">
+                {VARIANT_TYPES.map((t) => <option key={t} value={t}>{variantLabel(t, mode)}</option>)}
+              </select>
+              <button onClick={() => ovDelete(selectedVariant)} title="Delete this braid (undoable)" className="p-1 rounded border border-border bg-card hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          );
+        })()}
+        {/* Right-click quick editor at the cursor. */}
+        {ctxVariant && ctx && (() => {
+          const ov = ovOf(ctxVariant);
+          return (
+            <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 230), top: ctx.y + 4, zIndex: 60 }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-card border border-border shadow-xl text-[11px]">
+              <span className="inline-flex items-center gap-1 pr-1 font-medium">
+                <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[ctxVariant.type] }} />
+                {variantLabel(ctxVariant.type, mode)} · {Math.round(confidenceOf(ctxVariant) * 100)}%
+              </span>
+              <button onClick={() => { ovBoost(ctxVariant); setCtx(null); }} title="Boost confidence (👍)" className={"inline-flex items-center gap-1 px-1.5 py-1 rounded border " + (ov.confirmed ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted")}><ThumbsUp className="w-3 h-3" /></button>
+              <button onClick={() => { ovSuppress(ctxVariant); setCtx(null); }} title="Suppress confidence (👎)" className={"inline-flex items-center gap-1 px-1.5 py-1 rounded border " + (ov.suppressed ? "bg-destructive/80 text-white border-destructive" : "bg-card border-border hover:bg-muted")}><ThumbsDown className="w-3 h-3" /></button>
+              <button onClick={() => ovDelete(ctxVariant)} title="Delete this highlight" className="inline-flex items-center gap-1 px-1.5 py-1 rounded border border-border bg-card hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40"><Trash2 className="w-3 h-3" /></button>
+            </div>
+          );
+        })()}
         {focusSide !== "b" && (
           <div ref={panelARef} data-sv-scroll="a" onScroll={onPanelScroll("a")} className="border-r border-border min-w-0 bg-card overflow-y-auto min-h-0">
             <WitnessHeader
@@ -454,6 +514,7 @@ export function CollationView({
               onEditText={(text) => project.updateWitness(witnessA.id, { text })}
               onAnnotate={requestAnnotate(witnessA.id)}
               registerAnchor={registerAnchor}
+              onVariantContext={(vid, x, y) => setCtx({ vid, x, y })}
               advancedMode={advancedMode}
               pick={leftPick}
               onPick={onPick}
@@ -572,6 +633,7 @@ export function CollationView({
               onEditText={(text) => project.updateWitness(witnessB.id, { text })}
               onAnnotate={requestAnnotate(witnessB.id)}
               registerAnchor={registerAnchor}
+              onVariantContext={(vid, x, y) => setCtx({ vid, x, y })}
               advancedMode={advancedMode}
               pick={rightPick}
               onPick={onPick}

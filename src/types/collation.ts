@@ -118,8 +118,11 @@ export interface VariantOverride {
   type?: VariantType;
   /** Drop the braid entirely (the two readings no longer count as linked). */
   deleted?: boolean;
-  /** Editor vouches this pairing is correct ⇒ treat as full confidence. */
+  /** Editor vouches this pairing is correct ⇒ treat as full confidence (👍). */
   confirmed?: boolean;
+  /** Editor doubts this pairing ⇒ force low confidence (👎); dotted, and hidden
+   *  when below a hide-threshold. Mutually exclusive with `confirmed`. */
+  suppressed?: boolean;
 }
 
 /** Stable key for a braid: its reading pair (so an override survives recompute,

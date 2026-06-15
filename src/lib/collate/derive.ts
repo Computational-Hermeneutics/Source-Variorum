@@ -61,8 +61,12 @@ export function deriveView(
       const o = ov[variantSignature(v)];
       if (!o) return [v];
       if (o.deleted) return [];
-      if (!o.type && !o.confirmed) return [v];
-      return [{ ...v, ...(o.type ? { type: o.type } : {}), ...(o.confirmed ? { similarity: 1 } : {}) }];
+      if (!o.type && !o.confirmed && !o.suppressed) return [v];
+      return [{
+        ...v,
+        ...(o.type ? { type: o.type } : {}),
+        ...(o.confirmed ? { similarity: 1 } : o.suppressed ? { similarity: Math.min(v.similarity, 0.05) } : {}),
+      }];
     });
   }
   const apparatus = buildApparatus(variants, a, b, c);
