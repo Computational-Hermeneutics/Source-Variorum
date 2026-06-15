@@ -74,13 +74,24 @@ configures each.
   dashed / dotted** by confidence band (cut-offs user-set in Settings ▸ Braid),
   and the panel highlight echoes it as a **half-tone dot screen** for fuzzier
   loci. Hover a ribbon for its exact %.
+- **The click model on a highlight:** a **single click** selects the locus, shows
+  its braid, and **pulls the other panel in line** (the linked passage scrolls
+  into alignment); a **second click** deselects; a **double-click** selects the
+  word (or code token) natively; a **right-click** looks the word up in the
+  **dictionary** (see below).
 - A **braid editor** for curating the auto-collation (Auto mode): select a braid
-  — or right-click a highlight — for a compact editor (it sits in the margin by
-  the braid, hides while scrolling, is draggable aside) to **approve 👍** (full
-  confidence; the locus becomes an **underline**, the settled state), **doubt 👎**
-  (graduated, −25% per click), flag **tentative** (provisional, rendered grey),
-  **swap the type**, or **delete** the link. Every edit is undoable and saved
-  with the project as an editorial layer over the live auto braid.
+  for a compact editor (it sits in the margin by the braid, hides while scrolling,
+  is draggable aside) to **approve 👍** (full confidence; the locus becomes an
+  **underline**, the settled state), **doubt 👎** (graduated, −25% per click), flag
+  **tentative** (provisional, rendered grey), **swap the type**, or **delete** the
+  link. Every edit is undoable and saved with the project as an editorial layer
+  over the live auto braid.
+- A **dictionary** on right-click: in **CodeX** the token is looked up in a
+  bundled **PDP-1 MACRO instruction set** (`public/dictionaries/`, the folder
+  where further language references can be dropped); in **TextX** the word is
+  fetched from the free [Dictionary API](https://dictionaryapi.dev) (a sandboxed
+  browser cannot reach the OS dictionary, so SV queries this instead, degrading
+  gracefully offline).
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
@@ -124,8 +135,10 @@ A project holds many sources, organised in a small file organiser:
   flips you into User mode automatically, and toggling back to Auto previews the
   pristine braid without deleting your edits; **Advanced** is hand-linking.
 - An on-screen **assistant** (a paperclip with opinions) offers witty, mode-aware
-  tips and the occasional quotation — different banter for CodeX and TextX. Off
-  switch in Settings ▸ Appearance.
+  tips and the occasional quotation — different banter for CodeX and TextX.
+  Dismiss with the ✕ and he returns at a random moment; type **"clippy"** to
+  summon him, or **"hacker"** for **Hackerman**, a green-terminal h4x0r alarmed by
+  what he found inside the collation engine. Off switch in Settings ▸ Appearance.
 - **Storage / "user mode":** the collation is never stored as a frozen braid.
   Source witnesses plus an **editorial layer** (braid overrides + hand links,
   keyed by the reading pair) live on the project; on load the auto braid is

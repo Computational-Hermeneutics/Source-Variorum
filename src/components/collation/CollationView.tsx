@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw, ThumbsUp, ThumbsDown, Trash2, Flag } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw, ThumbsUp, ThumbsDown, Trash2, Flag, BookOpen } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
 import { VARIANT_TYPE_COLORS, VARIANT_TYPES, variantLabel, comparableWitnesses, confidenceOf, variantSignature, suppressSteps } from "@/types/collation";
 import { LANGS, highlightRanges, tokenStyle } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
+import { lookup, type Definition } from "@/lib/dictionary";
 import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
@@ -121,12 +122,12 @@ export function CollationView({
   // (the edited braid reloads in the user's edited state, not pristine Auto).
   const ovOf = (v: Variant) => collation.variantOverrides?.[variantSignature(v)] ?? {};
   // Approve 👍 → also leave selection (you've signed off; move on).
-  const ovBoost = (v: Variant) => { const approving = !ovOf(v).confirmed; project.setVariantOverride(variantSignature(v), { confirmed: approving, suppress: 0, suppressed: false, tentative: false }); if (approving) { setSelectedId(null); setCtx(null); } };
+  const ovBoost = (v: Variant) => { const approving = !ovOf(v).confirmed; project.setVariantOverride(variantSignature(v), { confirmed: approving, suppress: 0, suppressed: false, tentative: false }); if (approving) { setSelectedId(null); } };
   // Graduated 👎: each click knocks 25% off; cycles 0→1→2→3→4→0.
   const ovSuppress = (v: Variant) => { const cur = suppressSteps(ovOf(v)); project.setVariantOverride(variantSignature(v), { suppress: cur >= 4 ? 0 : cur + 1, suppressed: false, confirmed: false }); };
   const ovTentative = (v: Variant) => project.setVariantOverride(variantSignature(v), { tentative: !ovOf(v).tentative, confirmed: false });
   const ovSwap = (v: Variant, t: VariantType) => project.setVariantOverride(variantSignature(v), { type: t });
-  const ovDelete = (v: Variant) => { project.setVariantOverride(variantSignature(v), { deleted: true }); setSelectedId((id) => (id === v.id ? null : id)); setCtx(null); };
+  const ovDelete = (v: Variant) => { project.setVariantOverride(variantSignature(v), { deleted: true }); setSelectedId((id) => (id === v.id ? null : id)); };
   // Shared editor controls (used by the on-braid bar and the right-click menu):
   // approve 👍 / graduated doubt 👎 (a two-tone fill shows how far) / tentative
   // flag / swap type / delete.
@@ -145,17 +146,24 @@ export function CollationView({
     );
   };
   const selectedVariant = useMemo(() => variants.find((v) => v.id === selectedId) ?? null, [variants, selectedId]);
-  // Right-click quick editor (context menu at the cursor).
-  const [ctx, setCtx] = useState<{ x: number; y: number; vid: string } | null>(null);
-  const ctxVariant = ctx ? variants.find((v) => v.id === ctx.vid) ?? null : null;
+  // Right-click → dictionary popup at the cursor. CodeX looks the token up in the
+  // bundled PDP-1 instruction set; TextX queries the free Dictionary API (the OS
+  // dictionary isn't reachable from a sandboxed browser).
+  const [dict, setDict] = useState<{ x: number; y: number; def: Definition; loading: boolean } | null>(null);
+  const dictReq = useRef(0);
+  const doLookup = useCallback((word: string, x: number, y: number) => {
+    const id = ++dictReq.current;
+    setDict({ x, y, def: { word, source: "", text: null }, loading: true });
+    lookup(word, mode).then((def) => { if (dictReq.current === id) setDict((d) => (d ? { ...d, def, loading: false } : d)); });
+  }, [mode]);
   useEffect(() => {
-    if (!ctx) return;
-    const close = () => setCtx(null);
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setCtx(null); };
+    if (!dict) return;
+    const close = () => setDict(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDict(null); };
     const t = setTimeout(() => { window.addEventListener("click", close); window.addEventListener("scroll", close, true); }, 0);
     window.addEventListener("keydown", onKey);
     return () => { clearTimeout(t); window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("keydown", onKey); };
-  }, [ctx]);
+  }, [dict]);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
@@ -505,14 +513,19 @@ export function CollationView({
             {editorButtons(selectedVariant)}
           </div>
         )}
-        {/* Right-click quick editor at the cursor. */}
-        {ctxVariant && ctx && (
-          <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 260), top: ctx.y + 4, zIndex: 60 }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-card border border-border shadow-xl text-[11px]">
-            <span className="inline-flex items-center gap-1 pr-1 font-medium select-none">
-              <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[ctxVariant.type] }} />
-              {variantLabel(ctxVariant.type, mode)} · {Math.round(confidenceOf(ctxVariant) * 100)}%
-            </span>
-            {editorButtons(ctxVariant, () => setCtx(null))}
+        {/* Right-click → dictionary definition at the cursor. */}
+        {dict && (
+          <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left: Math.min(dict.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 300), top: dict.y + 6, zIndex: 60, width: 280 }} className="rounded-lg bg-card border border-border shadow-xl text-[12px] overflow-hidden">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-border bg-muted/40">
+              <BookOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+              <span className="font-medium truncate">{dict.def.word}</span>
+            </div>
+            <div className="px-2.5 py-2 leading-snug">
+              {dict.loading ? <span className="text-muted-foreground italic">Looking up…</span>
+                : dict.def.text ? <span className="text-foreground/90">{dict.def.text}</span>
+                : <span className="text-muted-foreground italic">{mode === "source" ? "Not in the PDP-1 instruction set." : "No definition found."}</span>}
+            </div>
+            {(!dict.loading && dict.def.source) && <div className="px-2.5 pb-1.5 text-[10px] text-muted-foreground">{dict.def.source}</div>}
           </div>
         )}
         {focusSide !== "b" && (
@@ -542,7 +555,7 @@ export function CollationView({
               onEditText={(text) => project.updateWitness(witnessA.id, { text })}
               onAnnotate={requestAnnotate(witnessA.id)}
               registerAnchor={registerAnchor}
-              onVariantContext={(vid, x, y) => setCtx({ vid, x, y })}
+              onLookup={doLookup}
               advancedMode={advancedMode}
               pick={leftPick}
               onPick={onPick}
@@ -661,7 +674,7 @@ export function CollationView({
               onEditText={(text) => project.updateWitness(witnessB.id, { text })}
               onAnnotate={requestAnnotate(witnessB.id)}
               registerAnchor={registerAnchor}
-              onVariantContext={(vid, x, y) => setCtx({ vid, x, y })}
+              onLookup={doLookup}
               advancedMode={advancedMode}
               pick={rightPick}
               onPick={onPick}

@@ -6,6 +6,7 @@ import { StickyNote } from "lucide-react";
 import type { CollationMode, Variant, Witness, WordRun } from "@/types/collation";
 import { VARIANT_TYPE_COLORS, confidenceOf } from "@/types/collation";
 import { highlightRanges, tokenStyle, type HToken } from "@/lib/highlight";
+import { wordAtPoint } from "@/lib/dictionary";
 
 type Side = "a" | "b";
 
@@ -186,7 +187,7 @@ export function WitnessPanel({
   hoveredId,
   onSelect,
   onHover,
-  onVariantContext,
+  onLookup,
   onEditText,
   onAnnotate,
   registerAnchor,
@@ -216,8 +217,8 @@ export function WitnessPanel({
   hoveredId: string | null;
   onSelect: (id: string | null, scroll?: boolean) => void;
   onHover: (id: string | null) => void;
-  /** Right-click on a variant span → open its quick editor at the cursor. */
-  onVariantContext: (id: string, x: number, y: number) => void;
+  /** Right-click → look up the word under the cursor (dictionary). */
+  onLookup: (word: string, x: number, y: number) => void;
   onEditText: (text: string) => void;
   onAnnotate: (line: number) => void;
   registerAnchor: (id: string, side: Side, el: HTMLElement | null) => void;
@@ -462,10 +463,13 @@ export function WitnessPanel({
                     data-seg-start={seg.start}
                     onMouseEnter={() => onHover(seg.vid)}
                     onMouseLeave={() => onHover(null)}
-                    onContextMenu={seg.vid && seg.type !== "match" ? (e) => { e.preventDefault(); e.stopPropagation(); onVariantContext(seg.vid, e.clientX, e.clientY); } : undefined}
+                    onContextMenu={(e) => { const w = wordAtPoint(e.clientX, e.clientY); if (w) { e.preventDefault(); e.stopPropagation(); onLookup(w, e.clientX, e.clientY); } }}
                     onClick={(e) => {
                       // Don't let the click reach the background.
                       e.stopPropagation();
+                      // Double-click selects the word (native) — don't toggle the
+                      // locus selection off on the second click.
+                      if (e.detail >= 2) return;
                       // Annotate mode: any click on this panel adds a note.
                       if (annotateMode) {
                         onAnnotate(row.n);
