@@ -70,6 +70,17 @@ configures each.
   variant as a band at its position in the base text, a viewport box that tracks
   scroll, and click-to-jump. Draggable to widen, hideable. A horizontal
   **change-overview** histogram is also available as a modal (View menu).
+- **Confidence** on every braid (its pairing similarity): ribbons draw **solid /
+  dashed / dotted** by confidence band (cut-offs user-set in Settings ▸ Braid),
+  and the panel highlight echoes it as a **half-tone dot screen** for fuzzier
+  loci. Hover a ribbon for its exact %.
+- A **braid editor** for curating the auto-collation (Auto mode): select a braid
+  — or right-click a highlight — for a compact editor (it sits in the margin by
+  the braid, hides while scrolling, is draggable aside) to **approve 👍** (full
+  confidence; the locus becomes an **underline**, the settled state), **doubt 👎**
+  (graduated, −25% per click), flag **tentative** (provisional, rendered grey),
+  **swap the type**, or **delete** the link. Every edit is undoable and saved
+  with the project as an editorial layer over the live auto braid.
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).
@@ -103,10 +114,17 @@ A project holds many sources, organised in a small file organiser:
   override the auto braid.
 - **⌘/Ctrl-click** any passage to attach a marginal annotation; an **annotate**
   mode (per panel) turns a plain click into a note.
-- **Settings** (Help menu) in panels — **User** (a name for signing
-  annotations), **Appearance** (mode, theme, text size), **Code** (default
-  language), **Text** (Juxta-style tokenizer toggles: ignore case / punctuation /
-  whitespace when aligning).
+- **Settings** (Help menu) — **User**, **Appearance** (mode, theme, text size),
+  **Braid** (confidence band cut-offs, hide-below-confidence, opacity,
+  long-distance hiding, cable sag), **CodeX** / **TextX** (per-engine matching
+  options), and **Data** (editorial-layer counts + a Danger zone: *re-run auto
+  collation* and *clear all braids*).
+- **Storage / "user mode":** the collation is never stored as a frozen braid.
+  Source witnesses plus an **editorial layer** (braid overrides + hand links,
+  keyed by the reading pair) live on the project; on load the auto braid is
+  re-derived and your edits are **re-applied on top** — so a project with edits
+  reopens in your edited state. The layer is plain, human-readable JSON in the
+  `.svar` (`variantOverrides` / `manualLinks` / `annotations`).
 - **New / Open / Save** projects as `.svar` files; **export** to Markdown, **TEI
   P5** (parallel-segmentation `<app>/<rdg>`), PDF, or JSON. The working project
   autosaves to the browser.
