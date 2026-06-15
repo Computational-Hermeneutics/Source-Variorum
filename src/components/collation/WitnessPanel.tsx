@@ -467,6 +467,9 @@ export function WitnessPanel({
                     onClick={(e) => {
                       // Don't let the click reach the background.
                       e.stopPropagation();
+                      // Alt/Option-click = dictionary lookup. A reliable backup for
+                      // the right-click, which macOS / the trackpad can intercept.
+                      if (e.altKey) { const w = wordAtPoint(e.clientX, e.clientY); if (w) { e.preventDefault(); onLookup(w, e.clientX, e.clientY); } return; }
                       // Double-click selects the word (native) — don't toggle the
                       // locus selection off on the second click.
                       if (e.detail >= 2) return;

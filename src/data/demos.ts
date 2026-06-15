@@ -86,7 +86,7 @@ const SPACEWAR_EXTRAS: DemoWitness[] = ([
   { siglum: "snow", title: "Snowflake (SA-100)", date: "1962", folder: "Related PDP-1 programs", provenance: "snowflake_sa-100.txt", file: SW("snowflake_sa-100.txt") },
   { siglum: "stars", title: "Expensive Planetarium (stars)", date: "13 Mar 1962", author: "Peter Samson", folder: "Related PDP-1 programs", provenance: "stars_expensive_planetarium.txt", file: SW("stars_expensive_planetarium.txt") },
 ] as DemoWitness[]).map((w) => ({ ...w, lang: "pdp1" }));
-const SPACEWAR_CORPUS: DemoWitness[] = [...SPACEWAR_VERSIONS, ...SPACEWAR_EXTRAS, readme("Spacewar! corpus — read me", SW("README.md"))];
+const SPACEWAR_CORPUS: DemoWitness[] = [...SPACEWAR_VERSIONS, ...SPACEWAR_EXTRAS, readme("Spacewar! corpus — read me", SW("README.md")), readme("PDP-1 instruction set — reference", SW("PDP-1-INSTRUCTIONS.md"))];
 
 const OTHELLO_EDITIONS: DemoWitness[] = [
   { siglum: "F", title: "Othello — First Folio (1623, old spelling)", date: "1623", provenance: "Shakespeare's First Folio, original spelling (public domain; via Project Gutenberg #2270, normalised)", file: "demos/othello_folio1623.txt" },

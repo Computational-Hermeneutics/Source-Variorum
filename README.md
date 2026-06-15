@@ -77,7 +77,8 @@ configures each.
 - **The click model on a highlight:** a **single click** selects the locus, shows
   its braid, and **pulls the other panel in line** (the linked passage scrolls
   into alignment); a **second click** deselects; a **double-click** selects the
-  word (or code token) natively; a **right-click** looks the word up in the
+  word (or code token) natively; a **right-click** (or **Alt/Option-click**, a
+  backup since macOS can intercept the context menu) looks the word up in the
   **dictionary** (see below).
 - A **braid editor** for curating the auto-collation (Auto mode): select a braid
   for a compact editor (it sits in the margin by the braid, hides while scrolling,
@@ -86,12 +87,19 @@ configures each.
   **tentative** (provisional, rendered grey), **swap the type**, or **delete** the
   link. Every edit is undoable and saved with the project as an editorial layer
   over the live auto braid.
-- A **dictionary** on right-click: in **CodeX** the token is looked up in a
-  bundled **PDP-1 MACRO instruction set** (`public/dictionaries/`, the folder
-  where further language references can be dropped); in **TextX** the word is
-  fetched from the free [Dictionary API](https://dictionaryapi.dev) (a sandboxed
-  browser cannot reach the OS dictionary, so SV queries this instead, degrading
-  gracefully offline).
+- A **dictionary** on right-click / Alt-click. In **CodeX** the token is looked
+  up in a bundled **PDP-1 MACRO instruction set** (`public/dictionaries/`, the
+  folder where further language references can be dropped) — each entry gives the
+  full name, the operand signature, the octal opcode, a description, and a small
+  example, with a **reference link** back to the source (Landsteiner's "Inside
+  Spacewar!" at masswerk.at). If the token is instead a **macro, label, or
+  symbol defined in the witness itself**, the popup also shows the **source
+  snippet that defines it** — the function it actually calls, not just a gloss.
+  In **TextX** the word is fetched from the free
+  [Dictionary API](https://dictionaryapi.dev) (a sandboxed browser cannot reach
+  the OS dictionary, so SV queries this instead, degrading gracefully offline).
+  The same PDP-1 reference is also a reading document in the Spacewar! corpus
+  (*PDP-1 instruction set — reference*).
 - An auto-generated **critical apparatus** listing every locus of divergence by
   siglum, and a **deep-dive** modal of quantitative statistics (verbatim overlap,
   moved-block counts, Jaccard / Dice / cosine similarity).

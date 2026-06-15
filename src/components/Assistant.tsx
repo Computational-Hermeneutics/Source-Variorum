@@ -7,25 +7,31 @@ import { poolFor, HACKERMAN } from "@/data/assistant-messages";
 
 type Persona = "clippy" | "hacker";
 
-/** A friendly (or hacked) paperclip — the Clippy homage, ported from LLMbench. */
-function ClipGlyph({ hacker, className = "w-9 h-12" }: { hacker?: boolean; className?: string }) {
+/** A friendly (or hacked) paperclip — the Clippy homage, ported from LLMbench.
+ *  The doubled wire (two long verticals turning back at top and bottom) is the
+ *  body; the eyes and brows sit on the upper bend. */
+function ClipGlyph({ hacker, className = "w-10 h-16" }: { hacker?: boolean; className?: string }) {
   const wire = hacker ? "#00ff00" : "var(--primary)";
   return (
-    <svg viewBox="0 0 48 64" className={className} aria-hidden="true">
-      <path d="M24 5 C13 5, 9 12, 9 20 L9 44 C9 52, 13 58, 21 58 L27 58 C35 58, 39 52, 39 44 L39 20 C39 13, 35 9, 28 9 L21 9" fill="none" stroke={wire} strokeWidth="3" strokeLinecap="round" />
+    <svg viewBox="0 0 56 80" className={className} aria-hidden="true">
+      {/* the classic bent-paperclip body: outer hairpin doubling back inside */}
+      <path d="M21 18 C21 7, 43 7, 43 19 L43 62 C43 75, 17 77, 13 63 L13 27 C13 18, 33 16, 33 25 L33 58 C33 65, 23 65, 23 58 L23 30"
+        fill="none" stroke={wire} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
       {hacker ? (
         <>
-          <rect x="14" y="26" width="8" height="4" rx="1" fill="#00ff00" />
-          <rect x="26" y="26" width="8" height="4" rx="1" fill="#00ff00" />
-          <path d="M19 36 Q24 39, 29 36" fill="none" stroke="#00ff00" strokeWidth="1.5" strokeLinecap="round" />
+          <rect x="18" y="26" width="9" height="4.5" rx="1" fill="#00ff00" />
+          <rect x="31" y="26" width="9" height="4.5" rx="1" fill="#00ff00" />
+          <path d="M22 39 Q29 43, 36 39" fill="none" stroke="#00ff00" strokeWidth="1.8" strokeLinecap="round" />
         </>
       ) : (
         <>
-          <circle cx="18" cy="28" r="3.1" fill="#2a2a2a" />
-          <circle cx="30" cy="28" r="3.1" fill="#2a2a2a" />
-          <circle cx="19" cy="27" r="1.1" fill="#fff" />
-          <circle cx="31" cy="27" r="1.1" fill="#fff" />
-          <path d="M19 36 Q24 40, 29 36" fill="none" stroke="#2a2a2a" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M18 23 q4 -3 8 0" fill="none" stroke="#2a2a2a" strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M30 23 q4 -3 8 0" fill="none" stroke="#2a2a2a" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="22" cy="30" r="3.6" fill="#fff" stroke="#2a2a2a" strokeWidth="1.4" />
+          <circle cx="34" cy="30" r="3.6" fill="#fff" stroke="#2a2a2a" strokeWidth="1.4" />
+          <circle cx="23" cy="30.5" r="1.5" fill="#2a2a2a" />
+          <circle cx="35" cy="30.5" r="1.5" fill="#2a2a2a" />
+          <path d="M23 40 Q29 44, 35 40" fill="none" stroke="#2a2a2a" strokeWidth="1.8" strokeLinecap="round" />
         </>
       )}
     </svg>
@@ -110,7 +116,7 @@ export function Assistant({ mode, enabled }: { mode: CollationMode; enabled: boo
         </div>
       </div>
       <button onClick={next} title="Tell me another" className="mr-5 -mt-0.5 hover:scale-110 active:scale-95 transition-transform">
-        <ClipGlyph hacker={hacker} className="w-8 h-11" />
+        <ClipGlyph hacker={hacker} className="w-11 h-16" />
       </button>
     </div>
   );
