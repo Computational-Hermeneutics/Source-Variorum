@@ -284,10 +284,15 @@ export default function Home() {
   // braid without deleting your edits (Clear all braids in Settings ▸ Data does
   // delete them). -----
   const braidEditCount = Object.keys(collation.variantOverrides ?? {}).length + Object.values(collation.manualLinks ?? {}).reduce((s, a) => s + a.length, 0);
-  // Always a working close read: the editorial layer (overrides + hand links) is
-  // always applied. (The old Auto/User/Advanced switch was removed — there is one
-  // mode now.) Clear all braids in Settings ▸ Data to get the pristine reading.
-  const viewCollation = collation;
+  // Auto vs User. USER (default) applies your editorial layer — a working close
+  // read. AUTO previews the pristine engine braid without deleting your edits.
+  // Editing a braid flips you into User mode.
+  const [userMode, setUserMode] = useState(true);
+  useEffect(() => { if (braidEditCount > 0) setUserMode(true); }, [braidEditCount]);
+  const viewCollation = useMemo(
+    () => (userMode || braidEditCount === 0 ? collation : { ...collation, variantOverrides: {}, manualLinks: {} }),
+    [collation, userMode, braidEditCount]
+  );
 
   // ----- The derived view runs in a Web Worker so a slow recompute never freezes
   // the UI: the page stays live, a progress bar shows, and the user can CANCEL
@@ -383,6 +388,18 @@ export default function Home() {
       try { localStorage.setItem(BRAID_VIZ_KEY, JSON.stringify(next)); } catch { /* ignore */ }
       return next;
     });
+  };
+  // Idiot-proof "give me my braids back": restore every braid VIEW setting to
+  // default (opacity, hide-below-confidence, long-distance, analysis on, gutter
+  // width) without touching the project, then reload.
+  const resetBraidView = () => {
+    setBraidViz(DEFAULT_BRAID_VIZ);
+    try {
+      localStorage.setItem(BRAID_VIZ_KEY, JSON.stringify(DEFAULT_BRAID_VIZ));
+      localStorage.removeItem("source-variorum-analysis");
+      localStorage.removeItem("source-variorum-braid-width");
+    } catch { /* ignore */ }
+    window.location.reload();
   };
   const setEngineOpt = <K extends keyof EngineOpts>(key: K, val: EngineOpts[K]) => {
     setEngineOpts((prev) => {
@@ -499,6 +516,7 @@ export default function Home() {
         { kind: "checkbox", label: "Version hotspots", checked: stripCols.hotspots, onToggle: () => setStripCol("hotspots", !stripCols.hotspots) },
         { kind: "separator" },
         { kind: "action", label: "Annotations & apparatus…", onClick: () => setShowApparatus(true) },
+        { kind: "action", label: "Show my braids (reset braid view)", onClick: resetBraidView },
         { kind: "separator" },
         { kind: "header", label: "Show variants" },
         ...VARIANT_TYPES.map((t): MenuEntry => ({
@@ -556,14 +574,12 @@ export default function Home() {
           <MenuBar menus={menus} />
 
           <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {/* A working close read: your editorial layer is always applied. A
-                subtle chip marks that you've edited the braid (no count, no mode
-                switching) — the Data folder has the exact figures. */}
-            {braidEditCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-[var(--sv-variation)] text-white text-[11px]" title={`Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"} (see Data ▸ Editorial layer)`}>
-                <Spline className="w-3 h-3" />close read
-              </span>
-            )}
+            {/* Auto = the pristine engine braid; User = your edited close read
+                (edits applied). Editing a braid flips you to User automatically. */}
+            <div className="flex rounded border border-border overflow-hidden text-[11px]" title="Auto: the engine's braid · User: your edited close read (your edits applied)">
+              <button onClick={() => setUserMode(false)} className={"px-2 py-1 " + (!userMode ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>Auto</button>
+              <button onClick={() => setUserMode(true)} title={braidEditCount ? `Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"}` : "User mode — your edits apply here"} className={"inline-flex items-center gap-1 px-2 py-1 border-l border-border " + (userMode ? "bg-[var(--sv-variation)] text-white" : "bg-card hover:bg-muted")}>User{braidEditCount > 0 && <span className="tabular-nums opacity-80">{braidEditCount}</span>}</button>
+            </div>
 
             <button onClick={() => setShowApparatus(true)} className="p-1.5 rounded border border-border bg-card hover:bg-muted" title="Annotations & apparatus"><ListTree className="w-3.5 h-3.5" /></button>
 
@@ -731,18 +747,7 @@ export default function Home() {
           onEngineOpt={setEngineOpt}
           braidViz={braidViz}
           onBraidVizOpt={setBraidVizOpt}
-          onResetBraidView={() => {
-            // Idiot-proof "give me my braids back": restore every braid VIEW
-            // setting to default (opacity, hide-below-confidence, long-distance,
-            // analysis on, gutter width) without touching the project, then reload.
-            setBraidViz(DEFAULT_BRAID_VIZ);
-            try {
-              localStorage.setItem(BRAID_VIZ_KEY, JSON.stringify(DEFAULT_BRAID_VIZ));
-              localStorage.removeItem("source-variorum-analysis");
-              localStorage.removeItem("source-variorum-braid-width");
-            } catch { /* ignore */ }
-            window.location.reload();
-          }}
+          onResetBraidView={resetBraidView}
           assistantOn={assistantOn}
           onAssistant={setAssistantOnP}
           braidEditCount={braidEditCount}
