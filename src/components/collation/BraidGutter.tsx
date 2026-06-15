@@ -37,9 +37,13 @@ export interface BraidViz {
   opacity: number;
   /** Hide ribbons whose vertical span exceeds (1 − this)×viewport (0 = off). */
   hideLongDistance: number;
+  /** "Gravity": how much a ribbon sags in the middle, like a slack patch cable.
+   *  0 = taut S-curves; 1 = full droop. Short (near-horizontal) ribbons sag most,
+   *  steep long-range ones stay taut, so the braid reads with physical depth. */
+  cableSag: number;
 }
 
-export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0 };
+export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0, cableSag: 0.5 };
 
 export function BraidGutter({
   width,
@@ -99,7 +103,11 @@ export function BraidGutter({
           : band === "med" ? `${Math.max(3, w * 1.4)} ${Math.max(3, w * 1.3)}`
           : `${Math.max(1, w * 0.5)} ${Math.max(2.5, w * 1.5)}`; // dotted
         const cx = width / 2;
-        const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
+        // Gravity: pull the mid control points DOWN so the ribbon hangs like a
+        // slack cable. Slack is greatest for short, near-horizontal correspondences
+        // and tapers to nothing for steep long-range ones (which read as taut).
+        const sag = viz.cableSag * Math.min(width * 0.9, 56) * (1 - Math.min(1, span * 1.4)) * (active ? 0.5 : 1);
+        const d = `M 0 ${r.yA} C ${cx} ${r.yA + sag} ${cx} ${r.yB + sag} ${width} ${r.yB}`;
         // The further apart the two ends sit, the more the reading has moved —
         // boost opacity with vertical distance so long-range correspondences read
         // through the busier short ones.

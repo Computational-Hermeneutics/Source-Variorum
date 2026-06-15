@@ -81,16 +81,24 @@ function segmentByLine(text: string): Segment[] {
 }
 
 /**
- * Split into sentences. We break after ., !, ? (and closing quotes/brackets that
- * follow them) plus trailing whitespace, but keep the punctuation and the space
- * with the sentence. Newlines also force a break so verse/short lines segment
- * sensibly. Deliberately simple and offset-preserving rather than linguistically
- * perfect; the aligner tolerates imperfect boundaries.
+ * Split into sentences/clauses. We break after sentence punctuation . ! ? AND
+ * the colon : (each with any closing quotes/brackets and trailing whitespace),
+ * keeping the punctuation and the space with the segment. Splitting on the colon
+ * matters for collation: it lets a clause one witness sets off as its own
+ * sentence ("As wolves love lambs…") align with the same clause another glues on
+ * after a colon ("…to satisfy: Just as the wolf loves the lamb…"), which a
+ * sentence-only split would bury in a larger, unmatchable unit. The colon does
+ * NOT break when preceded by an upper-case letter (a speaker label like
+ * "SOCRATES:"), so labels stay attached to their turn. The semicolon is
+ * deliberately NOT a boundary — it is too common mid-sentence in older prose and
+ * splitting on it shatters the alignment. Newlines also force a break so
+ * verse/short lines segment sensibly. Deliberately simple and offset-preserving
+ * rather than linguistically perfect; the aligner tolerates imperfect boundaries.
  */
 function segmentBySentence(text: string): Segment[] {
   const segments: Segment[] = [];
   const lineOf = lineAt(text);
-  const boundary = /([.!?]+["'”’)\]]*\s+|\n+)/g;
+  const boundary = /([.!?]+["'”’)\]]*\s+|(?<![A-Z]):["'”’)\]]*\s+|\n+)/g;
   let start = 0;
   let index = 0;
   let m: RegExpExecArray | null;

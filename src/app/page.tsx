@@ -1135,6 +1135,12 @@ function SettingsModal({
                   <input type="range" min={0} max={95} step={5} value={Math.round(braidViz.hideLongDistance * 100)} onChange={(e) => onBraidVizOpt("hideLongDistance", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Hide long-distance braids" />
                 </span>
               </SettingsRow>
+              <SettingsRow label="Cable sag (gravity)" hint={braidViz.cableSag > 0 ? "Ribbons hang like slack patch cables; short links droop most." : "Taut S-curves, no droop."}>
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{braidViz.cableSag > 0 ? `${Math.round(braidViz.cableSag * 100)}%` : "off"}</span>
+                  <input type="range" min={0} max={100} step={5} value={Math.round(braidViz.cableSag * 100)} onChange={(e) => onBraidVizOpt("cableSag", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Cable sag" />
+                </span>
+              </SettingsRow>
             </div>
           )}
 
