@@ -877,8 +877,8 @@ function EnginesModal({
           <label htmlFor="engine-pick" className="text-[12px] text-muted-foreground">Engine</label>
           <EngineIcon engine={view} className="w-4 h-4 text-primary" />
           <select id="engine-pick" value={view} onChange={(e) => setView(e.target.value as CollationMode)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-2 py-1">
-            <option value="source">CX-Engine — code</option>
-            <option value="text">TX-Engine — text</option>
+            <option value="source">CodeX (CX) — code &amp; exact collation</option>
+            <option value="text">TextX (TX) — prose, verse &amp; translation</option>
           </select>
           {active ? (
             <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">Active</span>
@@ -888,24 +888,24 @@ function EnginesModal({
         </div>
 
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold"><EngineIcon engine={view} className="w-4 h-4 text-primary" />{isCX ? "CX-Engine — code" : "TX-Engine — text"}</h3>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold"><EngineIcon engine={view} className="w-4 h-4 text-primary" />{isCX ? "CodeX — the CX-Engine" : "TextX — the TX-Engine"}</h3>
           {isCX ? (
             <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
               <li><strong>Unit:</strong> the <strong>line</strong>. Monospace, literal reading.</li>
               <li><strong>Matching:</strong> source is near one-to-one, so it trusts exact line correspondence; only genuinely-alike leftover lines pair (a renamed label, a changed operand), otherwise a clean <strong>addition</strong>/<strong>deletion</strong>. A block is <strong>moved</strong> only when near-identical.</li>
-              <li><strong>Good for:</strong> program listings, versions of a source file, disassemblies — where structure and exact tokens matter.</li>
+              <li><strong>Good for:</strong> program listings, versions of a source file, disassemblies, and <strong>exact textual collation</strong> (diplomatic transcriptions) — wherever structure and the literal tokens matter.</li>
             </ul>
           ) : (
             <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
-              <li><strong>Unit:</strong> the <strong>sentence</strong>. Proportional type, smart reading.</li>
+              <li><strong>Unit:</strong> the <strong>sentence</strong> (or line, for verse). Proportional type, smart reading.</li>
               <li><strong>Matching:</strong> prose is routinely rephrased, so it pairs loosely — a reworded sentence stays one <strong>substitution</strong> locus rather than an unrelated delete-plus-add — and accepts fuzzier <strong>moves</strong>. Correspondence is semantic, not positional.</li>
-              <li><strong>Good for:</strong> editions, translations, drafts — where the &ldquo;same&rdquo; passage is said differently.</li>
+              <li><strong>Good for:</strong> <strong>prose, verse, and translation</strong> — editions, drafts, and parallel renderings where the &ldquo;same&rdquo; passage is said differently.</li>
             </ul>
           )}
         </div>
 
         <div>
-          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{isCX ? "CX-Engine options" : "TX-Engine options"}</h4>
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{isCX ? "CodeX options" : "TextX options"}</h4>
           <div className="divide-y divide-border">
             {isCX ? (
               <>
@@ -945,7 +945,7 @@ function EnginesModal({
               </>
             )}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-1.5">Shared normalisation (ignore case / punctuation / whitespace) and more options live in <strong>Settings ▸ {isCX ? "CX-Engine" : "TX-Engine"}</strong>.</p>
+          <p className="text-[11px] text-muted-foreground mt-1.5">Shared normalisation (ignore case / punctuation / whitespace) and more options live in <strong>Settings ▸ {isCX ? "CodeX" : "TextX"}</strong>.</p>
         </div>
       </div>
     </ModalShell>
@@ -965,13 +965,13 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <p>Two witnesses sit side by side with a central <strong>braid</strong> of ribbons connecting matching passages, including text that has <strong>moved</strong> between them. The left panel is the <strong>base</strong> (copy-text). Click any passage or ribbon to highlight the shared reading in both panels and fade the rest; click empty space to clear.</p>
         </section>
         <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two engines: the CX-Engine (code) &amp; the TX-Engine (text)</h3>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two engines: CodeX (CX) &amp; TextX (TX)</h3>
           <p>The mode (View menu or Settings) selects which <strong>engine</strong> collates the witnesses. It changes both the typography <em>and</em> how the braid is computed, because the two materials behave differently. See <strong>Analyse ▸ Engines (CX · TX)</strong> for each engine&rsquo;s settings.</p>
           <ul className="list-disc pl-5 space-y-1 mt-1.5">
-            <li><EngineIcon engine="source" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>CX-Engine</strong> (code) aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so it trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. Options: <em>ignore comments</em>, <em>detect moved blocks</em>. The braid stays tight and faithful to the listing.</li>
-            <li><EngineIcon engine="text" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>TX-Engine</strong> (text) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
+            <li><EngineIcon engine="source" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>CodeX</strong> engine (CX, for code and <em>exact</em> textual collation) aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so it trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. Options: <em>ignore comments</em>, <em>detect moved blocks</em>. The braid stays tight and faithful to the listing.</li>
+            <li><EngineIcon engine="text" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>TextX</strong> engine (TX, for prose, verse, and translation) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
           </ul>
-          <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style normalisation toggles; the engines differ in their unit of alignment, their matching thresholds, and their per-engine options (Settings ▸ CX-Engine / TX-Engine).</p>
+          <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style normalisation toggles; the engines differ in their unit of alignment, their matching thresholds, and their per-engine options (Settings ▸ CodeX / TextX).</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Confidence</h3>
@@ -1034,8 +1034,8 @@ const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "user", label: "User" },
   { id: "appearance", label: "Appearance" },
   { id: "braid", label: "Braid" },
-  { id: "code", label: "CX-Engine" },
-  { id: "text", label: "TX-Engine" },
+  { id: "code", label: "CodeX" },
+  { id: "text", label: "TextX" },
 ];
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -1223,7 +1223,7 @@ function SettingsModal({
 
           {tab === "code" && (
             <div className="divide-y divide-border">
-              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>CX-Engine</strong> aligns code <strong>line by line</strong> and reads literally. These options change how the braid is computed for <em>code</em> witnesses.</div>
+              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>CodeX</strong> engine (CX) aligns <strong>line by line</strong> and reads literally — for code and exact textual collation. These options change how the braid is computed.</div>
               <SettingsRow label="Ignore comments" hint="Strip ; // # /* … */ before matching, so a re-/de-commented line still aligns.">
                 <Toggle on={!!tokenizer.ignoreComments} onClick={() => onTokenizer("ignoreComments", !tokenizer.ignoreComments)} />
               </SettingsRow>
@@ -1248,13 +1248,13 @@ function SettingsModal({
                   </optgroup>
                 </select>
               </SettingsRow>
-              <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more CX-Engine options will live here.</div>
+              <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more CodeX options will live here.</div>
             </div>
           )}
 
           {tab === "text" && (
             <div className="divide-y divide-border">
-              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>TX-Engine</strong> aligns prose <strong>sentence by sentence</strong> and reads smartly. These options decide which differences count as a real variant (Juxta-style normalisation). The case / punctuation / whitespace toggles apply to both engines.</div>
+              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>TextX</strong> engine (TX) aligns prose <strong>sentence by sentence</strong> and reads smartly — for prose, verse, and translation. These options decide which differences count as a real variant (Juxta-style normalisation). The case / punctuation / whitespace toggles apply to both engines.</div>
               <SettingsRow label="Regularise spelling" hint="Fold early-modern ↔ modern orthography (long-s, u/v, i/j, vv→w, doubled letters, final -e) so old-spelling and modern witnesses align. Aggressive — can over-merge.">
                 <Toggle on={!!tokenizer.regulariseSpelling} onClick={() => onTokenizer("regulariseSpelling", !tokenizer.regulariseSpelling)} />
               </SettingsRow>

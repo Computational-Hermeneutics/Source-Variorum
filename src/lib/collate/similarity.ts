@@ -59,6 +59,24 @@ function stripComments(s: string): string {
     .replace(/#[^\n]*/g, " "); // # to end of line
 }
 
+/** Irregular plurals a bare "-s" rule can't reach: f/fe→ves, vowel changes, and
+ *  the common -en/Latin forms. A simple suffix strip would mangle these (or, for
+ *  -ves, break stem-v verbs like "loves"/"moves"), so we map them explicitly. */
+const IRREGULAR_PLURALS: Record<string, string> = {
+  wolves: "wolf", leaves: "leaf", lives: "life", knives: "knife", halves: "half",
+  calves: "calf", selves: "self", shelves: "shelf", thieves: "thief", wives: "wife",
+  elves: "elf", loaves: "loaf", scarves: "scarf", wharves: "wharf", hooves: "hoof",
+  men: "man", women: "woman", children: "child", feet: "foot", teeth: "tooth",
+  geese: "goose", mice: "mouse", people: "person", oxen: "ox", brethren: "brother",
+};
+
+/** Fold a word to its singular for matching: irregular map first, then -ies→y and
+ *  a regular trailing -s (not -ss). Operates on the lowercased comparison key. */
+function singularise(w: string): string {
+  if (IRREGULAR_PLURALS[w]) return IRREGULAR_PLURALS[w];
+  return w.replace(/ies$/, "y").replace(/([^s])s$/, "$1");
+}
+
 /** Fold early-modern English orthography toward a modern matching key. Operates
  *  on a lowercased copy used only for comparison (never displayed). */
 function regulariseSpelling(s: string): string {
@@ -100,7 +118,7 @@ export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): s
   if (o.ignorePunctuation) r = r.replace(/[^\p{L}\p{N}\s]/gu, "");
   if (o.ignoreCase) r = r.toLowerCase();
   if (o.regulariseSpelling) r = regulariseSpelling(r);
-  if (o.matchPluralSingular) r = r.replace(/ies\b/gi, "y").replace(/([^s\W])s\b/gi, "$1");
+  if (o.matchPluralSingular) r = r.replace(/[a-z]+/gi, (w) => singularise(w.toLowerCase()) || w);
   if (o.ignoreWordOrder) r = r.split(/\s+/).filter(Boolean).sort().join(" ");
   if (normCache.size > 60000) normCache.clear();
   normCache.set(s, r);

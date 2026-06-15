@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, CSSProperties } from "react";
 import { StickyNote } from "lucide-react";
 import type { CollationMode, Variant, Witness, WordRun } from "@/types/collation";
-import { VARIANT_TYPE_COLORS } from "@/types/collation";
+import { VARIANT_TYPE_COLORS, confidenceOf } from "@/types/collation";
 import { highlightRanges, tokenStyle, type HToken } from "@/lib/highlight";
 
 type Side = "a" | "b";
@@ -45,7 +45,7 @@ function colorize(absStart: number, str: string, tokens: HToken[], isDark: boole
 /** Background tint for a variant span. Matches stay untinted so the eye rests on
  *  what changed; when a variant is selected every other span is faded so the
  *  locus under work stands alone. */
-function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean, anySelected: boolean) {
+function tintStyle(type: Variant["type"], band: Band, selected: boolean, hovered: boolean, anySelected: boolean): CSSProperties {
   // The selected locus KEEPS its variant-type colour (so a transposition still
   // reads as blue, an omission as red, etc.) and is framed in the strong
   // version-variation yellow — the yellow marks "you are here", it doesn't
@@ -65,15 +65,30 @@ function tintStyle(type: Variant["type"], selected: boolean, hovered: boolean, a
   }
   const color = VARIANT_TYPE_COLORS[type];
   const alpha = hovered ? 30 : anySelected ? 8 : 22;
+  // Half-tone echoes the braid's confidence texture: a HIGH-confidence locus is a
+  // solid wash; a MEDIUM one is a fine dot screen; a LOW one a coarser, airier dot
+  // screen — so an uncertain reading literally looks less solid.
+  if (band !== "high" && !hovered) {
+    const dot = `color-mix(in srgb, ${color} ${Math.min(60, alpha + 28)}%, transparent)`;
+    const size = band === "low" ? 4.5 : 3;
+    const r = band === "low" ? 1 : 1.1;
+    return {
+      backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.5}px)`,
+      backgroundSize: `${size}px ${size}px`,
+      opacity: anySelected ? 0.55 : 1,
+    };
+  }
   return {
     background: `color-mix(in srgb, ${color} ${alpha}%, transparent)`,
     opacity: anySelected && !hovered ? 0.55 : 1,
   };
 }
 
+type Band = "high" | "med" | "low";
 interface LineSeg {
   vid: string;
   type: Variant["type"];
+  band: Band;
   text: string;
   /** Absolute character offset of this segment's first character in the witness. */
   start: number;
@@ -85,14 +100,21 @@ interface Row {
   segs: LineSeg[];
 }
 
+/** Confidence band of a variant given the (user-set) cut-offs, for the panel's
+ *  half-tone tint: high = solid, medium = fine dots, low = coarse dots. */
+function bandOf(v: Variant, confHigh: number, confMed: number): Band {
+  const c = confidenceOf(v);
+  return c >= confHigh ? "high" : c >= confMed ? "med" : "low";
+}
+
 /** Build line rows, splitting each variant's span at line boundaries so every
  *  visual line carries its own tinted segments plus a stable line number. */
-function buildRows(text: string, variants: Variant[], side: Side): Row[] {
+function buildRows(text: string, variants: Variant[], side: Side, confHigh: number, confMed: number): Row[] {
   // Variant spans on this side, sorted by start offset (they tile the text).
   const spans = variants
     .map((v) => ({ v, sp: side === "a" ? v.a : v.b }))
     .filter((x) => x.sp !== undefined)
-    .map((x) => ({ vid: x.v.id, type: x.v.type, start: x.sp!.start, end: x.sp!.end }))
+    .map((x) => ({ vid: x.v.id, type: x.v.type, band: bandOf(x.v, confHigh, confMed), start: x.sp!.start, end: x.sp!.end }))
     .sort((a, b) => a.start - b.start);
 
   const rows: Row[] = [];
@@ -111,18 +133,18 @@ function buildRows(text: string, variants: Variant[], side: Side): Row[] {
       const s = spans[j];
       const from = Math.max(s.start, ls, pos);
       const to = Math.min(s.end, le);
-      if (from > pos) segs.push({ vid: "", type: "match", text: text.slice(pos, from), start: pos, anchor: false });
+      if (from > pos) segs.push({ vid: "", type: "match", band: "high", text: text.slice(pos, from), start: pos, anchor: false });
       if (to > from) {
         const anchor = !seen.has(s.vid) && s.start >= ls && s.start < le;
         if (anchor) seen.add(s.vid);
-        segs.push({ vid: s.vid, type: s.type, text: text.slice(from, to), start: from, anchor });
+        segs.push({ vid: s.vid, type: s.type, band: s.band, text: text.slice(from, to), start: from, anchor });
         pos = to;
       }
       j++;
     }
     // Trailing uncovered text on this line (e.g. when a manual link reassigned a
     // partner): render it plain rather than dropping it.
-    if (pos < le) segs.push({ vid: "", type: "match", text: text.slice(pos, le), start: pos, anchor: false });
+    if (pos < le) segs.push({ vid: "", type: "match", band: "high", text: text.slice(pos, le), start: pos, anchor: false });
     rows.push({ n, segs });
     n++;
   };
@@ -143,6 +165,8 @@ export function WitnessPanel({
   variants,
   mode,
   fontSize,
+  confHigh,
+  confMed,
   editMode,
   annotateMode,
   selectedId,
@@ -168,6 +192,9 @@ export function WitnessPanel({
   variants: Variant[];
   mode: CollationMode;
   fontSize: number;
+  /** Confidence band cut-offs (from braid settings) for the half-tone tint. */
+  confHigh: number;
+  confMed: number;
   editMode: boolean;
   /** Annotate mode for this panel: a plain click on a line adds a note. */
   annotateMode?: boolean;
@@ -202,7 +229,7 @@ export function WitnessPanel({
   const [draft, setDraft] = useState(witness.text);
   useEffect(() => setDraft(witness.text), [witness.text, witness.id]);
 
-  const rows = useMemo(() => buildRows(witness.text, variants, side), [witness.text, variants, side]);
+  const rows = useMemo(() => buildRows(witness.text, variants, side, confHigh, confMed), [witness.text, variants, side, confHigh, confMed]);
   const gutterCh = String(rows.length).length + 1;
 
   // Word-level runs per variant for this side (substitution/variant only): lets
@@ -245,11 +272,20 @@ export function WitnessPanel({
     return out;
   };
 
-  // Word-level tinting: only the words that differ carry the variant background.
+  // Word-level tinting: only the words that differ carry the variant background —
+  // solid for a high-confidence locus, a half-tone dot screen for medium/low so
+  // the changed words echo their braid's dashed/dotted confidence texture.
+  const wordTint = (color: string, band: Band): CSSProperties => {
+    if (band === "high") return { background: `color-mix(in srgb, ${color} 30%, transparent)` };
+    const dot = `color-mix(in srgb, ${color} 58%, transparent)`;
+    const size = band === "low" ? 4.5 : 3;
+    const r = band === "low" ? 1 : 1.1;
+    return { backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.5}px)`, backgroundSize: `${size}px ${size}px` };
+  };
   const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode =>
     tintRuns(
       seg,
-      runs.filter((r) => r.changed).map((r) => ({ start: r.start, end: r.end, style: { background: `color-mix(in srgb, ${color} 30%, transparent)` } }))
+      runs.filter((r) => r.changed).map((r) => ({ start: r.start, end: r.end, style: wordTint(color, seg.band) }))
     );
 
   // Advanced-mode pick highlight: show the exact selected character range.
@@ -392,14 +428,14 @@ export function WitnessPanel({
                 // selected locus reverts to whole-span tint to show the full reading.
                 const useWordTint = analysis && !advancedMode && !selected && !!runs;
                 const style = !analysis
-                  ? (selected ? tintStyle(seg.type, true, hovered, false) : undefined)
+                  ? (selected ? tintStyle(seg.type, seg.band, true, hovered, false) : undefined)
                   : advancedMode
-                    ? tintStyle(seg.type, false, hovered, false)
+                    ? tintStyle(seg.type, seg.band, false, hovered, false)
                     : useWordTint
                       ? hovered
                         ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
                         : { opacity: anySelected ? 0.55 : 1 }
-                      : tintStyle(seg.type, selected, hovered, anySelected);
+                      : tintStyle(seg.type, seg.band, selected, hovered, anySelected);
                 return (
                   <span
                     key={k}

@@ -441,6 +441,8 @@ export function CollationView({
               side="a"
               witness={witnessA}
               variants={panelVariants}
+              confHigh={braidViz.confHigh}
+              confMed={braidViz.confMed}
               mode={mode}
               fontSize={fontSize}
               editMode={editSide === "a"}
@@ -557,6 +559,8 @@ export function CollationView({
               side="b"
               witness={witnessB}
               variants={panelVariants}
+              confHigh={braidViz.confHigh}
+              confMed={braidViz.confMed}
               mode={mode}
               fontSize={fontSize}
               editMode={editSide === "b"}
