@@ -45,7 +45,17 @@ function colorize(absStart: number, str: string, tokens: HToken[], isDark: boole
 /** Background tint for a variant span. Matches stay untinted so the eye rests on
  *  what changed; when a variant is selected every other span is faded so the
  *  locus under work stands alone. */
-function tintStyle(type: Variant["type"], band: Band, selected: boolean, hovered: boolean, anySelected: boolean): CSSProperties {
+function tintStyle(type: Variant["type"], band: Band, selected: boolean, hovered: boolean, anySelected: boolean, confirmed = false, tentative = false): CSSProperties {
+  // Approved (👍): the editor has signed off, so the locus no longer shouts as a
+  // highlight — it's UNDERLINED in its type colour, the "settled" state.
+  if (confirmed && !selected) {
+    return { textDecorationLine: "underline", textDecorationColor: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[type]} 85%, transparent)`, textDecorationThickness: "2px", textUnderlineOffset: "3px", opacity: anySelected && !hovered ? 0.6 : 1 };
+  }
+  // Tentative: a provisional flag to revisit — drawn in a neutral GREY dot screen
+  // (not the type colour) so it reads as "unsure", set apart from the real types.
+  if (tentative && !selected) {
+    return { backgroundImage: "radial-gradient(color-mix(in srgb, var(--muted-foreground) 34%, transparent) 0.9px, transparent 1.5px)", backgroundSize: "3.5px 3.5px", opacity: anySelected && !hovered ? 0.55 : 1 };
+  }
   // The selected locus KEEPS its variant-type colour (so a transposition still
   // reads as blue, an omission as red, etc.) and is framed in the strong
   // version-variation yellow — the yellow marks "you are here", it doesn't
@@ -89,6 +99,8 @@ interface LineSeg {
   vid: string;
   type: Variant["type"];
   band: Band;
+  confirmed: boolean;
+  tentative: boolean;
   text: string;
   /** Absolute character offset of this segment's first character in the witness. */
   start: number;
@@ -114,7 +126,7 @@ function buildRows(text: string, variants: Variant[], side: Side, confHigh: numb
   const spans = variants
     .map((v) => ({ v, sp: side === "a" ? v.a : v.b }))
     .filter((x) => x.sp !== undefined)
-    .map((x) => ({ vid: x.v.id, type: x.v.type, band: bandOf(x.v, confHigh, confMed), start: x.sp!.start, end: x.sp!.end }))
+    .map((x) => ({ vid: x.v.id, type: x.v.type, band: bandOf(x.v, confHigh, confMed), confirmed: !!x.v.confirmed, tentative: !!x.v.tentative, start: x.sp!.start, end: x.sp!.end }))
     .sort((a, b) => a.start - b.start);
 
   const rows: Row[] = [];
@@ -133,18 +145,18 @@ function buildRows(text: string, variants: Variant[], side: Side, confHigh: numb
       const s = spans[j];
       const from = Math.max(s.start, ls, pos);
       const to = Math.min(s.end, le);
-      if (from > pos) segs.push({ vid: "", type: "match", band: "high", text: text.slice(pos, from), start: pos, anchor: false });
+      if (from > pos) segs.push({ vid: "", type: "match", band: "high", confirmed: false, tentative: false, text: text.slice(pos, from), start: pos, anchor: false });
       if (to > from) {
         const anchor = !seen.has(s.vid) && s.start >= ls && s.start < le;
         if (anchor) seen.add(s.vid);
-        segs.push({ vid: s.vid, type: s.type, band: s.band, text: text.slice(from, to), start: from, anchor });
+        segs.push({ vid: s.vid, type: s.type, band: s.band, confirmed: s.confirmed, tentative: s.tentative, text: text.slice(from, to), start: from, anchor });
         pos = to;
       }
       j++;
     }
     // Trailing uncovered text on this line (e.g. when a manual link reassigned a
     // partner): render it plain rather than dropping it.
-    if (pos < le) segs.push({ vid: "", type: "match", band: "high", text: text.slice(pos, le), start: pos, anchor: false });
+    if (pos < le) segs.push({ vid: "", type: "match", band: "high", confirmed: false, tentative: false, text: text.slice(pos, le), start: pos, anchor: false });
     rows.push({ n, segs });
     n++;
   };
@@ -278,9 +290,10 @@ export function WitnessPanel({
   // Word-level tinting: only the words that differ carry the variant background —
   // solid for a high-confidence locus, a half-tone dot screen for medium/low so
   // the changed words echo their braid's dashed/dotted confidence texture.
-  const wordTint = (color: string, band: Band): CSSProperties => {
-    if (band === "high") return { background: `color-mix(in srgb, ${color} 30%, transparent)` };
-    const dot = `color-mix(in srgb, ${color} 34%, transparent)`;
+  const wordTint = (color: string, band: Band, tentative: boolean): CSSProperties => {
+    const c = tentative ? "var(--muted-foreground)" : color; // grey for provisional
+    if (band === "high" && !tentative) return { background: `color-mix(in srgb, ${c} 30%, transparent)` };
+    const dot = `color-mix(in srgb, ${c} 34%, transparent)`;
     const size = band === "low" ? 4.5 : 3.5;
     const r = band === "low" ? 0.8 : 0.9;
     return { backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.6}px)`, backgroundSize: `${size}px ${size}px` };
@@ -288,7 +301,7 @@ export function WitnessPanel({
   const wordBody = (seg: LineSeg, runs: WordRun[], color: string): ReactNode =>
     tintRuns(
       seg,
-      runs.filter((r) => r.changed).map((r) => ({ start: r.start, end: r.end, style: wordTint(color, seg.band) }))
+      runs.filter((r) => r.changed).map((r) => ({ start: r.start, end: r.end, style: wordTint(color, seg.band, seg.tentative) }))
     );
 
   // Advanced-mode pick highlight: show the exact selected character range.
@@ -428,17 +441,18 @@ export function WitnessPanel({
                 const hovered = seg.vid === hoveredId;
                 const runs = wordRunsByVid.get(seg.vid);
                 // Word-level tinting applies at rest (auto mode, not selected); a
-                // selected locus reverts to whole-span tint to show the full reading.
-                const useWordTint = analysis && !advancedMode && !selected && !!runs;
+                // selected locus reverts to whole-span tint. APPROVED loci skip
+                // word-tint so the WHOLE sentence is underlined, not just words.
+                const useWordTint = analysis && !advancedMode && !selected && !!runs && !seg.confirmed;
                 const style = !analysis
-                  ? (selected ? tintStyle(seg.type, seg.band, true, hovered, false) : undefined)
+                  ? (selected ? tintStyle(seg.type, seg.band, true, hovered, false, seg.confirmed, seg.tentative) : undefined)
                   : advancedMode
-                    ? tintStyle(seg.type, seg.band, false, hovered, false)
+                    ? tintStyle(seg.type, seg.band, false, hovered, false, seg.confirmed, seg.tentative)
                     : useWordTint
                       ? hovered
                         ? { background: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[seg.type]} 14%, transparent)` }
                         : { opacity: anySelected ? 0.55 : 1 }
-                      : tintStyle(seg.type, seg.band, selected, hovered, anySelected);
+                      : tintStyle(seg.type, seg.band, selected, hovered, anySelected, seg.confirmed, seg.tentative);
                 return (
                   <span
                     key={k}

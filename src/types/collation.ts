@@ -118,11 +118,21 @@ export interface VariantOverride {
   type?: VariantType;
   /** Drop the braid entirely (the two readings no longer count as linked). */
   deleted?: boolean;
-  /** Editor vouches this pairing is correct ⇒ treat as full confidence (👍). */
+  /** Editor vouches this pairing is correct ⇒ full confidence (👍, "approved"). */
   confirmed?: boolean;
-  /** Editor doubts this pairing ⇒ force low confidence (👎); dotted, and hidden
-   *  when below a hide-threshold. Mutually exclusive with `confirmed`. */
+  /** Graduated doubt (👎): each step knocks 25% off the confidence (1–4 ⇒ −25…
+   *  −100%). Mutually exclusive with `confirmed`. */
+  suppress?: number;
+  /** Legacy boolean doubt (pre-graduated); read as suppress=4 for back-compat. */
   suppressed?: boolean;
+  /** Provisional: the editor is unsure and wants to revisit. Rendered grey. */
+  tentative?: boolean;
+}
+
+/** Effective suppression steps (0–4) of an override, folding the legacy boolean. */
+export function suppressSteps(o: VariantOverride | undefined): number {
+  if (!o) return 0;
+  return o.suppress ?? (o.suppressed ? 4 : 0);
 }
 
 /** Stable key for a braid: its reading pair (so an override survives recompute,
@@ -190,6 +200,10 @@ export interface Variant {
   aWords?: WordRun[];
   /** Word-level runs within the B-side span (substitution/variant only). */
   bWords?: WordRun[];
+  /** Editor approved this braid (👍) — render as an underline, not a highlight. */
+  confirmed?: boolean;
+  /** Editor flagged this braid as provisional — render grey, to revisit. */
+  tentative?: boolean;
 }
 
 /**

@@ -8,7 +8,7 @@
  */
 
 import type { Collation, Witness } from "@/types/collation";
-import { variantSignature } from "@/types/collation";
+import { variantSignature, suppressSteps } from "@/types/collation";
 import { collate } from "./collate";
 import type { NormalizeOptions } from "./similarity";
 import { buildApparatus } from "./apparatus";
@@ -61,11 +61,13 @@ export function deriveView(
       const o = ov[variantSignature(v)];
       if (!o) return [v];
       if (o.deleted) return [];
-      if (!o.type && !o.confirmed && !o.suppressed) return [v];
+      const supp = suppressSteps(o);
+      if (!o.type && !o.confirmed && !supp && !o.tentative) return [v];
       return [{
         ...v,
         ...(o.type ? { type: o.type } : {}),
-        ...(o.confirmed ? { similarity: 1 } : o.suppressed ? { similarity: Math.min(v.similarity, 0.05) } : {}),
+        ...(o.confirmed ? { similarity: 1, confirmed: true } : supp ? { similarity: Math.max(0, v.similarity - 0.25 * supp) } : {}),
+        ...(o.tentative ? { tentative: true } : {}),
       }];
     });
   }

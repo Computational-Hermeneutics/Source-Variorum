@@ -329,7 +329,7 @@ export function useProject(initial: Collation) {
       commit((c) => {
         const next = { ...(c.variantOverrides ?? {}) };
         const merged = { ...next[signature], ...patch };
-        if (!merged.type && !merged.deleted && !merged.confirmed && !merged.suppressed) delete next[signature];
+        if (!merged.type && !merged.deleted && !merged.confirmed && !merged.suppress && !merged.suppressed && !merged.tentative) delete next[signature];
         else next[signature] = merged;
         return { ...c, variantOverrides: next };
       }),
