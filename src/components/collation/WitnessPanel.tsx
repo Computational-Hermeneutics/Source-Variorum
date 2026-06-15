@@ -51,10 +51,11 @@ function tintStyle(type: Variant["type"], band: Band, selected: boolean, hovered
   if (confirmed && !selected) {
     return { textDecorationLine: "underline", textDecorationColor: `color-mix(in srgb, ${VARIANT_TYPE_COLORS[type]} 85%, transparent)`, textDecorationThickness: "2px", textUnderlineOffset: "3px", opacity: anySelected && !hovered ? 0.6 : 1 };
   }
-  // Tentative: a provisional flag to revisit — drawn in a neutral GREY dot screen
-  // (not the type colour) so it reads as "unsure", set apart from the real types.
+  // Tentative: a provisional flag to revisit — a flat NEUTRAL GREY highlight (not
+  // the type colour), so it reads as "noted but unsure", set apart from the real
+  // typed loci and from the approved underline.
   if (tentative && !selected) {
-    return { backgroundImage: "radial-gradient(color-mix(in srgb, var(--muted-foreground) 34%, transparent) 0.9px, transparent 1.5px)", backgroundSize: "3.5px 3.5px", opacity: anySelected && !hovered ? 0.55 : 1 };
+    return { background: "color-mix(in srgb, hsl(var(--muted-foreground)) 26%, transparent)", opacity: anySelected && !hovered ? 0.55 : 1 };
   }
   // The selected locus KEEPS its variant-type colour (so a transposition still
   // reads as blue, an omission as red, etc.) and is framed in the strong
@@ -291,9 +292,9 @@ export function WitnessPanel({
   // solid for a high-confidence locus, a half-tone dot screen for medium/low so
   // the changed words echo their braid's dashed/dotted confidence texture.
   const wordTint = (color: string, band: Band, tentative: boolean): CSSProperties => {
-    const c = tentative ? "var(--muted-foreground)" : color; // grey for provisional
-    if (band === "high" && !tentative) return { background: `color-mix(in srgb, ${c} 30%, transparent)` };
-    const dot = `color-mix(in srgb, ${c} 34%, transparent)`;
+    if (tentative) return { background: "color-mix(in srgb, hsl(var(--muted-foreground)) 26%, transparent)" }; // flat grey, provisional
+    if (band === "high") return { background: `color-mix(in srgb, ${color} 30%, transparent)` };
+    const dot = `color-mix(in srgb, ${color} 34%, transparent)`;
     const size = band === "low" ? 4.5 : 3.5;
     const r = band === "low" ? 0.8 : 0.9;
     return { backgroundImage: `radial-gradient(${dot} ${r}px, transparent ${r + 0.6}px)`, backgroundSize: `${size}px ${size}px` };
@@ -443,7 +444,7 @@ export function WitnessPanel({
                 // Word-level tinting applies at rest (auto mode, not selected); a
                 // selected locus reverts to whole-span tint. APPROVED loci skip
                 // word-tint so the WHOLE sentence is underlined, not just words.
-                const useWordTint = analysis && !advancedMode && !selected && !!runs && !seg.confirmed;
+                const useWordTint = analysis && !advancedMode && !selected && !!runs && !seg.confirmed && !seg.tentative;
                 const style = !analysis
                   ? (selected ? tintStyle(seg.type, seg.band, true, hovered, false, seg.confirmed, seg.tentative) : undefined)
                   : advancedMode

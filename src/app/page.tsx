@@ -691,7 +691,7 @@ export default function Home() {
         </span>
       </footer>
 
-      <Assistant mode={collation.mode} enabled={assistantOn} onDisable={() => setAssistantOnP(false)} />
+      <Assistant mode={collation.mode} enabled={assistantOn} />
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
       {showEngines && (
