@@ -11,7 +11,9 @@ type Persona = "clippy" | "hacker";
  *  A clean bent-paperclip body (outer wire doubling back inside) with a face
  *  sitting in the upper bend. */
 function ClipGlyph({ hacker, className = "w-11 h-16" }: { hacker?: boolean; className?: string }) {
-  const wire = hacker ? "#00ff00" : "var(--primary)";
+  // NB: --primary is an HSL *triplet* ("352 47% 33%"), so it must be wrapped in
+  // hsl() — a bare var(--primary) is an invalid stroke and renders nothing (white).
+  const wire = hacker ? "#00ff00" : "hsl(var(--primary))";
   const ink = hacker ? "#00ff00" : "#2a2a2a";
   return (
     <svg viewBox="0 0 60 88" className={className} aria-hidden="true">

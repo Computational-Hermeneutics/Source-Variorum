@@ -420,8 +420,11 @@ export default function Home() {
   const gotoMatch = (dir: number) => {
     const els = Array.from(document.querySelectorAll<HTMLElement>("[data-sv-match]"));
     if (!els.length) return;
+    els.forEach((e) => e.classList.remove("sv-match-current"));
     matchIdxRef.current = (matchIdxRef.current + dir + els.length) % els.length;
-    els[matchIdxRef.current]?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const el = els[matchIdxRef.current];
+    el?.classList.add("sv-match-current"); // the active hit is drawn stronger
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
   const loadDemo = (id: string) => {
@@ -553,11 +556,12 @@ export default function Home() {
           <MenuBar menus={menus} />
 
           <div className="flex items-center gap-1.5 ml-auto flex-wrap">
-            {/* A working close read: your editorial layer is always applied. The
-                chip shows how many braids you've edited (no mode switching). */}
+            {/* A working close read: your editorial layer is always applied. A
+                subtle chip marks that you've edited the braid (no count, no mode
+                switching) — the Data folder has the exact figures. */}
             {braidEditCount > 0 && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-[var(--sv-variation)] text-white text-[11px]" title={`Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"}`}>
-                <Spline className="w-3 h-3" />{braidEditCount} edit{braidEditCount === 1 ? "" : "s"}
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded border border-border bg-[var(--sv-variation)] text-white text-[11px]" title={`Your working close read — ${braidEditCount} edited braid${braidEditCount === 1 ? "" : "s"} (see Data ▸ Editorial layer)`}>
+                <Spline className="w-3 h-3" />close read
               </span>
             )}
 

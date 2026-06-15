@@ -151,6 +151,7 @@ export function CollationView({
   // dictionary isn't reachable from a sandboxed browser).
   const [dict, setDict] = useState<{ x: number; y: number; def: Definition; loading: boolean } | null>(null);
   const dictReq = useRef(0);
+  const dictRef = useRef<HTMLDivElement>(null);
   const doLookup = useCallback((word: string, x: number, y: number) => {
     const id = ++dictReq.current;
     setDict({ x, y, def: { word, source: "", text: null }, loading: true });
@@ -159,11 +160,16 @@ export function CollationView({
   }, [mode, witnessA.text, witnessB.text]);
   useEffect(() => {
     if (!dict) return;
-    const close = () => setDict(null);
+    // Close on outside click / Escape / scrolling the page — but NOT when the
+    // scroll (or click) happens inside the popup itself, so the reader can scroll
+    // a long definition without it vanishing.
+    const inside = (t: EventTarget | null) => t instanceof Node && dictRef.current?.contains(t);
+    const onClick = (e: MouseEvent) => { if (!inside(e.target)) setDict(null); };
+    const onScroll = (e: Event) => { if (!inside(e.target)) setDict(null); };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDict(null); };
-    const t = setTimeout(() => { window.addEventListener("click", close); window.addEventListener("scroll", close, true); }, 0);
+    const t = setTimeout(() => { window.addEventListener("click", onClick); window.addEventListener("scroll", onScroll, true); }, 0);
     window.addEventListener("keydown", onKey);
-    return () => { clearTimeout(t); window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("keydown", onKey); };
+    return () => { clearTimeout(t); window.removeEventListener("click", onClick); window.removeEventListener("scroll", onScroll, true); window.removeEventListener("keydown", onKey); };
   }, [dict]);
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
@@ -516,7 +522,7 @@ export function CollationView({
         )}
         {/* Right-click / Alt-click → dictionary definition at the cursor. */}
         {dict && (
-          <div onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left: Math.min(dict.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 320), top: dict.y + 6, zIndex: 60, width: 300, maxHeight: "60vh" }} className="rounded-lg bg-card border border-border shadow-xl text-[12px] overflow-hidden flex flex-col">
+          <div ref={dictRef} onClick={(e) => e.stopPropagation()} style={{ position: "fixed", left: Math.min(dict.x, (typeof window !== "undefined" ? window.innerWidth : 9999) - 320), top: dict.y + 6, zIndex: 60, width: 300, maxHeight: "60vh" }} className="rounded-lg bg-card border border-border shadow-xl text-[12px] overflow-hidden flex flex-col">
             <div className="flex items-baseline gap-2 px-2.5 py-1.5 border-b border-border bg-muted/40">
               <BookOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0 self-center" />
               <span className="font-semibold font-mono truncate">{dict.def.word}</span>

@@ -211,3 +211,12 @@
 /* Brief highlight when jumping to a definition (right-click ▸ jump). */
 @keyframes sv-flash { 0%, 100% { background: transparent; } 25% { background: color-mix(in srgb, var(--sv-variation) 38%, transparent); } }
 .sv-flash { animation: sv-flash 1.2s ease-in-out; border-radius: 3px; }
+
+/* The active Find hit (stepped to with the up/down arrows) is drawn stronger
+   than the other matches — solid fill, dark text, a heavier ring. The find marks
+   set an inline background, so these need !important to win. */
+[data-sv-match].sv-match-current {
+  background: #ff8a00 !important;
+  color: #1a1205 !important;
+  box-shadow: inset 0 0 0 1.5px #b35e00, 0 0 0 1px #ff8a00 !important;
+}
