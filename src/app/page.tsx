@@ -731,6 +731,18 @@ export default function Home() {
           onEngineOpt={setEngineOpt}
           braidViz={braidViz}
           onBraidVizOpt={setBraidVizOpt}
+          onResetBraidView={() => {
+            // Idiot-proof "give me my braids back": restore every braid VIEW
+            // setting to default (opacity, hide-below-confidence, long-distance,
+            // analysis on, gutter width) without touching the project, then reload.
+            setBraidViz(DEFAULT_BRAID_VIZ);
+            try {
+              localStorage.setItem(BRAID_VIZ_KEY, JSON.stringify(DEFAULT_BRAID_VIZ));
+              localStorage.removeItem("source-variorum-analysis");
+              localStorage.removeItem("source-variorum-braid-width");
+            } catch { /* ignore */ }
+            window.location.reload();
+          }}
           assistantOn={assistantOn}
           onAssistant={setAssistantOnP}
           braidEditCount={braidEditCount}
@@ -1146,6 +1158,7 @@ function SettingsModal({
   onEngineOpt,
   braidViz,
   onBraidVizOpt,
+  onResetBraidView,
   assistantOn,
   onAssistant,
   braidEditCount,
@@ -1174,6 +1187,7 @@ function SettingsModal({
   onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
   braidViz: BraidViz;
   onBraidVizOpt: (key: keyof BraidViz, val: number) => void;
+  onResetBraidView: () => void;
   assistantOn: boolean;
   onAssistant: (v: boolean) => void;
   braidEditCount: number;
@@ -1252,6 +1266,10 @@ function SettingsModal({
 
           {tab === "braid" && (
             <div className="divide-y divide-border">
+              <div className="flex items-center justify-between gap-3 py-2">
+                <div className="text-[11px] text-muted-foreground"><strong className="text-foreground">Braids missing or faint?</strong> One click restores every braid view setting below (and the gutter) to default. It does not touch your project.</div>
+                <button onClick={onResetBraidView} className="shrink-0 px-2.5 py-1.5 rounded border border-primary/60 bg-primary/10 text-primary hover:bg-primary/20 text-[12px] font-medium">Show my braids</button>
+              </div>
               <div className="pb-2 text-[11px] text-muted-foreground">How the braid ribbons are drawn. <strong>Confidence</strong> sets each ribbon&rsquo;s line texture — <span className="font-medium">solid</span> ≥{Math.round(braidViz.confHigh * 100)}%, <span className="font-medium">dashed</span> ≥{Math.round(braidViz.confMed * 100)}%, <span className="font-medium">dotted</span> below — and the cut-offs are yours to set:</div>
               <SettingsRow label="Solid at/above" hint="Confidence at which a braid is drawn as a firm, solid ribbon.">
                 <span className="flex items-center gap-2 text-[11px] text-muted-foreground">

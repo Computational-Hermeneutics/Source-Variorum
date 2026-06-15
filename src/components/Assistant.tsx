@@ -7,36 +7,41 @@ import { poolFor, HACKERMAN } from "@/data/assistant-messages";
 
 type Persona = "clippy" | "hacker";
 
-/** A friendly (or hacked) paperclip — the Clippy homage, ported from LLMbench.
- *  A clean bent-paperclip body (outer wire doubling back inside) with a face
- *  sitting in the upper bend. */
-function ClipGlyph({ hacker, className = "w-11 h-16" }: { hacker?: boolean; className?: string }) {
-  // A grey metal paperclip (hacker: green terminal).
-  const wire = hacker ? "#00ff00" : "#8a8a8a";
-  const ink = hacker ? "#00ff00" : "#2a2a2a";
+/** The cute Clippy / Hackerman paperclip — the EXACT artwork from LLMbench
+ *  (src/components/easter-eggs/Clippy.tsx), unedited. SV already defines the
+ *  --slate and --ink HSL theme vars it uses, so it renders as-is. */
+function ClipGlyph({ hacker, className = "w-12 h-16" }: { hacker?: boolean; className?: string }) {
+  const isHackerman = hacker;
   return (
-    <svg viewBox="0 0 60 88" className={className} aria-hidden="true">
-      {/* the classic bent paperclip: an outer hairpin doubling back inside */}
-      <path d="M21 24 C21 11, 45 11, 45 24 L45 66 C45 80, 17 82, 13 66 L13 30 C13 21, 35 19, 35 30 L35 60"
-        fill="none" stroke={wire} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
-      {/* eyebrows */}
-      <path d="M19 30 q5 -3.5 10 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M31 30 q5 -3.5 10 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
-      {hacker ? (
+    <svg viewBox="0 0 48 64" className={className} aria-hidden="true">
+      <path
+        d="M24 4 C12 4, 8 12, 8 20 L8 44 C8 52, 12 58, 20 58 L28 58 C36 58, 40 52, 40 44 L40 20 C40 12, 36 8, 28 8 L20 8"
+        fill="none"
+        stroke={isHackerman ? "#00ff00" : "hsl(var(--slate))"}
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+      {isHackerman ? (
         <>
-          <rect x="19" y="35" width="9" height="4.5" rx="1" fill="#00ff00" />
-          <rect x="32" y="35" width="9" height="4.5" rx="1" fill="#00ff00" />
-          <path d="M23 47 Q30 51, 37 47" fill="none" stroke="#00ff00" strokeWidth="1.8" strokeLinecap="round" />
+          <rect x="14" y="26" width="8" height="4" rx="1" fill="#00ff00" />
+          <rect x="26" y="26" width="8" height="4" rx="1" fill="#00ff00" />
+          <line x1="22" y1="28" x2="26" y2="28" stroke="#00ff00" strokeWidth="1.5" />
         </>
       ) : (
         <>
-          <circle cx="24" cy="38" r="4" fill="#fff" stroke={ink} strokeWidth="1.5" />
-          <circle cx="36" cy="38" r="4" fill="#fff" stroke={ink} strokeWidth="1.5" />
-          <circle cx="25" cy="38.5" r="1.7" fill={ink} />
-          <circle cx="37" cy="38.5" r="1.7" fill={ink} />
-          <path d="M24 47 Q30 52, 36 47" fill="none" stroke={ink} strokeWidth="1.9" strokeLinecap="round" />
+          <circle cx="18" cy="28" r="3" fill="hsl(var(--ink))" />
+          <circle cx="30" cy="28" r="3" fill="hsl(var(--ink))" />
+          <circle cx="19" cy="27" r="1" fill="white" />
+          <circle cx="31" cy="27" r="1" fill="white" />
         </>
       )}
+      <path
+        d="M20 36 Q24 40, 28 36"
+        fill="none"
+        stroke={isHackerman ? "#00ff00" : "hsl(var(--ink))"}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
