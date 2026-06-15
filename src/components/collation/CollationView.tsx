@@ -37,6 +37,7 @@ export function CollationView({
   project,
   view,
   fontSize,
+  onFont,
   editSide,
   onEditSide,
   annotateSide,
@@ -69,6 +70,7 @@ export function CollationView({
   project: Project;
   view: View;
   fontSize: number;
+  onFont: (delta: number) => void;
   editSide: Side | null;
   onEditSide: (s: Side | null) => void;
   annotateSide: Side | null;
@@ -488,6 +490,11 @@ export function CollationView({
               <button onClick={(e) => { e.stopPropagation(); setShowDiff(true); }} title="Standard diff — unified +/− line view of the two witnesses" className="p-0.5 rounded bg-card/90 border border-border text-muted-foreground hover:text-foreground shadow-sm">
                 <DiffIcon className="w-3 h-3" />
               </button>
+              {/* Panel reading-text size (moved here from the View menu). */}
+              <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
+                <button onClick={(e) => { e.stopPropagation(); onFont(1); }} title="Larger reading text" className="px-1 py-0.5 flex items-center justify-center text-muted-foreground hover:bg-muted text-[10px] font-semibold leading-none">A+</button>
+                <button onClick={(e) => { e.stopPropagation(); onFont(-1); }} title="Smaller reading text" className="px-1 py-0.5 flex items-center justify-center text-muted-foreground hover:bg-muted text-[9px] font-semibold leading-none border-t border-border">A−</button>
+              </div>
               <button
                 onClick={(e) => { e.stopPropagation(); onSelect(null); }}
                 disabled={!selectedId}

@@ -118,43 +118,61 @@ export function OverviewStrip({
   const mini = useMemo(() => {
     if (!colMinimap) return { blocks: [] as { y: number; x: number; w: number; line: number }[], rowH: 1 };
     const CPR = mode === "text" ? 46 : 40; // approx chars per wrapped row
-    const MAX_ROWS = 2400; // hard cap on rendered rows (perf); downsampled past this
     const lines = baseText.split("\n");
-    // Pass 1: soft-wrap every line into mini-rows (each row = one or more segments).
+    const blocks: { y: number; x: number; w: number; line: number }[] = [];
+
+    if (mode === "text") {
+      // Prose: position every wrapped row by its CHARACTER OFFSET, not by a
+      // running row count. Rendered prose height is ~proportional to characters
+      // (uniform density), and so is the scroll position the viewport box maps
+      // from — so char-offset placement lines the map up with the panel, whereas
+      // the old per-line ceil(len/CPR) rounding drifted (each short line stole an
+      // extra fraction of a row). A long paragraph still spans many rows ⇒ a tall
+      // block.
+      const total = Math.max(1, baseText.length);
+      const rowH = Math.max(0.6, (CPR / total) * VH * 0.85);
+      let approx = 0; for (const l of lines) approx += Math.max(1, Math.ceil(l.length / CPR));
+      const stride = Math.max(1, Math.ceil(approx / 2600)); // perf cap on emitted rows
+      let charPos = 0, seen = 0;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].replace(/\t/g, "    ");
+        const lineStart = charPos;
+        charPos += lines[i].length + 1; // +1 for the consumed "\n"
+        if (!line.trim()) continue; // blank line → just advances the offset
+        const indent = Math.min(0.32, (line.length - line.trimStart().length) / 90);
+        const nrows = Math.max(1, Math.ceil(line.length / CPR));
+        for (let r = 0; r < nrows; r++) {
+          if (seen++ % stride !== 0) continue;
+          const segLen = r === nrows - 1 ? line.length - r * CPR : CPR;
+          const x = r === 0 ? indent : 0;
+          const y = ((lineStart + r * CPR) / total) * VH;
+          blocks.push({ y, x, w: Math.min(0.97 - x, Math.max(0.05, (segLen / CPR) * 0.97)), line: i + 1 });
+        }
+      }
+      return { blocks, rowH };
+    }
+
+    // Code: each source line is ~one rendered row, so position by row index (a
+    // blank or short line still takes a row, matching the panel). Word-blocks per
+    // wrapped row keep indentation/structure legible.
     const rows: { line: number; segs: { x: number; w: number }[] }[] = [];
     for (let i = 0; i < lines.length && rows.length < 8000; i++) {
       const line = lines[i].replace(/\t/g, "    ");
-      const trimmed = line.trim();
-      if (!trimmed) { rows.push({ line: i + 1, segs: [] }); continue; } // blank → empty row
+      if (!line.trim()) { rows.push({ line: i + 1, segs: [] }); continue; }
       const nrows = Math.max(1, Math.ceil(line.length / CPR));
-      if (mode === "text") {
-        // Prose: each wrapped row is a solid bar (full width except the ragged
-        // last line of the paragraph), so the paragraph fills as a block.
-        const indent = Math.min(0.32, (line.length - line.trimStart().length) / 90);
-        for (let r = 0; r < nrows; r++) {
-          const segLen = r === nrows - 1 ? line.length - r * CPR : CPR;
-          const x = r === 0 ? indent : 0;
-          rows.push({ line: i + 1, segs: [{ x, w: Math.min(0.97 - x, Math.max(0.05, (segLen / CPR) * 0.97)) }] });
-        }
-      } else {
-        // Code: place each whitespace-run on its wrapped row by char column.
-        const byRow: { x: number; w: number }[][] = Array.from({ length: nrows }, () => []);
-        const re = /\S+/g; let m: RegExpExecArray | null;
-        while ((m = re.exec(line))) {
-          const r = Math.floor(m.index / CPR);
-          const col = (m.index % CPR) / CPR;
-          const w = Math.min(0.97 - col, m[0].length / CPR);
-          if (r < nrows && w > 0) byRow[r].push({ x: col, w });
-        }
-        for (let r = 0; r < nrows; r++) rows.push({ line: i + 1, segs: byRow[r] });
+      const byRow: { x: number; w: number }[][] = Array.from({ length: nrows }, () => []);
+      const re = /\S+/g; let m: RegExpExecArray | null;
+      while ((m = re.exec(line))) {
+        const r = Math.floor(m.index / CPR);
+        const col = (m.index % CPR) / CPR;
+        const w = Math.min(0.97 - col, m[0].length / CPR);
+        if (r < nrows && w > 0) byRow[r].push({ x: col, w });
       }
+      for (let r = 0; r < nrows; r++) rows.push({ line: i + 1, segs: byRow[r] });
     }
-    // Pass 2: emit, downsampling by stride if we blew past MAX_ROWS.
     const total = Math.max(1, rows.length);
-    const stride = Math.max(1, Math.ceil(total / MAX_ROWS));
-    const rowStep = (VH / total) * stride;
-    const rowH = Math.max(0.6, rowStep * 0.72); // small gap → reads as lines, not a slab
-    const blocks: { y: number; x: number; w: number; line: number }[] = [];
+    const stride = Math.max(1, Math.ceil(total / 2400));
+    const rowH = Math.max(0.6, (VH / total) * stride * 0.7);
     for (let idx = 0; idx < total; idx += stride) {
       const y = (idx / total) * VH;
       for (const s of rows[idx].segs) blocks.push({ y, x: s.x, w: s.w, line: rows[idx].line });

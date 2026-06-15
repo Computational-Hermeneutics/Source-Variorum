@@ -415,11 +415,6 @@ export default function Home() {
         { kind: "separator" },
         { kind: "action", label: "Annotations & apparatus…", onClick: () => setShowApparatus(true) },
         { kind: "separator" },
-        { kind: "header", label: "Text size" },
-        { kind: "action", label: "Larger", shortcut: "A+", onClick: () => setFont(1) },
-        { kind: "action", label: "Smaller", shortcut: "A−", onClick: () => setFont(-1) },
-        { kind: "action", label: "Reset", onClick: () => setFontSize(13) },
-        { kind: "separator" },
         { kind: "header", label: "Show variants" },
         ...VARIANT_TYPES.map((t): MenuEntry => ({
           kind: "checkbox",
@@ -515,6 +510,7 @@ export default function Home() {
             project={project}
             view={view}
             fontSize={fontSize}
+            onFont={setFont}
             editSide={editSide}
             onEditSide={setEditSide}
             annotateSide={annotateSide}
