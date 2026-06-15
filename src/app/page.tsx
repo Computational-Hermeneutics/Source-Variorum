@@ -1058,8 +1058,17 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           </ul>
         </section>
         <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">A working close read</h3>
-          <p>The collation is computed live, and your editorial edits (approve / doubt / flag / swap / delete a braid) are always applied on top — this is a working close read, not a frozen machine reading. Clear all braids in <strong>Settings ▸ Data</strong> to return to the pristine auto-collation.</p>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Editing the braid · Auto vs User</h3>
+          <p>Select a braid (or a highlight) for a compact editor in the margin: <strong>approve 👍</strong>, <strong>doubt 👎</strong> (graduated, −25% per click), flag <strong>tentative</strong>, <strong>swap the type</strong>, or <strong>delete</strong> it. Your edits are saved with the project as an editorial layer keyed to the reading pair, so they survive re-collation.</p>
+          <p className="mt-1.5">The <strong>Auto | User</strong> toggle (top right) chooses what the braid shows: <strong>User</strong> (default) applies your editorial layer — your working close read; <strong>Auto</strong> previews the pristine engine braid without deleting your edits. Editing a braid flips you to User automatically. <em>Clear all braids</em> in <strong>Settings ▸ Data</strong> removes the layer for good. If braids ever look missing, <strong>View ▸ Show my braids</strong> resets the braid view to defaults.</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Click, look up, jump</h3>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Single click</strong> a highlight to select the locus and pull the other panel into line; <strong>click again</strong> to deselect.</li>
+            <li><strong>Double-click</strong> selects the word (or code token).</li>
+            <li><strong>Right-click</strong> (or <Key>⌥</Key>/Alt-click, a backup) looks the word up in a <strong>dictionary</strong>: in CodeX, the bundled PDP-1 instruction set; in TextX, an online dictionary. If the token is a macro or label defined in the witness, the popup shows the defining snippet — <strong>click its header to jump</strong> to the definition.</li>
+          </ul>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Apparatus, notes &amp; export</h3>
