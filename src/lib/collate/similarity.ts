@@ -26,6 +26,10 @@ export interface NormalizeOptions {
    *  modernised witnesses align. Heuristic and deliberately aggressive: it can
    *  over-merge (e.g. "hat"≈"hate"), so it is off by default. */
   regulariseSpelling?: boolean;
+  /** TX-Engine: compare readings as a bag of words (sort tokens) so two passages
+   *  with the same words in a different order count as the same reading — a
+   *  reordered clause is a match/variant, not an unrelated substitution. */
+  ignoreWordOrder?: boolean;
 }
 
 export const DEFAULT_NORMALIZE: NormalizeOptions = {
@@ -34,6 +38,7 @@ export const DEFAULT_NORMALIZE: NormalizeOptions = {
   ignoreWhitespace: true,
   ignoreComments: false,
   regulariseSpelling: false,
+  ignoreWordOrder: false,
 };
 
 /** Strip line and block comments across the common syntaxes (PDP-1 / assembler
@@ -66,13 +71,31 @@ function regulariseSpelling(s: string): string {
  *  significant by turning the corresponding flag off. The optional engine flags
  *  (ignoreComments, regulariseSpelling) add code- and text-specific folding.
  *  Callers that need verbatim equality compare the raw strings separately. */
+// Memoise by input string for the current option signature. The aligner calls
+// normalize on the same segment texts hundreds of thousands of times (every DP
+// cell in the residue pass, every move-detection pair), so caching the result
+// turns repeated work — including the costly sort/spelling folds — into a lookup.
+// The cache clears whenever the options change or it grows past a cap.
+const normCache = new Map<string, string>();
+let normCacheSig = "\0";
+function sigOf(o: NormalizeOptions): string {
+  return `${+!!o.ignoreCase}${+!!o.ignorePunctuation}${+!!o.ignoreWhitespace}${+!!o.ignoreComments}${+!!o.regulariseSpelling}${+!!o.ignoreWordOrder}`;
+}
+
 export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): string {
+  const sig = sigOf(o);
+  if (sig !== normCacheSig) { normCache.clear(); normCacheSig = sig; }
+  const hit = normCache.get(s);
+  if (hit !== undefined) return hit;
   let r = s;
   if (o.ignoreComments) r = stripComments(r);
   if (o.ignoreWhitespace) r = r.replace(/\s+/g, " ").trim();
   if (o.ignorePunctuation) r = r.replace(/[^\p{L}\p{N}\s]/gu, "");
   if (o.ignoreCase) r = r.toLowerCase();
   if (o.regulariseSpelling) r = regulariseSpelling(r);
+  if (o.ignoreWordOrder) r = r.split(/\s+/).filter(Boolean).sort().join(" ");
+  if (normCache.size > 60000) normCache.clear();
+  normCache.set(s, r);
   return r;
 }
 

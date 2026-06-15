@@ -100,6 +100,18 @@ export function variantLabel(type: VariantType, mode: CollationMode): string {
   return VARIANT_TYPE_LABELS[type];
 }
 
+/**
+ * Confidence that a braid (a pairing of two readings) is correct, in [0,1].
+ * Substitution / variant / transposition are *guesses* the engine made by
+ * similarity, so their confidence IS that similarity. A match is verbatim-equal
+ * (certain). An addition / omission is one-sided — there is no pairing to be
+ * unsure about — so it is solid too. Low-confidence braids are the fuzzy
+ * pairings, which the visualisation renders dashed below a threshold. */
+export function confidenceOf(v: Variant): number {
+  if (v.type === "match" || v.type === "addition" || v.type === "deletion") return 1;
+  return v.similarity;
+}
+
 /** Colours for tinting passages and ribbons. Editorial palette, not Vector Lab. */
 export const VARIANT_TYPE_COLORS: Record<VariantType, string> = {
   match: "#9fb8c4", // muted blue (the braid's resting colour)

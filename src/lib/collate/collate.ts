@@ -38,6 +38,12 @@ export interface CollateOptions {
    *  off, displaced text falls through to plain addition/deletion — a tighter,
    *  more literal braid. Default on. */
   detectMoves: boolean;
+  /** TX-Engine: segment by LINE rather than sentence — for verse, drama, and
+   *  anything where the line, not the sentence, is the unit of comparison. */
+  segmentByLine?: boolean;
+  /** CX-Engine: drop blank lines before aligning, so added/removed blank lines
+   *  (reformatting) do not register as additions/deletions. */
+  ignoreBlankLines?: boolean;
 }
 
 export const DEFAULT_OPTIONS: CollateOptions = {
@@ -48,6 +54,8 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   subThreshold: 0.2,
   normalize: DEFAULT_NORMALIZE,
   detectMoves: true,
+  segmentByLine: false,
+  ignoreBlankLines: false,
 };
 
 /**
@@ -308,8 +316,17 @@ export function collate(
 ): Variant[] {
   // Base defaults < mode profile (literal for code, smart for prose) < explicit.
   const opts: CollateOptions = { ...DEFAULT_OPTIONS, ...MODE_PROFILE[options.mode], ...options };
-  const segsA = segment(witnessA.text, opts.mode);
-  const segsB = segment(witnessB.text, opts.mode);
+  // Segment by line when asked (verse/drama in the TX-Engine), else by the mode's
+  // natural unit. Optionally drop blank-line segments (CX-Engine reformatting),
+  // re-indexing so the remaining segments stay contiguous for run-merging.
+  const segMode: CollationMode = opts.segmentByLine ? "source" : opts.mode;
+  const prep = (text: string): Segment[] => {
+    let segs = segment(text, segMode);
+    if (opts.ignoreBlankLines) segs = segs.filter((s) => s.text.trim().length > 0).map((s, i) => ({ ...s, index: i }));
+    return segs;
+  };
+  const segsA = prep(witnessA.text);
+  const segsB = prep(witnessB.text);
 
   const keysA = segsA.map((s) => normalize(s.text, opts.normalize));
   const keysB = segsB.map((s) => normalize(s.text, opts.normalize));

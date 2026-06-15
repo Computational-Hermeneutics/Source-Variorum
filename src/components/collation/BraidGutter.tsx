@@ -12,6 +12,8 @@ export interface Ribbon {
   yB: number;
   /** Variant length, for stroke thickness. */
   length: number;
+  /** Confidence that this pairing is correct, in [0,1] (see confidenceOf). */
+  confidence: number;
 }
 
 /** Map a variant length to a stroke width. Matches stay hairline; larger moved
@@ -30,6 +32,7 @@ export function BraidGutter({
   selectedId,
   hoveredId,
   visibleTypes,
+  confidenceThreshold = 0,
   onSelect,
   onHover,
 }: {
@@ -40,6 +43,8 @@ export function BraidGutter({
   selectedId: string | null;
   hoveredId: string | null;
   visibleTypes: Set<VariantType>;
+  /** Braids with confidence below this render dashed (the engine's fuzzy guesses). */
+  confidenceThreshold?: number;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
 }) {
@@ -66,6 +71,10 @@ export function BraidGutter({
         const color = VARIANT_TYPE_COLORS[r.type];
         const active = isSelected || r.id === hoveredId;
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
+        // Low-confidence braids (fuzzy pairings below the threshold) render dashed
+        // so the eye can tell a sure correspondence from one the engine guessed.
+        const low = confidenceThreshold > 0 && r.confidence < confidenceThreshold;
+        const dash = low ? `${Math.max(2, w * 0.9)} ${Math.max(3, w * 1.6)}` : undefined;
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
         // The further apart the two ends sit, the more the reading has moved —
@@ -89,8 +98,9 @@ export function BraidGutter({
             fill="none"
             stroke={color}
             strokeWidth={w}
-            strokeLinecap="round"
-            opacity={opacity}
+            strokeLinecap={low ? "butt" : "round"}
+            strokeDasharray={dash}
+            opacity={low && !active ? opacity * 0.85 : opacity}
             style={{ cursor: r.type === "match" ? "default" : "pointer", transition: "opacity 120ms, stroke-width 120ms" }}
             onMouseEnter={() => onHover(r.id)}
             onMouseLeave={() => onHover(null)}

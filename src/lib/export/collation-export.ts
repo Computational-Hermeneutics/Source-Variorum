@@ -31,12 +31,20 @@ export function pairOf(c: Collation): [Witness, Witness] {
  *  collation. `normalize` lets the caller pass the active engine settings
  *  (ignore case / punctuation / whitespace / comments / spelling); `detectMoves`
  *  toggles transposition recovery. Both default to the engine defaults. */
-export function deriveView(c: Collation, normalize?: NormalizeOptions, detectMoves?: boolean) {
+export function deriveView(
+  c: Collation,
+  normalize?: NormalizeOptions,
+  detectMoves?: boolean,
+  extra?: { segmentByLine?: boolean; ignoreBlankLines?: boolean; subThreshold?: number },
+) {
   const [a, b] = pairOf(c);
   let variants = collate(a, b, {
     mode: c.mode,
     ...(normalize ? { normalize } : {}),
     ...(detectMoves !== undefined ? { detectMoves } : {}),
+    ...(extra?.segmentByLine !== undefined ? { segmentByLine: extra.segmentByLine } : {}),
+    ...(extra?.ignoreBlankLines !== undefined ? { ignoreBlankLines: extra.ignoreBlankLines } : {}),
+    ...(extra?.subThreshold !== undefined ? { subThreshold: extra.subThreshold } : {}),
   });
   const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
   if (links.length) variants = applyManualLinks(variants, links, a, b);

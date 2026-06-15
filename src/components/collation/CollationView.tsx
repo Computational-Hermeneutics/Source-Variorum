@@ -5,7 +5,7 @@ import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockO
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
-import { VARIANT_TYPE_COLORS, variantLabel, comparableWitnesses } from "@/types/collation";
+import { VARIANT_TYPE_COLORS, variantLabel, comparableWitnesses, confidenceOf } from "@/types/collation";
 import { LANGS, highlightRanges, tokenStyle } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
@@ -63,6 +63,7 @@ export function CollationView({
   stripVisible,
   onHideStrip,
   search,
+  confidenceThreshold,
   isDark,
 }: {
   project: Project;
@@ -94,6 +95,8 @@ export function CollationView({
   stripVisible: boolean;
   onHideStrip: () => void;
   search?: string;
+  /** Braids below this confidence render dashed (0 = all solid). */
+  confidenceThreshold: number;
   isDark: boolean;
 }) {
   const editMode = editSide !== null;
@@ -441,6 +444,7 @@ export function CollationView({
                   selectedId={selectedId}
                   hoveredId={hoveredId}
                   maxLength={maxLength}
+                  confidenceThreshold={confidenceThreshold}
                   onSelect={onSelect}
                   onHover={setHoveredId}
                   fontSize={fontSize}
@@ -730,6 +734,7 @@ function BraidLayer({
   selectedId,
   hoveredId,
   maxLength,
+  confidenceThreshold,
   onSelect,
   onHover,
   fontSize,
@@ -744,6 +749,7 @@ function BraidLayer({
   selectedId: string | null;
   hoveredId: string | null;
   maxLength: number;
+  confidenceThreshold: number;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
   fontSize: number;
@@ -775,7 +781,7 @@ function BraidLayer({
       // leaves the viewport toward an off-screen counterpart (the braid's point).
       const visA = yA >= -24 && yA <= H + 24, visB = yB >= -24 && yB <= H + 24;
       if (!visA && !visB) continue;
-      next.push({ id: v.id, type: v.type, yA, yB, length: v.length });
+      next.push({ id: v.id, type: v.type, yA, yB, length: v.length, confidence: confidenceOf(v) });
     }
     setRibbons(next);
     setSize({ width: gutter.clientWidth, height: H });
@@ -810,6 +816,7 @@ function BraidLayer({
       selectedId={selectedId}
       hoveredId={hoveredId}
       visibleTypes={visibleTypes}
+      confidenceThreshold={confidenceThreshold}
       onSelect={onSelect}
       onHover={onHover}
     />
@@ -1294,6 +1301,9 @@ function DeepDivePanel({
         {stat("Deletions", String(metrics.counts.deletion), "Passages present in the base but absent from the right (B) witness — text omitted.")}
         {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`, "Raw character length of each witness, base (A) → right (B). A quick sense of how much each side carries.")}
       </div>
+      <p className="mt-4 pt-3 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
+        <strong className="text-foreground/80">Confidence.</strong> Each braid carries a confidence in [0,1] — its pairing similarity (the engine&rsquo;s Sørensen–Dice score). A verbatim <em>match</em> is 1.0; a <em>substitution</em>, <em>variant</em>, or <em>transposition</em> takes the similarity of the two readings it joins; one-sided <em>additions</em>/<em>omissions</em> have no pairing to doubt and stay solid. The <strong>Confidence</strong> slider in the status bar dashes every braid below a chosen threshold, so the firm correspondences and the engine&rsquo;s fuzzier guesses read apart at a glance.
+      </p>
     </ModalCard>
   );
 }

@@ -24,6 +24,14 @@ const LANG_KEY = "source-variorum-lang";
 const USER_KEY = "source-variorum-user";
 const TOKENIZER_KEY = "source-variorum-tokenizer";
 const DETECT_MOVES_KEY = "source-variorum-detect-moves";
+const CONFIDENCE_KEY = "source-variorum-confidence";
+const ENGINE_OPTS_KEY = "source-variorum-engine-opts";
+
+/** Engine-level (non-normalisation) braid options. `looseThreshold` is the
+ *  TX-Engine sub-pairing sensitivity (lower = pair reworded sentences more
+ *  eagerly); it maps to the engine's subThreshold in text mode only. */
+type EngineOpts = { segmentByLine: boolean; ignoreBlankLines: boolean; looseThreshold: number };
+const DEFAULT_ENGINE_OPTS: EngineOpts = { segmentByLine: false, ignoreBlankLines: false, looseThreshold: 0.2 };
 
 /** A small glyph for each engine — CX (code) and TX (text) — reused in Help,
  *  Analyse ▸ Engines, and Settings so the two engines read as one identity. */
@@ -148,6 +156,8 @@ export default function Home() {
   const [userName, setUserName] = useState("");
   const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
   const [detectMoves, setDetectMoves] = useState(true);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0); // 0..1; 0 = all braids solid
+  const [engineOpts, setEngineOpts] = useState<EngineOpts>(DEFAULT_ENGINE_OPTS);
   const [showEngines, setShowEngines] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
@@ -193,6 +203,10 @@ export default function Home() {
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
       const dm = localStorage.getItem(DETECT_MOVES_KEY);
       if (dm != null) setDetectMoves(dm === "1");
+      const cf = localStorage.getItem(CONFIDENCE_KEY);
+      if (cf != null) setConfidenceThreshold(Math.min(1, Math.max(0, parseFloat(cf) || 0)));
+      const eo = localStorage.getItem(ENGINE_OPTS_KEY);
+      if (eo) setEngineOpts({ ...DEFAULT_ENGINE_OPTS, ...JSON.parse(eo) });
       const sc = localStorage.getItem("source-variorum-strip-cols");
       if (sc) setStripCols((prev) => ({ ...prev, ...JSON.parse(sc) }));
       if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
@@ -248,7 +262,15 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project]);
 
-  const view = useMemo(() => deriveView(collation, tokenizer, detectMoves), [collation, tokenizer, detectMoves]);
+  const view = useMemo(
+    () => deriveView(collation, tokenizer, detectMoves, {
+      segmentByLine: engineOpts.segmentByLine,
+      ignoreBlankLines: engineOpts.ignoreBlankLines,
+      // Loose-pairing sensitivity is a TX-Engine control; leave code on its default.
+      subThreshold: collation.mode === "text" ? engineOpts.looseThreshold : undefined,
+    }),
+    [collation, tokenizer, detectMoves, engineOpts]
+  );
 
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
@@ -270,6 +292,18 @@ export default function Home() {
   const setDetectMovesP = (val: boolean) => {
     setDetectMoves(val);
     try { localStorage.setItem(DETECT_MOVES_KEY, val ? "1" : "0"); } catch { /* ignore */ }
+  };
+  const setConfidenceP = (val: number) => {
+    const v = Math.min(1, Math.max(0, val));
+    setConfidenceThreshold(v);
+    try { localStorage.setItem(CONFIDENCE_KEY, String(v)); } catch { /* ignore */ }
+  };
+  const setEngineOpt = <K extends keyof EngineOpts>(key: K, val: EngineOpts[K]) => {
+    setEngineOpts((prev) => {
+      const next = { ...prev, [key]: val };
+      try { localStorage.setItem(ENGINE_OPTS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   };
   const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
     setTokenizer((prev) => {
@@ -504,6 +538,7 @@ export default function Home() {
             stripVisible={stripVisible}
             onHideStrip={() => setStripCols((p) => { const next = { minimap: false, variants: false, hotspots: false }; try { localStorage.setItem("source-variorum-strip-cols", JSON.stringify(next)); } catch {} return next; })}
             search={search}
+            confidenceThreshold={confidenceThreshold}
             isDark={isDark}
           />
         </main>
@@ -528,6 +563,19 @@ export default function Home() {
             );
           })}
         </div>
+        {/* Confidence threshold — braids the engine is less sure of (low pairing
+            similarity) render dashed at or above this cut. 0 = all solid. */}
+        <span className="inline-flex items-center gap-1.5 shrink-0" title="Confidence threshold: braids below this (fuzzy pairings the engine guessed) render dashed. Drag to 0 to show all solid.">
+          <span className={confidenceThreshold > 0 ? "text-foreground" : ""}>Confidence</span>
+          <input
+            type="range" min={0} max={100} step={5}
+            value={Math.round(confidenceThreshold * 100)}
+            onChange={(e) => setConfidenceP(parseInt(e.target.value, 10) / 100)}
+            className="w-20 accent-primary align-middle"
+            aria-label="Confidence threshold"
+          />
+          <span className="tabular-nums w-9">{confidenceThreshold > 0 ? `≥${Math.round(confidenceThreshold * 100)}%` : "off"}</span>
+        </span>
         <span className="ml-auto inline-flex items-center gap-2 shrink-0">
           {/* Find in both panels */}
           <span className="inline-flex items-center gap-1 rounded border border-border bg-card px-1.5 py-0.5">
@@ -569,6 +617,8 @@ export default function Home() {
           onTokenizer={setTokenizerOpt}
           detectMoves={detectMoves}
           onDetectMoves={setDetectMovesP}
+          engineOpts={engineOpts}
+          onEngineOpt={setEngineOpt}
           onClose={() => setShowEngines(false)}
         />
       )}
@@ -590,6 +640,8 @@ export default function Home() {
           onTokenizer={setTokenizerOpt}
           detectMoves={detectMoves}
           onDetectMoves={setDetectMovesP}
+          engineOpts={engineOpts}
+          onEngineOpt={setEngineOpt}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -746,6 +798,8 @@ function EnginesModal({
   onTokenizer,
   detectMoves,
   onDetectMoves,
+  engineOpts,
+  onEngineOpt,
   onClose,
 }: {
   mode: CollationMode;
@@ -754,6 +808,8 @@ function EnginesModal({
   onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
   detectMoves: boolean;
   onDetectMoves: (val: boolean) => void;
+  engineOpts: EngineOpts;
+  onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
   onClose: () => void;
 }) {
   const [view, setView] = useState<CollationMode>(mode);
@@ -802,6 +858,9 @@ function EnginesModal({
                 <SettingsRow label="Ignore comments" hint="Strip ; // # /* … */ before matching, so a re-/de-commented line still aligns.">
                   <Toggle on={!!tokenizer.ignoreComments} onClick={() => onTokenizer("ignoreComments", !tokenizer.ignoreComments)} />
                 </SettingsRow>
+                <SettingsRow label="Ignore blank lines" hint="Drop blank lines before aligning, so added/removed spacing isn't an addition/deletion.">
+                  <Toggle on={engineOpts.ignoreBlankLines} onClick={() => onEngineOpt("ignoreBlankLines", !engineOpts.ignoreBlankLines)} />
+                </SettingsRow>
                 <SettingsRow label="Detect moved blocks" hint="Recover relocated code as a transposition. Off ⇒ a tighter add/delete braid.">
                   <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
                 </SettingsRow>
@@ -811,11 +870,20 @@ function EnginesModal({
                 <SettingsRow label="Regularise spelling" hint="Fold early-modern ↔ modern orthography (long-s, u/v, i/j, vv→w, doubled letters, final -e). Aggressive — can over-merge.">
                   <Toggle on={!!tokenizer.regulariseSpelling} onClick={() => onTokenizer("regulariseSpelling", !tokenizer.regulariseSpelling)} />
                 </SettingsRow>
+                <SettingsRow label="Word-order insensitive" hint="Compare readings as a bag of words, so a reordered clause counts as the same reading.">
+                  <Toggle on={!!tokenizer.ignoreWordOrder} onClick={() => onTokenizer("ignoreWordOrder", !tokenizer.ignoreWordOrder)} />
+                </SettingsRow>
+                <SettingsRow label="Segment by line (verse)" hint="Align line by line instead of sentence by sentence — for verse and drama.">
+                  <Toggle on={engineOpts.segmentByLine} onClick={() => onEngineOpt("segmentByLine", !engineOpts.segmentByLine)} />
+                </SettingsRow>
                 <SettingsRow label="Ignore accidentals" hint="Treat punctuation as non-substantive (the substantives/accidentals distinction).">
                   <Toggle on={tokenizer.ignorePunctuation} onClick={() => onTokenizer("ignorePunctuation", !tokenizer.ignorePunctuation)} />
                 </SettingsRow>
                 <SettingsRow label="Detect moved passages" hint="Recover relocated prose as a transposition. Off ⇒ plain addition/omission.">
                   <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
+                </SettingsRow>
+                <SettingsRow label="Loose pairing" hint={`How eagerly to pair reworded sentences as one substitution (lower = more eager). Now ${engineOpts.looseThreshold.toFixed(2)}.`}>
+                  <input type="range" min={5} max={70} step={5} value={Math.round(engineOpts.looseThreshold * 100)} onChange={(e) => onEngineOpt("looseThreshold", parseInt(e.target.value, 10) / 100)} className="w-24 accent-primary" aria-label="Loose pairing sensitivity" />
                 </SettingsRow>
               </>
             )}
@@ -847,6 +915,11 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             <li><EngineIcon engine="text" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>TX-Engine</strong> (text) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
           </ul>
           <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style normalisation toggles; the engines differ in their unit of alignment, their matching thresholds, and their per-engine options (Settings ▸ CX-Engine / TX-Engine).</p>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Confidence</h3>
+          <p>Most braids are not certain — when the engine pairs two readings that are not identical (a reworded sentence, a renamed label, a moved block) it is making a judgement, scored by how alike the two sides are. That score is the braid&rsquo;s <strong>confidence</strong>: 100% for a verbatim match, lower for a fuzzy pairing. One-sided additions and omissions have no pairing to doubt, so they stay solid.</p>
+          <p className="mt-1.5">The <strong>Confidence</strong> slider in the status bar sets a threshold: braids the engine is <em>less</em> sure of than the threshold render <strong>dashed</strong>, so you can see at a glance which correspondences are firm and which are the engine&rsquo;s best guess. Drag it to <em>off</em> to draw every braid solid. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
@@ -888,6 +961,10 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               <p className="text-[9px] leading-snug text-muted-foreground/80">Eddy &amp; Viv were defined by the VVV / Translation Arrays team (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry); see ShakerVis (Geng, Cheesman, Laramee, Flanagan &amp; Thiel, <em>Information Visualization</em> 14(4), 2013) and Cheesman et al., delightedbeauty.org/vvv.</p>
             </div>
           </details>
+        </section>
+        <section>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Lineage</h3>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">Source Variorum is part of the <a href="https://computational-hermeneutics.github.io" target="_blank" rel="noreferrer" className="text-primary hover:underline">Computational Hermeneutics</a> family of tools. As software it grows from the same codebase lineage as the <strong>Critical Code Studies Workbench (CCS-WB)</strong> and LLMbench — sharing their local-first, no-model-calls architecture and editor scaffolding — and its design draws on Juxta, the Versioning Machine, and the VVV / Translation Arrays project (see About).</p>
         </section>
       </div>
     </ModalShell>
@@ -945,6 +1022,8 @@ function SettingsModal({
   onTokenizer,
   detectMoves,
   onDetectMoves,
+  engineOpts,
+  onEngineOpt,
   onResetData,
 }: {
   onClose: () => void;
@@ -963,6 +1042,8 @@ function SettingsModal({
   onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
   detectMoves: boolean;
   onDetectMoves: (val: boolean) => void;
+  engineOpts: EngineOpts;
+  onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
   onResetData: () => void;
 }) {
   const [tab, setTab] = useState<SettingsTab>("user");
@@ -978,27 +1059,29 @@ function SettingsModal({
         </div>
       }
     >
-      <div className="flex gap-5 min-h-[16rem]">
-        {/* Left tab rail */}
-        <nav className="shrink-0 w-28 flex flex-col gap-0.5">
+      <div className="flex min-h-[16rem]">
+        {/* Left tab rail — the active tab is highlighted and runs flush to the
+            divider so it reads as connected to the panel it shows on the right. */}
+        <nav className="shrink-0 w-28 flex flex-col gap-0.5 border-r border-border pr-3 relative z-10">
           {SETTINGS_TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={"flex items-center gap-1.5 text-left px-2.5 py-1.5 rounded text-[13px] " + (tab === t.id ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted text-foreground/80")}
+              aria-current={tab === t.id ? "page" : undefined}
+              className={"flex items-center gap-1.5 text-left px-2.5 py-1 text-[11.5px] rounded-md " + (tab === t.id ? "bg-primary text-primary-foreground font-semibold rounded-r-none -mr-3 pr-3" : "hover:bg-muted text-foreground/70")}
             >
-              {t.id === "code" && <EngineIcon engine="source" className="w-3.5 h-3.5 shrink-0" />}
-              {t.id === "text" && <EngineIcon engine="text" className="w-3.5 h-3.5 shrink-0" />}
+              {t.id === "code" && <EngineIcon engine="source" className="w-3 h-3 shrink-0" />}
+              {t.id === "text" && <EngineIcon engine="text" className="w-3 h-3 shrink-0" />}
               {t.label}
             </button>
           ))}
         </nav>
 
         {/* Panel content */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pl-5">
           {tab === "user" && (
             <div className="divide-y divide-border">
-              <SettingsRow label="Your name" hint="Signs annotations and apparatus notes (like CCS-WB).">
+              <SettingsRow label="Your name" hint="Signs your annotations and apparatus notes.">
                 <input
                   value={userName}
                   onChange={(e) => onUserName(e.target.value)}
@@ -1040,6 +1123,9 @@ function SettingsModal({
               <SettingsRow label="Ignore comments" hint="Strip ; // # /* … */ before matching, so a re-/de-commented line still aligns.">
                 <Toggle on={!!tokenizer.ignoreComments} onClick={() => onTokenizer("ignoreComments", !tokenizer.ignoreComments)} />
               </SettingsRow>
+              <SettingsRow label="Ignore blank lines" hint="Drop blank lines before aligning, so added/removed spacing isn't an addition/deletion.">
+                <Toggle on={engineOpts.ignoreBlankLines} onClick={() => onEngineOpt("ignoreBlankLines", !engineOpts.ignoreBlankLines)} />
+              </SettingsRow>
               <SettingsRow label="Detect moved blocks" hint="Recover relocated code as a transposition. Off ⇒ a tighter add/delete braid.">
                 <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
               </SettingsRow>
@@ -1067,6 +1153,18 @@ function SettingsModal({
               <div className="pb-2 text-[11px] text-muted-foreground">The <strong>TX-Engine</strong> aligns prose <strong>sentence by sentence</strong> and reads smartly. These options decide which differences count as a real variant (Juxta-style normalisation). The case / punctuation / whitespace toggles apply to both engines.</div>
               <SettingsRow label="Regularise spelling" hint="Fold early-modern ↔ modern orthography (long-s, u/v, i/j, vv→w, doubled letters, final -e) so old-spelling and modern witnesses align. Aggressive — can over-merge.">
                 <Toggle on={!!tokenizer.regulariseSpelling} onClick={() => onTokenizer("regulariseSpelling", !tokenizer.regulariseSpelling)} />
+              </SettingsRow>
+              <SettingsRow label="Word-order insensitive" hint="Compare readings as a bag of words, so a reordered clause counts as the same reading, not a substitution.">
+                <Toggle on={!!tokenizer.ignoreWordOrder} onClick={() => onTokenizer("ignoreWordOrder", !tokenizer.ignoreWordOrder)} />
+              </SettingsRow>
+              <SettingsRow label="Segment by line (verse)" hint="Align line by line instead of sentence by sentence — for verse and drama.">
+                <Toggle on={engineOpts.segmentByLine} onClick={() => onEngineOpt("segmentByLine", !engineOpts.segmentByLine)} />
+              </SettingsRow>
+              <SettingsRow label="Loose pairing" hint={`How eagerly to pair reworded sentences as one substitution (lower = more eager). Now ${engineOpts.looseThreshold.toFixed(2)}.`}>
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-7">{engineOpts.looseThreshold.toFixed(2)}</span>
+                  <input type="range" min={5} max={70} step={5} value={Math.round(engineOpts.looseThreshold * 100)} onChange={(e) => onEngineOpt("looseThreshold", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Loose pairing sensitivity" />
+                </span>
               </SettingsRow>
               <SettingsRow label="Detect moved passages" hint="Recover relocated prose as a transposition. Off ⇒ plain addition/omission.">
                 <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
