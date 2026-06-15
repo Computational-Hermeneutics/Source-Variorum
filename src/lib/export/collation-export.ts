@@ -78,6 +78,10 @@ export function parseProjectFile(text: string): SavedCollation | null {
         links: data.links ?? [],
         apparatusEdits: data.apparatusEdits ?? {},
         manualLinks: data.manualLinks ?? {},
+        // The editorial layer MUST survive a save/load round-trip — these ARE the
+        // user's working edition on top of the auto-collation.
+        variantOverrides: data.variantOverrides ?? {},
+        notes: typeof data.notes === "string" ? data.notes : undefined,
         folders: Array.isArray(data.folders) ? data.folders : [],
         trash: Array.isArray(data.trash) ? data.trash : [],
         createdAt: data.createdAt ?? new Date().toISOString(),
