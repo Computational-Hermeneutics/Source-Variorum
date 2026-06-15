@@ -263,15 +263,69 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project]);
 
-  const view = useMemo(
-    () => deriveView(collation, tokenizer, detectMoves, {
-      segmentByLine: engineOpts.segmentByLine,
-      ignoreBlankLines: engineOpts.ignoreBlankLines,
-      // Loose-pairing sensitivity is a TX-Engine control; leave code on its default.
-      subThreshold: collation.mode === "text" ? engineOpts.looseThreshold : undefined,
-    }),
-    [collation, tokenizer, detectMoves, engineOpts]
-  );
+  // Engine knobs beyond normalize + move toggle (loose-pairing is TX-only).
+  const extra = useMemo(() => ({
+    segmentByLine: engineOpts.segmentByLine,
+    ignoreBlankLines: engineOpts.ignoreBlankLines,
+    subThreshold: collation.mode === "text" ? engineOpts.looseThreshold : undefined,
+  }), [engineOpts, collation.mode]);
+
+  // ----- The derived view runs in a Web Worker so a slow recompute never freezes
+  // the UI: the page stays live, a progress bar shows, and the user can CANCEL
+  // mid-compute (terminating the worker). The FIRST view is computed synchronously
+  // so `view` is never null and the panels have something to render immediately;
+  // every later recompute is handed to the worker. Falls back to synchronous
+  // compute if workers are unavailable. -----
+  const [view, setView] = useState(() => deriveView(collation, tokenizer, detectMoves, extra));
+  const [computing, setComputing] = useState(false);
+  const workerRef = useRef<Worker | null>(null);
+  const jobIdRef = useRef(0);
+  const inputsRef = useRef({ collation, tokenizer, detectMoves, engineOpts });
+  const appliedRef = useRef({ collation, tokenizer, detectMoves, engineOpts });
+  inputsRef.current = { collation, tokenizer, detectMoves, engineOpts };
+
+  useEffect(() => {
+    let w: Worker | null = null;
+    try {
+      w = new Worker(new URL("../lib/collate/view.worker.ts", import.meta.url));
+      w.onmessage = (e: MessageEvent<{ id: number; ok: boolean; view?: ReturnType<typeof deriveView> }>) => {
+        if (e.data.id !== jobIdRef.current) return; // a newer job superseded this one
+        if (e.data.ok && e.data.view) { setView(e.data.view); appliedRef.current = inputsRef.current; }
+        setComputing(false);
+      };
+      workerRef.current = w;
+    } catch { workerRef.current = null; /* no worker → synchronous fallback below */ }
+    return () => { w?.terminate(); workerRef.current = null; };
+  }, []);
+
+  // Recompute whenever the inputs change (skip when they already match the view).
+  useEffect(() => {
+    const ap = appliedRef.current;
+    if (collation === ap.collation && tokenizer === ap.tokenizer && detectMoves === ap.detectMoves && engineOpts === ap.engineOpts) return;
+    const w = workerRef.current;
+    if (!w) { // synchronous fallback (no worker support)
+      setView(deriveView(collation, tokenizer, detectMoves, extra));
+      appliedRef.current = inputsRef.current;
+      return;
+    }
+    const id = ++jobIdRef.current;
+    setComputing(true);
+    w.postMessage({ id, collation, normalize: tokenizer, detectMoves, extra });
+  }, [collation, tokenizer, detectMoves, engineOpts, extra]);
+
+  // Cancel an in-flight recompute: kill the worker, restore a fresh one, and roll
+  // the option toggles back to what produced the view on screen (ref-equal, so it
+  // won't kick off another recompute).
+  const cancelCompute = useCallback(() => {
+    workerRef.current?.terminate();
+    jobIdRef.current++; // invalidate the cancelled job
+    try { workerRef.current = new Worker(new URL("../lib/collate/view.worker.ts", import.meta.url)); workerRef.current.onmessage = (e: MessageEvent<{ id: number; ok: boolean; view?: ReturnType<typeof deriveView> }>) => { if (e.data.id !== jobIdRef.current) return; if (e.data.ok && e.data.view) { setView(e.data.view); appliedRef.current = inputsRef.current; } setComputing(false); }; } catch { workerRef.current = null; }
+    const ap = appliedRef.current;
+    setTokenizer(ap.tokenizer);
+    setDetectMoves(ap.detectMoves);
+    setEngineOpts(ap.engineOpts);
+    setComputing(false);
+  }, []);
 
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
@@ -505,7 +559,19 @@ export default function Home() {
 
       <div className="flex-1 flex min-h-0">
         <SourceOrganiser project={project} demos={DEMOS} onLoadDemo={loadDemo} onAddSource={() => setShowAdd(true)} onImport={importSources} hidden={sidebarHidden} onHidden={setSidebarHiddenP} />
-        <main ref={mainRef} className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col">
+        <main ref={mainRef} className="flex-1 min-w-0 min-h-0 overflow-hidden flex flex-col relative">
+          {/* Recompute feedback: a live indeterminate bar + a Cancel control, so
+              the user always knows the engine is working and can bail out of a
+              slow recompute (e.g. word-order on a long text) mid-flight. */}
+          {computing && (
+            <div className="absolute top-0 left-0 right-0 z-30 flex items-center gap-2 px-3 py-1.5 bg-card/95 backdrop-blur border-b border-border shadow-sm">
+              <div className="relative h-1 flex-1 rounded-full bg-muted overflow-hidden">
+                <div className="absolute inset-y-0 w-2/5 rounded-full animate-sv-load" style={{ background: "var(--primary)" }} />
+              </div>
+              <span className="text-[11px] text-muted-foreground shrink-0">Recomputing the collation…</span>
+              <button onClick={cancelCompute} className="shrink-0 px-2 py-0.5 rounded border border-border bg-card hover:bg-muted text-[11px]">Cancel</button>
+            </div>
+          )}
           <CollationView
             project={project}
             view={view}

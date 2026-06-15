@@ -10,48 +10,12 @@
 import jsPDF from "jspdf";
 import type { Collation, SavedCollation, Variant, Witness } from "@/types/collation";
 import { VARIANT_TYPE_LABELS, VARIANT_TYPE_COLORS } from "@/types/collation";
-import { collate } from "@/lib/collate/collate";
-import type { NormalizeOptions } from "@/lib/collate/similarity";
-import { buildApparatus } from "@/lib/collate/apparatus";
-import { computeCollationMetrics } from "@/lib/collate/metrics";
-import { applyManualLinks, pairKey } from "@/lib/collate/manual";
-
-/** The two witnesses the braid currently compares (the panel selections). */
-export function pairOf(c: Collation): [Witness, Witness] {
-  const a = c.witnesses.find((w) => w.id === c.leftId) ?? c.witnesses[0];
-  const b =
-    c.witnesses.find((w) => w.id === c.rightId) ??
-    c.witnesses.find((w) => w.id !== a.id) ??
-    c.witnesses[1] ??
-    a;
-  return [a, b];
-}
-
-/** Recompute the full derived view (variants + apparatus + metrics) from a
- *  collation. `normalize` lets the caller pass the active engine settings
- *  (ignore case / punctuation / whitespace / comments / spelling); `detectMoves`
- *  toggles transposition recovery. Both default to the engine defaults. */
-export function deriveView(
-  c: Collation,
-  normalize?: NormalizeOptions,
-  detectMoves?: boolean,
-  extra?: { segmentByLine?: boolean; ignoreBlankLines?: boolean; subThreshold?: number },
-) {
-  const [a, b] = pairOf(c);
-  let variants = collate(a, b, {
-    mode: c.mode,
-    ...(normalize ? { normalize } : {}),
-    ...(detectMoves !== undefined ? { detectMoves } : {}),
-    ...(extra?.segmentByLine !== undefined ? { segmentByLine: extra.segmentByLine } : {}),
-    ...(extra?.ignoreBlankLines !== undefined ? { ignoreBlankLines: extra.ignoreBlankLines } : {}),
-    ...(extra?.subThreshold !== undefined ? { subThreshold: extra.subThreshold } : {}),
-  });
-  const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
-  if (links.length) variants = applyManualLinks(variants, links, a, b);
-  const apparatus = buildApparatus(variants, a, b, c);
-  const metrics = computeCollationMetrics(variants, a, b);
-  return { a, b, variants, apparatus, metrics };
-}
+// pairOf + deriveView live in derive.ts (jsPDF-free) so a Web Worker can run the
+// engine without loading PDF code; imported for use here and re-exported for
+// existing import sites.
+import { pairOf, deriveView } from "@/lib/collate/derive";
+export { pairOf, deriveView };
+export type { DeriveExtra, DerivedView } from "@/lib/collate/derive";
 
 /** Browser download helper. */
 export function download(filename: string, content: string | Blob, mime = "text/plain") {
