@@ -11,7 +11,7 @@ import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
 import type { deriveView } from "@/lib/export/collation-export";
 import { WitnessPanel } from "./WitnessPanel";
-import { BraidGutter, type Ribbon } from "./BraidGutter";
+import { BraidGutter, type Ribbon, type BraidViz } from "./BraidGutter";
 import { Histogram } from "./Histogram";
 import { OverviewStrip } from "./OverviewStrip";
 import { HotspotBar } from "./HotspotBar";
@@ -63,7 +63,7 @@ export function CollationView({
   stripVisible,
   onHideStrip,
   search,
-  confidenceThreshold,
+  braidViz,
   isDark,
 }: {
   project: Project;
@@ -96,7 +96,7 @@ export function CollationView({
   onHideStrip: () => void;
   search?: string;
   /** Braids below this confidence render dashed (0 = all solid). */
-  confidenceThreshold: number;
+  braidViz: BraidViz;
   isDark: boolean;
 }) {
   const editMode = editSide !== null;
@@ -347,7 +347,7 @@ export function CollationView({
           {eddy.length >= 3 && (
             <div className="mb-4">
               <div className="text-[11px] text-muted-foreground mb-1.5">
-                <strong>Version distinctiveness (Eddy)</strong> — each witness&apos;s mean lexical distance from all the others. Longest bar = the outlier.
+                <strong>Version distinctiveness (Eddy2)</strong> — each witness&apos;s mean lexical distance from all the others. Longest bar = the outlier.
               </div>
               <div className="space-y-1">
                 {(() => {
@@ -444,7 +444,7 @@ export function CollationView({
                   selectedId={selectedId}
                   hoveredId={hoveredId}
                   maxLength={maxLength}
-                  confidenceThreshold={confidenceThreshold}
+                  braidViz={braidViz}
                   onSelect={onSelect}
                   onHover={setHoveredId}
                   fontSize={fontSize}
@@ -734,7 +734,7 @@ function BraidLayer({
   selectedId,
   hoveredId,
   maxLength,
-  confidenceThreshold,
+  braidViz,
   onSelect,
   onHover,
   fontSize,
@@ -749,7 +749,7 @@ function BraidLayer({
   selectedId: string | null;
   hoveredId: string | null;
   maxLength: number;
-  confidenceThreshold: number;
+  braidViz: BraidViz;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
   fontSize: number;
@@ -816,7 +816,7 @@ function BraidLayer({
       selectedId={selectedId}
       hoveredId={hoveredId}
       visibleTypes={visibleTypes}
-      confidenceThreshold={confidenceThreshold}
+      viz={braidViz}
       onSelect={onSelect}
       onHover={onHover}
     />
@@ -1302,7 +1302,7 @@ function DeepDivePanel({
         {stat("Lengths (A→B)", `${witnessA.text.length} → ${witnessB.text.length} ch`, "Raw character length of each witness, base (A) → right (B). A quick sense of how much each side carries.")}
       </div>
       <p className="mt-4 pt-3 border-t border-border text-[11px] text-muted-foreground leading-relaxed">
-        <strong className="text-foreground/80">Confidence.</strong> Each braid carries a confidence in [0,1] — its pairing similarity (the engine&rsquo;s Sørensen–Dice score). A verbatim <em>match</em> is 1.0; a <em>substitution</em>, <em>variant</em>, or <em>transposition</em> takes the similarity of the two readings it joins; one-sided <em>additions</em>/<em>omissions</em> have no pairing to doubt and stay solid. The <strong>Confidence</strong> slider in the status bar dashes every braid below a chosen threshold, so the firm correspondences and the engine&rsquo;s fuzzier guesses read apart at a glance.
+        <strong className="text-foreground/80">Confidence.</strong> Each braid carries a confidence in [0,1] — its pairing similarity (the engine&rsquo;s Sørensen–Dice score). A verbatim <em>match</em> is 1.0; a <em>substitution</em>, <em>variant</em>, or <em>transposition</em> takes the similarity of the two readings it joins; one-sided <em>additions</em>/<em>omissions</em> have no pairing to doubt and stay solid. The braid draws it as line texture — <strong>solid</strong> (high) / <strong>dashed</strong> (medium) / <strong>dotted</strong> (low) — and <strong>Settings ▸ Braid</strong> lets you hide braids below a confidence you choose.
       </p>
     </ModalCard>
   );

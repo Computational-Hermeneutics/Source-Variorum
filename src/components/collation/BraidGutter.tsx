@@ -24,6 +24,23 @@ function thickness(type: VariantType, length: number, maxLength: number): number
   return Math.min(12, scaled);
 }
 
+/** Confidence bands that set a braid's line style: high → solid, medium →
+ *  dashed, low → dotted. So line texture reads as the engine's certainty. */
+export const CONF_HIGH = 0.85;
+export const CONF_MED = 0.6;
+
+/** Visualisation controls for the braid (set in Settings ▸ Braid). */
+export interface BraidViz {
+  /** Don't draw braids whose confidence is below this (0 = draw all). */
+  hideBelowConfidence: number;
+  /** Global opacity multiplier for ribbons (0.1–1). */
+  opacity: number;
+  /** Hide ribbons whose vertical span exceeds (1 − this)×viewport (0 = off). */
+  hideLongDistance: number;
+}
+
+export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0 };
+
 export function BraidGutter({
   width,
   height,
@@ -32,7 +49,7 @@ export function BraidGutter({
   selectedId,
   hoveredId,
   visibleTypes,
-  confidenceThreshold = 0,
+  viz = DEFAULT_BRAID_VIZ,
   onSelect,
   onHover,
 }: {
@@ -43,8 +60,7 @@ export function BraidGutter({
   selectedId: string | null;
   hoveredId: string | null;
   visibleTypes: Set<VariantType>;
-  /** Braids with confidence below this render dashed (the engine's fuzzy guesses). */
-  confidenceThreshold?: number;
+  viz?: BraidViz;
   onSelect: (id: string | null) => void;
   onHover: (id: string | null) => void;
 }) {
@@ -65,32 +81,40 @@ export function BraidGutter({
     >
       {sorted.map((r) => {
         if (!visibleTypes.has(r.type)) return null;
+        // Hide braids the engine is too unsure of, when the reader has asked.
+        if (viz.hideBelowConfidence > 0 && r.confidence < viz.hideBelowConfidence) return null;
+        // Long-distance hiding: drop steep ribbons (ends far apart vertically).
+        const span = Math.abs(r.yA - r.yB) / Math.max(1, height);
+        if (viz.hideLongDistance > 0 && span > 1 - viz.hideLongDistance) return null;
         const isSelected = r.id === selectedId;
         // Keep the ribbon its variant-type colour; selection is shown by emphasis
         // (thicker + full opacity) so the type stays legible.
         const color = VARIANT_TYPE_COLORS[r.type];
         const active = isSelected || r.id === hoveredId;
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
-        // Low-confidence braids (fuzzy pairings below the threshold) render dashed
-        // so the eye can tell a sure correspondence from one the engine guessed.
-        const low = confidenceThreshold > 0 && r.confidence < confidenceThreshold;
-        const dash = low ? `${Math.max(2, w * 0.9)} ${Math.max(3, w * 1.6)}` : undefined;
+        // Confidence as line texture: high = solid, medium = dashed, low = dotted.
+        // (Matches and one-sided add/omit are confidence 1, so always solid.)
+        const band = r.confidence >= CONF_HIGH ? "high" : r.confidence >= CONF_MED ? "med" : "low";
+        const dash = band === "high" ? undefined
+          : band === "med" ? `${Math.max(3, w * 1.4)} ${Math.max(3, w * 1.3)}`
+          : `${Math.max(1, w * 0.5)} ${Math.max(2.5, w * 1.5)}`; // dotted
         const cx = width / 2;
         const d = `M 0 ${r.yA} C ${cx} ${r.yA} ${cx} ${r.yB} ${width} ${r.yB}`;
         // The further apart the two ends sit, the more the reading has moved —
         // boost opacity with vertical distance so long-range correspondences read
         // through the busier short ones.
-        const distBoost = Math.min(0.26, (Math.abs(r.yA - r.yB) / Math.max(1, height)) * 0.5);
+        const distBoost = Math.min(0.26, span * 0.5);
         // When a variant is selected, fade everything else right back so the one
         // being worked on stands alone. When nothing is selected, show ALL braids
         // (matches a touch lighter than changes so the eye still reads the changes).
-        const opacity = anySelected
+        const baseOp = anySelected
           ? active
             ? 0.95
             : 0.05
           : active
             ? 0.95
             : Math.min(0.95, (r.type === "match" ? 0.34 : 0.72) + distBoost);
+        const opacity = baseOp * (active ? 1 : viz.opacity);
         return (
           <path
             key={r.id}
@@ -98,9 +122,9 @@ export function BraidGutter({
             fill="none"
             stroke={color}
             strokeWidth={w}
-            strokeLinecap={low ? "butt" : "round"}
+            strokeLinecap={band === "high" ? "round" : band === "low" ? "round" : "butt"}
             strokeDasharray={dash}
-            opacity={low && !active ? opacity * 0.85 : opacity}
+            opacity={opacity}
             style={{ cursor: r.type === "match" ? "default" : "pointer", transition: "opacity 120ms, stroke-width 120ms" }}
             onMouseEnter={() => onHover(r.id)}
             onMouseLeave={() => onHover(null)}

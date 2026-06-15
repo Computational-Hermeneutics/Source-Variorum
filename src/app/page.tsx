@@ -6,6 +6,7 @@ import type { Collation, CollationMode, VariantType, Witness } from "@/types/col
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
 import { CollationView } from "@/components/collation/CollationView";
+import { type BraidViz, DEFAULT_BRAID_VIZ, CONF_HIGH, CONF_MED } from "@/components/collation/BraidGutter";
 import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
@@ -24,7 +25,7 @@ const LANG_KEY = "source-variorum-lang";
 const USER_KEY = "source-variorum-user";
 const TOKENIZER_KEY = "source-variorum-tokenizer";
 const DETECT_MOVES_KEY = "source-variorum-detect-moves";
-const CONFIDENCE_KEY = "source-variorum-confidence";
+const BRAID_VIZ_KEY = "source-variorum-braid-viz";
 const ENGINE_OPTS_KEY = "source-variorum-engine-opts";
 
 /** Engine-level (non-normalisation) braid options. `looseThreshold` is the
@@ -156,7 +157,7 @@ export default function Home() {
   const [userName, setUserName] = useState("");
   const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
   const [detectMoves, setDetectMoves] = useState(true);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0); // 0..1; 0 = all braids solid
+  const [braidViz, setBraidViz] = useState<BraidViz>(DEFAULT_BRAID_VIZ);
   const [engineOpts, setEngineOpts] = useState<EngineOpts>(DEFAULT_ENGINE_OPTS);
   const [showEngines, setShowEngines] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
@@ -203,8 +204,8 @@ export default function Home() {
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
       const dm = localStorage.getItem(DETECT_MOVES_KEY);
       if (dm != null) setDetectMoves(dm === "1");
-      const cf = localStorage.getItem(CONFIDENCE_KEY);
-      if (cf != null) setConfidenceThreshold(Math.min(1, Math.max(0, parseFloat(cf) || 0)));
+      const bv = localStorage.getItem(BRAID_VIZ_KEY);
+      if (bv) setBraidViz({ ...DEFAULT_BRAID_VIZ, ...JSON.parse(bv) });
       const eo = localStorage.getItem(ENGINE_OPTS_KEY);
       if (eo) setEngineOpts({ ...DEFAULT_ENGINE_OPTS, ...JSON.parse(eo) });
       const sc = localStorage.getItem("source-variorum-strip-cols");
@@ -293,10 +294,12 @@ export default function Home() {
     setDetectMoves(val);
     try { localStorage.setItem(DETECT_MOVES_KEY, val ? "1" : "0"); } catch { /* ignore */ }
   };
-  const setConfidenceP = (val: number) => {
-    const v = Math.min(1, Math.max(0, val));
-    setConfidenceThreshold(v);
-    try { localStorage.setItem(CONFIDENCE_KEY, String(v)); } catch { /* ignore */ }
+  const setBraidVizOpt = <K extends keyof BraidViz>(key: K, val: BraidViz[K]) => {
+    setBraidViz((prev) => {
+      const next = { ...prev, [key]: val };
+      try { localStorage.setItem(BRAID_VIZ_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
   };
   const setEngineOpt = <K extends keyof EngineOpts>(key: K, val: EngineOpts[K]) => {
     setEngineOpts((prev) => {
@@ -538,7 +541,7 @@ export default function Home() {
             stripVisible={stripVisible}
             onHideStrip={() => setStripCols((p) => { const next = { minimap: false, variants: false, hotspots: false }; try { localStorage.setItem("source-variorum-strip-cols", JSON.stringify(next)); } catch {} return next; })}
             search={search}
-            confidenceThreshold={confidenceThreshold}
+            braidViz={braidViz}
             isDark={isDark}
           />
         </main>
@@ -563,19 +566,6 @@ export default function Home() {
             );
           })}
         </div>
-        {/* Confidence threshold — braids the engine is less sure of (low pairing
-            similarity) render dashed at or above this cut. 0 = all solid. */}
-        <span className="inline-flex items-center gap-1.5 shrink-0" title="Confidence threshold: braids below this (fuzzy pairings the engine guessed) render dashed. Drag to 0 to show all solid.">
-          <span className={confidenceThreshold > 0 ? "text-foreground" : ""}>Confidence</span>
-          <input
-            type="range" min={0} max={100} step={5}
-            value={Math.round(confidenceThreshold * 100)}
-            onChange={(e) => setConfidenceP(parseInt(e.target.value, 10) / 100)}
-            className="w-20 accent-primary align-middle"
-            aria-label="Confidence threshold"
-          />
-          <span className="tabular-nums w-9">{confidenceThreshold > 0 ? `≥${Math.round(confidenceThreshold * 100)}%` : "off"}</span>
-        </span>
         <span className="ml-auto inline-flex items-center gap-2 shrink-0">
           {/* Find in both panels */}
           <span className="inline-flex items-center gap-1 rounded border border-border bg-card px-1.5 py-0.5">
@@ -642,6 +632,8 @@ export default function Home() {
           onDetectMoves={setDetectMovesP}
           engineOpts={engineOpts}
           onEngineOpt={setEngineOpt}
+          braidViz={braidViz}
+          onBraidVizOpt={setBraidVizOpt}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -753,8 +745,8 @@ function AboutModal({ onClose }: { onClose: () => void }) {
         <div className="space-y-3 text-[13px] leading-relaxed text-foreground/85">
           <p>A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a text so a reader can track how textual decisions were made. Source Variorum brings that apparatus of textual criticism to computational close reading, in two modes — source code and prose.</p>
           <p>Load several witnesses into a project, pick any two for the left and right panels, and read the <strong>braid</strong> between them: ribbons connecting matching passages, including text that has <strong>moved</strong>. Variants are typed and gathered into an editable critical apparatus. Edit witness text to correct errors, annotate with ⌘/Ctrl-click, and save or export the project.</p>
-          <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Local-first, no model calls.</p>
-          <p className="text-[9px] leading-snug text-muted-foreground/80"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
+          <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Initial UI Design language derived from LLMbench (Vector Lab). Local-first, no model calls.</p>
+          <p className="text-[9px] leading-snug text-muted-foreground/80"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics, which Source Variorum reworks as its own <em>Eddy2</em>/<em>Viv2</em> approximations (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
         </div>
         <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -919,7 +911,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Confidence</h3>
           <p>Most braids are not certain — when the engine pairs two readings that are not identical (a reworded sentence, a renamed label, a moved block) it is making a judgement, scored by how alike the two sides are. That score is the braid&rsquo;s <strong>confidence</strong>: 100% for a verbatim match, lower for a fuzzy pairing. One-sided additions and omissions have no pairing to doubt, so they stay solid.</p>
-          <p className="mt-1.5">The <strong>Confidence</strong> slider in the status bar sets a threshold: braids the engine is <em>less</em> sure of than the threshold render <strong>dashed</strong>, so you can see at a glance which correspondences are firm and which are the engine&rsquo;s best guess. Drag it to <em>off</em> to draw every braid solid. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
+          <p className="mt-1.5">Confidence shows in the braid as <strong>line texture</strong>: a <strong>solid</strong> ribbon is a firm correspondence (≥85%), a <strong>dashed</strong> one is medium (≥60%), and a <strong>dotted</strong> one is the engine&rsquo;s loose guess (below 60%). In <strong>Settings ▸ Braid</strong> you can <em>hide</em> braids below a confidence you choose, fade the ribbons, or drop long-distance ones — so you can thin a busy braid down to the correspondences you trust. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
@@ -949,15 +941,15 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <details className="group">
             <summary className="flex items-center gap-1.5 cursor-pointer list-none text-[12px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
               <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
-              Eddy &amp; Viv — version-divergence metrics
+              Eddy2 &amp; Viv2 — our version-divergence metrics
             </summary>
             <div className="mt-2 space-y-2">
-              <p>Two measures from the <strong>Version Variation Visualization (VVV)</strong> project for reasoning about how a set of versions diverge.</p>
-              <p><strong>Eddy</strong> — a single <em>version&apos;s</em> distinctiveness at a passage: the average distance between that version and all the others of the same passage. A high Eddy marks an <em>outlier</em> — the version whose wording diverges most from the rest.<br />
+              <p><strong>Eddy2</strong> and <strong>Viv2</strong> are Source Variorum&rsquo;s own take on two measures from the <strong>Version Variation Visualization (VVV)</strong> project — the <em>2</em> marks them as our pairwise/aggregate reworkings, not VVV&rsquo;s vector-space originals (Eddy / Viv).</p>
+              <p>VVV&rsquo;s <strong>Eddy</strong> is a single <em>version&apos;s</em> distinctiveness at a passage: the average distance between that version and all the others. A high value marks an <em>outlier</em> — the version whose wording diverges most.<br />
                 <span className="font-mono text-[12px]">Eddy(D&#x2c7;) = (1/n) &Sigma;<sub>k</sub> &#8741;D&#x2c7; &minus; D<sub>k</sub>&#8741;</span></p>
-              <p><strong>Viv</strong> (vivacity) — a <em>passage&apos;s</em> overall instability: the average of all the Eddy values for that passage (its &ldquo;diameter&rdquo;). A high Viv marks a <em>hotspot</em> where the versions most disagree.<br />
+              <p>VVV&rsquo;s <strong>Viv</strong> (vivacity) is a <em>passage&apos;s</em> overall instability: the average of all the Eddy values for that passage (its &ldquo;diameter&rdquo;). A high value marks a <em>hotspot</em> where the versions most disagree.<br />
                 <span className="font-mono text-[12px]">Viv(i) = (1/n) &Sigma;<sub>k</sub> Eddy(D<sub>k</sub><sup>i</sup>)</span></p>
-              <p className="text-[12px] text-muted-foreground">Source Variorum implements both, but as <strong>cheap pairwise/aggregate approximations, not the VVV vector-space originals</strong>. Our <em>Eddy</em> (the version-distinctiveness ranking) is a witness&apos;s mean <span className="font-mono text-[11px]">(1 &minus; Dice-bigram)</span> lexical distance from every other witness; our <em>Viv</em> (the <strong>Version hotspots</strong> overview) counts, at each point in the base text, how many witnesses diverge from the copy-text. They are heuristic, orientation-oriented measures, not canonical variant-graph computations: the numbers locate <em>where</em> and <em>which</em>, but should not be read as exact divergence distances.</p>
+              <p className="text-[12px] text-muted-foreground">Our <strong>Eddy2</strong> and <strong>Viv2</strong> are <strong>cheap pairwise/aggregate approximations, not the VVV vector-space originals</strong>. <em>Eddy2</em> (the version-distinctiveness ranking) is a witness&apos;s mean <span className="font-mono text-[11px]">(1 &minus; Dice-bigram)</span> lexical distance from every other witness; <em>Viv2</em> (the <strong>Version hotspots</strong> overview) counts, at each point in the base text, how many witnesses diverge from the copy-text. They are heuristic, orientation-oriented measures, not canonical variant-graph computations: the numbers locate <em>where</em> and <em>which</em>, but should not be read as exact divergence distances.</p>
               <p className="text-[9px] leading-snug text-muted-foreground/80">Eddy &amp; Viv were defined by the VVV / Translation Arrays team (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry); see ShakerVis (Geng, Cheesman, Laramee, Flanagan &amp; Thiel, <em>Information Visualization</em> 14(4), 2013) and Cheesman et al., delightedbeauty.org/vvv.</p>
             </div>
           </details>
@@ -972,10 +964,11 @@ function HelpModal({ onClose }: { onClose: () => void }) {
 }
 
 
-type SettingsTab = "user" | "appearance" | "code" | "text";
+type SettingsTab = "user" | "appearance" | "braid" | "code" | "text";
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "user", label: "User" },
   { id: "appearance", label: "Appearance" },
+  { id: "braid", label: "Braid" },
   { id: "code", label: "CX-Engine" },
   { id: "text", label: "TX-Engine" },
 ];
@@ -1024,6 +1017,8 @@ function SettingsModal({
   onDetectMoves,
   engineOpts,
   onEngineOpt,
+  braidViz,
+  onBraidVizOpt,
   onResetData,
 }: {
   onClose: () => void;
@@ -1044,6 +1039,8 @@ function SettingsModal({
   onDetectMoves: (val: boolean) => void;
   engineOpts: EngineOpts;
   onEngineOpt: (key: keyof EngineOpts, val: boolean | number) => void;
+  braidViz: BraidViz;
+  onBraidVizOpt: (key: keyof BraidViz, val: number) => void;
   onResetData: () => void;
 }) {
   const [tab, setTab] = useState<SettingsTab>("user");
@@ -1054,12 +1051,12 @@ function SettingsModal({
       onClose={onClose}
       footer={
         <div className="flex items-center gap-3">
-          <span className="text-[11px] text-muted-foreground flex-1">Saved data — the autosaved working project and your preferences.</span>
-          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] shrink-0">Clear &amp; reload…</button>
+          <span className="text-[11px] text-muted-foreground flex-1"><strong className="text-foreground/80">Reset Source Variorum.</strong> Permanently delete the autosaved working project <em>and</em> every preference stored in this browser, then reload to a clean state. Export anything you want to keep first.</span>
+          <button onClick={onResetData} className="px-3 py-1.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 text-[12px] shrink-0">Reset everything…</button>
         </div>
       }
     >
-      <div className="flex min-h-[16rem]">
+      <div className="flex h-[21rem]">
         {/* Left tab rail — the active tab is highlighted and runs flush to the
             divider so it reads as connected to the panel it shows on the right. */}
         <nav className="shrink-0 w-28 flex flex-col gap-0.5 border-r border-border pr-3 relative z-10">
@@ -1078,7 +1075,7 @@ function SettingsModal({
         </nav>
 
         {/* Panel content */}
-        <div className="flex-1 min-w-0 pl-5">
+        <div className="flex-1 min-w-0 pl-5 overflow-y-auto">
           {tab === "user" && (
             <div className="divide-y divide-border">
               <SettingsRow label="Your name" hint="Signs your annotations and apparatus notes.">
@@ -1113,6 +1110,30 @@ function SettingsModal({
                 <span className="w-9 text-center tabular-nums text-[12px]">{fontSize}px</span>
                 <button onClick={() => onFont(1)} className="w-7 h-7 rounded border border-border bg-card hover:bg-muted text-[12px]" title="Larger">A+</button>
                 <button onClick={onResetFont} className="ml-1 px-2 h-7 rounded border border-border bg-card hover:bg-muted text-[11px] text-muted-foreground" title="Reset to 13px">Reset</button>
+              </SettingsRow>
+            </div>
+          )}
+
+          {tab === "braid" && (
+            <div className="divide-y divide-border">
+              <div className="pb-2 text-[11px] text-muted-foreground">How the braid ribbons are drawn. <strong>Confidence</strong> already sets each ribbon&rsquo;s line texture automatically — <span className="font-medium">solid</span> ≥{Math.round(CONF_HIGH * 100)}%, <span className="font-medium">dashed</span> ≥{Math.round(CONF_MED * 100)}%, <span className="font-medium">dotted</span> below. These controls thin the braid down to what you want to see.</div>
+              <SettingsRow label="Hide below confidence" hint={braidViz.hideBelowConfidence > 0 ? `Don't draw braids the engine is less than ${Math.round(braidViz.hideBelowConfidence * 100)}% sure of.` : "Draw every braid (no confidence cut)."}>
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{braidViz.hideBelowConfidence > 0 ? `${Math.round(braidViz.hideBelowConfidence * 100)}%` : "off"}</span>
+                  <input type="range" min={0} max={95} step={5} value={Math.round(braidViz.hideBelowConfidence * 100)} onChange={(e) => onBraidVizOpt("hideBelowConfidence", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Hide below confidence" />
+                </span>
+              </SettingsRow>
+              <SettingsRow label="Ribbon opacity" hint="Fade the braid back so the text reads through it.">
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{Math.round(braidViz.opacity * 100)}%</span>
+                  <input type="range" min={10} max={100} step={5} value={Math.round(braidViz.opacity * 100)} onChange={(e) => onBraidVizOpt("opacity", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Ribbon opacity" />
+                </span>
+              </SettingsRow>
+              <SettingsRow label="Hide long-distance braids" hint={braidViz.hideLongDistance > 0 ? "Hide steep ribbons that connect far-apart passages." : "Show ribbons of any reach."}>
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{braidViz.hideLongDistance > 0 ? `${Math.round(braidViz.hideLongDistance * 100)}%` : "off"}</span>
+                  <input type="range" min={0} max={95} step={5} value={Math.round(braidViz.hideLongDistance * 100)} onChange={(e) => onBraidVizOpt("hideLongDistance", parseInt(e.target.value, 10) / 100)} className="w-28 accent-primary" aria-label="Hide long-distance braids" />
+                </span>
               </SettingsRow>
             </div>
           )}

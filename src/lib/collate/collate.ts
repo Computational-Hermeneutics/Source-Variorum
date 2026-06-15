@@ -44,6 +44,13 @@ export interface CollateOptions {
   /** CX-Engine: drop blank lines before aligning, so added/removed blank lines
    *  (reformatting) do not register as additions/deletions. */
   ignoreBlankLines?: boolean;
+  /** TX-Engine: locality prior. Prose is a narrative — corresponding passages
+   *  sit at similar RELATIVE positions across witnesses, and text rarely relocates
+   *  to a radically different part of the work. We subtract `localityWeight ×
+   *  |Δrelative-position|` from a candidate pairing's score, so nearer-in-the-text
+   *  pairings are preferred and distant ones must clear a higher similarity bar.
+   *  0 disables it (the right setting for code, which is not a narrative). */
+  localityWeight: number;
 }
 
 export const DEFAULT_OPTIONS: CollateOptions = {
@@ -56,6 +63,7 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   detectMoves: true,
   segmentByLine: false,
   ignoreBlankLines: false,
+  localityWeight: 0,
 };
 
 /**
@@ -67,9 +75,9 @@ export const DEFAULT_OPTIONS: CollateOptions = {
  * much more loosely (low subThreshold) and accepts fuzzier moves — the braid has
  * to be smarter because correspondence is semantic, not positional.
  */
-export const MODE_PROFILE: Record<CollationMode, Pick<CollateOptions, "moveThreshold" | "variantThreshold" | "minMoveLength" | "subThreshold">> = {
-  source: { moveThreshold: 0.82, variantThreshold: 0.82, minMoveLength: 8, subThreshold: 0.5 },
-  text: { moveThreshold: 0.7, variantThreshold: 0.85, minMoveLength: 12, subThreshold: 0.2 },
+export const MODE_PROFILE: Record<CollationMode, Pick<CollateOptions, "moveThreshold" | "variantThreshold" | "minMoveLength" | "subThreshold" | "localityWeight">> = {
+  source: { moveThreshold: 0.82, variantThreshold: 0.82, minMoveLength: 8, subThreshold: 0.5, localityWeight: 0 },
+  text: { moveThreshold: 0.7, variantThreshold: 0.85, minMoveLength: 12, subThreshold: 0.2, localityWeight: 0.35 },
 };
 
 function spanOf(run: Segment[]): Span {
@@ -142,10 +150,16 @@ function pairReplacementBlock(
 function detectMoves(
   dels: Segment[][],
   adds: Segment[][],
-  opts: CollateOptions
+  opts: CollateOptions,
+  nA: number,
+  nB: number
 ): { moves: RawVariant[]; leftDels: Segment[][]; leftAdds: Segment[][] } {
   const moves: RawVariant[] = [];
   const usedAdd = new Set<number>();
+  // Relative narrative position of each run (0 = start, 1 = end of its witness).
+  const loc = opts.localityWeight || 0;
+  const relA = dels.map((r) => r[0].index / Math.max(1, nA));
+  const relB = adds.map((r) => r[0].index / Math.max(1, nB));
 
   const order = dels
     .map((run, i) => ({ i, len: normalize(textOf(run), opts.normalize).length }))
@@ -156,12 +170,17 @@ function detectMoves(
   for (const { i } of order) {
     const delText = textOf(dels[i]);
     let best = -1;
-    let bestSim = opts.moveThreshold;
+    let bestEff = opts.moveThreshold; // effective (locality-penalised) score to beat
+    let bestSim = 0;
     for (let j = 0; j < adds.length; j++) {
       if (usedAdd.has(j)) continue;
       if (normalize(textOf(adds[j]), opts.normalize).length < opts.minMoveLength) continue;
       const sim = similarity(delText, textOf(adds[j]), opts.normalize);
-      if (sim >= bestSim) {
+      // A distant "move" in prose is improbable; charge it for the displacement so
+      // only a genuinely strong long-range match survives (loc = 0 ⇒ no charge).
+      const eff = sim - loc * Math.abs(relA[i] - relB[j]);
+      if (eff >= bestEff) {
+        bestEff = eff;
         bestSim = sim;
         best = j;
       }
@@ -194,7 +213,9 @@ function detectMoves(
 function pairResidue(
   dels: Segment[][],
   adds: Segment[][],
-  opts: CollateOptions
+  opts: CollateOptions,
+  nA: number,
+  nB: number
 ): { subs: RawVariant[]; leftDels: Segment[][]; leftAdds: Segment[][] } {
   const n = dels.length;
   const m = adds.length;
@@ -202,9 +223,16 @@ function pairResidue(
 
   const delText = dels.map(textOf);
   const addText = adds.map(textOf);
+  // Relative narrative position of each residual run, for the locality prior.
+  const loc = opts.localityWeight || 0;
+  const relA = dels.map((r) => r[0].index / Math.max(1, nA));
+  const relB = adds.map((r) => r[0].index / Math.max(1, nB));
   const GAP = -0.1;
   // Score for aligning del i with add j: similarity if it clears the bar, else
-  // a small penalty so the DP prefers a gap over a meaningless pairing.
+  // a small penalty so the DP prefers a gap over a meaningless pairing. The
+  // locality term nudges the alignment toward same-position pairings (prose is a
+  // narrative: the corresponding passage sits at a similar point in the text), so
+  // a moderate match at the right place beats a slightly better one far away.
   const simCache = new Map<number, number>();
   const score = (i: number, j: number): number => {
     const key = i * m + j;
@@ -216,7 +244,9 @@ function pairResidue(
       s = Math.max(la, lb) / Math.min(la, lb) > 6 ? 0 : similarity(delText[i], addText[j], opts.normalize);
       simCache.set(key, s);
     }
-    return s >= opts.subThreshold ? s : -0.25;
+    // Acceptance is still gated on the RAW similarity (checked in the traceback);
+    // locality only shapes which pairings the DP path prefers.
+    return s >= opts.subThreshold ? s - loc * Math.abs(relA[i] - relB[j]) : -0.25;
   };
 
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
@@ -392,13 +422,14 @@ export function collate(
   const addPool = coalesce(addSegs);
   // Move detection is optional: with it off, displaced runs stay add/delete for a
   // tighter, more literal braid (useful in the CX-Engine for small code edits).
+  const nA = segsA.length, nB = segsB.length;
   const { moves, leftDels, leftAdds } = opts.detectMoves === false
     ? { moves: [] as RawVariant[], leftDels: delPool, leftAdds: addPool }
-    : detectMoves(delPool, addPool, opts);
+    : detectMoves(delPool, addPool, opts, nA, nB);
   raw.push(...moves);
   // Similarity-aware residue alignment: pair what's left into substitutions
   // before falling back to plain omission/addition.
-  const residue = pairResidue(leftDels, leftAdds, opts);
+  const residue = pairResidue(leftDels, leftAdds, opts, nA, nB);
   raw.push(...residue.subs);
   residue.leftDels.forEach((run) => raw.push({ type: "deletion", aRun: run, similarity: 0 }));
   residue.leftAdds.forEach((run) => raw.push({ type: "addition", bRun: run, similarity: 0 }));
