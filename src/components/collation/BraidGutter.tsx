@@ -24,10 +24,10 @@ function thickness(type: VariantType, length: number, maxLength: number): number
   return Math.min(12, scaled);
 }
 
-/** Confidence bands that set a braid's line style: high → solid, medium →
- *  dashed, low → dotted. So line texture reads as the engine's certainty. */
-export const CONF_HIGH = 0.85;
-export const CONF_MED = 0.6;
+/** Default confidence band cuts: at/above HIGH → solid, at/above MED → dashed,
+ *  below → dotted. User-overridable via BraidViz (Settings ▸ Braid). */
+export const CONF_HIGH = 0.7;
+export const CONF_MED = 0.5;
 
 /** Visualisation controls for the braid (set in Settings ▸ Braid). */
 export interface BraidViz {
@@ -41,9 +41,13 @@ export interface BraidViz {
    *  0 = taut S-curves; 1 = full droop. Short (near-horizontal) ribbons sag most,
    *  steep long-range ones stay taut, so the braid reads with physical depth. */
   cableSag: number;
+  /** Confidence at/above which a braid draws SOLID. */
+  confHigh: number;
+  /** Confidence at/above which a braid draws DASHED (below ⇒ dotted). */
+  confMed: number;
 }
 
-export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0, cableSag: 0.5 };
+export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0, cableSag: 0.5, confHigh: CONF_HIGH, confMed: CONF_MED };
 
 export function BraidGutter({
   width,
@@ -96,12 +100,15 @@ export function BraidGutter({
         const color = VARIANT_TYPE_COLORS[r.type];
         const active = isSelected || r.id === hoveredId;
         const w = thickness(r.type, r.length, maxLength) * (active ? 1.6 : 1);
-        // Confidence as line texture: high = solid, medium = dashed, low = dotted.
+        // Confidence as line texture AND colour: high = solid & full colour,
+        // medium = close dashes & a little faded, low = tight dots & more faded —
+        // so the lack of confidence reads in the texture and the tone together.
         // (Matches and one-sided add/omit are confidence 1, so always solid.)
-        const band = r.confidence >= CONF_HIGH ? "high" : r.confidence >= CONF_MED ? "med" : "low";
+        const band = r.confidence >= viz.confHigh ? "high" : r.confidence >= viz.confMed ? "med" : "low";
         const dash = band === "high" ? undefined
-          : band === "med" ? `${Math.max(3, w * 1.4)} ${Math.max(3, w * 1.3)}`
-          : `${Math.max(1, w * 0.5)} ${Math.max(2.5, w * 1.5)}`; // dotted
+          : band === "med" ? `${Math.max(2.5, w * 1.1)} ${Math.max(2, w * 0.7)}` // close dashes
+          : `${Math.max(1, w * 0.42)} ${Math.max(2, w * 0.95)}`; // tight dots
+        const bandFade = band === "high" ? 1 : band === "med" ? 0.82 : 0.6;
         const cx = width / 2;
         // Gravity: pull the mid control points DOWN so the ribbon hangs like a
         // slack cable. Slack is greatest for short, near-horizontal correspondences
@@ -122,7 +129,8 @@ export function BraidGutter({
           : active
             ? 0.95
             : Math.min(0.95, (r.type === "match" ? 0.34 : 0.72) + distBoost);
-        const opacity = baseOp * (active ? 1 : viz.opacity);
+        const opacity = baseOp * (active ? 1 : viz.opacity * bandFade);
+        const conf = Math.round(r.confidence * 100);
         return (
           <path
             key={r.id}
@@ -130,14 +138,16 @@ export function BraidGutter({
             fill="none"
             stroke={color}
             strokeWidth={w}
-            strokeLinecap={band === "high" ? "round" : band === "low" ? "round" : "butt"}
+            strokeLinecap={band === "med" ? "butt" : "round"}
             strokeDasharray={dash}
             opacity={opacity}
             style={{ cursor: r.type === "match" ? "default" : "pointer", transition: "opacity 120ms, stroke-width 120ms" }}
             onMouseEnter={() => onHover(r.id)}
             onMouseLeave={() => onHover(null)}
             onClick={(e) => { e.stopPropagation(); onSelect(r.id === selectedId ? null : r.id); }}
-          />
+          >
+            <title>{`${r.type} · ${conf}% confidence${band === "high" ? " (high)" : band === "med" ? " (medium)" : " (low)"}`}</title>
+          </path>
         );
       })}
     </svg>

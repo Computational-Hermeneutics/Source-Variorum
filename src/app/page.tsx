@@ -6,7 +6,7 @@ import type { Collation, CollationMode, VariantType, Witness } from "@/types/col
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
 import { CollationView } from "@/components/collation/CollationView";
-import { type BraidViz, DEFAULT_BRAID_VIZ, CONF_HIGH, CONF_MED } from "@/components/collation/BraidGutter";
+import { type BraidViz, DEFAULT_BRAID_VIZ } from "@/components/collation/BraidGutter";
 import { SourceOrganiser } from "@/components/collation/SourceOrganiser";
 import { useProject } from "@/hooks/useProject";
 import { DEMOS, type Demo, type DemoWitness } from "@/data/demos";
@@ -808,7 +808,7 @@ function AboutModal({ onClose }: { onClose: () => void }) {
           <p>A <em>variorum</em> (from <em>cum notis variorum</em>) collates all known variants of a text so a reader can track how textual decisions were made. Source Variorum brings that apparatus of textual criticism to computational close reading, in two modes — source code and prose.</p>
           <p>Load several witnesses into a project, pick any two for the left and right panels, and read the <strong>braid</strong> between them: ribbons connecting matching passages, including text that has <strong>moved</strong>. Variants are typed and gathered into an editable critical apparatus. Edit witness text to correct errors, annotate with ⌘/Ctrl-click, and save or export the project.</p>
           <p className="text-[12px] text-muted-foreground">Design lineage: Juxta, the Versioning Machine, and dotplot alignment views. Initial UI Design language derived from LLMbench (Vector Lab). Local-first, no model calls.</p>
-          <p className="text-[9px] leading-snug text-muted-foreground/80"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics, which Source Variorum reworks as its own <em>Eddy2</em>/<em>Viv2</em> approximations (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
+          <p className="text-[9px] leading-snug text-muted-foreground/80"><strong>Inspiration:</strong> Source Variorum draws on Juxta and the Versioning Machine, and is inspired in part by the Version Variation Visualization (VVV) / Translation Arrays project at Swansea University (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry) — for version variation and its <em>Eddy</em>/<em>Viv</em> divergence metrics, which Source Variorum reworks as its own <em>Eddy<sup>2</sup></em>/<em>Viv<sup>2</sup></em> approximations (ShakerVis, <em>Information Visualization</em> 14(4), 2013).</p>
         </div>
         <div className="mt-5 pt-4 border-t border-border flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -927,6 +927,9 @@ function EnginesModal({
                 <SettingsRow label="Word-order insensitive" hint="Compare readings as a bag of words, so a reordered clause counts as the same reading.">
                   <Toggle on={!!tokenizer.ignoreWordOrder} onClick={() => onTokenizer("ignoreWordOrder", !tokenizer.ignoreWordOrder)} />
                 </SettingsRow>
+                <SettingsRow label="Match singular/plural" hint="Fold a regular plural to its singular (lambs≈lamb, lovers≈lover), so number alone isn't a variant.">
+                  <Toggle on={!!tokenizer.matchPluralSingular} onClick={() => onTokenizer("matchPluralSingular", !tokenizer.matchPluralSingular)} />
+                </SettingsRow>
                 <SettingsRow label="Segment by line (verse)" hint="Align line by line instead of sentence by sentence — for verse and drama.">
                   <Toggle on={engineOpts.segmentByLine} onClick={() => onEngineOpt("segmentByLine", !engineOpts.segmentByLine)} />
                 </SettingsRow>
@@ -973,7 +976,7 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Confidence</h3>
           <p>Most braids are not certain — when the engine pairs two readings that are not identical (a reworded sentence, a renamed label, a moved block) it is making a judgement, scored by how alike the two sides are. That score is the braid&rsquo;s <strong>confidence</strong>: 100% for a verbatim match, lower for a fuzzy pairing. One-sided additions and omissions have no pairing to doubt, so they stay solid.</p>
-          <p className="mt-1.5">Confidence shows in the braid as <strong>line texture</strong>: a <strong>solid</strong> ribbon is a firm correspondence (≥85%), a <strong>dashed</strong> one is medium (≥60%), and a <strong>dotted</strong> one is the engine&rsquo;s loose guess (below 60%). In <strong>Settings ▸ Braid</strong> you can <em>hide</em> braids below a confidence you choose, fade the ribbons, or drop long-distance ones — so you can thin a busy braid down to the correspondences you trust. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
+          <p className="mt-1.5">Confidence shows in the braid as <strong>line texture</strong> (and tone): a <strong>solid</strong> ribbon is a firm correspondence, a <strong>dashed</strong>, slightly-faded one is medium, and a <strong>dotted</strong>, fainter one is the engine&rsquo;s loose guess — hover any ribbon to read its exact %. The band cut-offs are yours to set in <strong>Settings ▸ Braid</strong>, where you can also <em>hide</em> braids below a confidence you choose (which also drops their panel highlighting), fade the ribbons, or drop long-distance ones. (Confidence is the pairing similarity — Sørensen–Dice over character bigrams; see Analyse ▸ Deep dive for the per-locus figures.)</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
@@ -1003,15 +1006,15 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <details className="group">
             <summary className="flex items-center gap-1.5 cursor-pointer list-none text-[12px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
               <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
-              Eddy2 &amp; Viv2 — our version-divergence metrics
+              Eddy<sup>2</sup> &amp; Viv<sup>2</sup> — our version-divergence metrics
             </summary>
             <div className="mt-2 space-y-2">
-              <p><strong>Eddy2</strong> and <strong>Viv2</strong> are Source Variorum&rsquo;s own take on two measures from the <strong>Version Variation Visualization (VVV)</strong> project — the <em>2</em> marks them as our pairwise/aggregate reworkings, not VVV&rsquo;s vector-space originals (Eddy / Viv).</p>
+              <p><strong>Eddy<sup>2</sup></strong> and <strong>Viv<sup>2</sup></strong> are Source Variorum&rsquo;s own take on two measures from the <strong>Version Variation Visualization (VVV)</strong> project — the <em>2</em> marks them as our pairwise/aggregate reworkings, not VVV&rsquo;s vector-space originals (Eddy / Viv).</p>
               <p>VVV&rsquo;s <strong>Eddy</strong> is a single <em>version&apos;s</em> distinctiveness at a passage: the average distance between that version and all the others. A high value marks an <em>outlier</em> — the version whose wording diverges most.<br />
                 <span className="font-mono text-[12px]">Eddy(D&#x2c7;) = (1/n) &Sigma;<sub>k</sub> &#8741;D&#x2c7; &minus; D<sub>k</sub>&#8741;</span></p>
               <p>VVV&rsquo;s <strong>Viv</strong> (vivacity) is a <em>passage&apos;s</em> overall instability: the average of all the Eddy values for that passage (its &ldquo;diameter&rdquo;). A high value marks a <em>hotspot</em> where the versions most disagree.<br />
                 <span className="font-mono text-[12px]">Viv(i) = (1/n) &Sigma;<sub>k</sub> Eddy(D<sub>k</sub><sup>i</sup>)</span></p>
-              <p className="text-[12px] text-muted-foreground">Our <strong>Eddy2</strong> and <strong>Viv2</strong> are <strong>cheap pairwise/aggregate approximations, not the VVV vector-space originals</strong>. <em>Eddy2</em> (the version-distinctiveness ranking) is a witness&apos;s mean <span className="font-mono text-[11px]">(1 &minus; Dice-bigram)</span> lexical distance from every other witness; <em>Viv2</em> (the <strong>Version hotspots</strong> overview) counts, at each point in the base text, how many witnesses diverge from the copy-text. They are heuristic, orientation-oriented measures, not canonical variant-graph computations: the numbers locate <em>where</em> and <em>which</em>, but should not be read as exact divergence distances.</p>
+              <p className="text-[12px] text-muted-foreground">Our <strong>Eddy<sup>2</sup></strong> and <strong>Viv<sup>2</sup></strong> are <strong>cheap pairwise/aggregate approximations, not the VVV vector-space originals</strong>. <em>Eddy<sup>2</sup></em> (the version-distinctiveness ranking) is a witness&apos;s mean <span className="font-mono text-[11px]">(1 &minus; Dice-bigram)</span> lexical distance from every other witness; <em>Viv<sup>2</sup></em> (the <strong>Version hotspots</strong> overview) counts, at each point in the base text, how many witnesses diverge from the copy-text. They are heuristic, orientation-oriented measures, not canonical variant-graph computations: the numbers locate <em>where</em> and <em>which</em>, but should not be read as exact divergence distances.</p>
               <p className="text-[9px] leading-snug text-muted-foreground/80">Eddy &amp; Viv were defined by the VVV / Translation Arrays team (Tom Cheesman, Stephan Thiel, Kevin Flanagan, Zhao Geng, Alison Ehrmann, Robert S. Laramee, Jonathan Hope, David M. Berry); see ShakerVis (Geng, Cheesman, Laramee, Flanagan &amp; Thiel, <em>Information Visualization</em> 14(4), 2013) and Cheesman et al., delightedbeauty.org/vvv.</p>
             </div>
           </details>
@@ -1178,7 +1181,19 @@ function SettingsModal({
 
           {tab === "braid" && (
             <div className="divide-y divide-border">
-              <div className="pb-2 text-[11px] text-muted-foreground">How the braid ribbons are drawn. <strong>Confidence</strong> already sets each ribbon&rsquo;s line texture automatically — <span className="font-medium">solid</span> ≥{Math.round(CONF_HIGH * 100)}%, <span className="font-medium">dashed</span> ≥{Math.round(CONF_MED * 100)}%, <span className="font-medium">dotted</span> below. These controls thin the braid down to what you want to see.</div>
+              <div className="pb-2 text-[11px] text-muted-foreground">How the braid ribbons are drawn. <strong>Confidence</strong> sets each ribbon&rsquo;s line texture — <span className="font-medium">solid</span> ≥{Math.round(braidViz.confHigh * 100)}%, <span className="font-medium">dashed</span> ≥{Math.round(braidViz.confMed * 100)}%, <span className="font-medium">dotted</span> below — and the cut-offs are yours to set:</div>
+              <SettingsRow label="Solid at/above" hint="Confidence at which a braid is drawn as a firm, solid ribbon.">
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{Math.round(braidViz.confHigh * 100)}%</span>
+                  <input type="range" min={50} max={100} step={5} value={Math.round(braidViz.confHigh * 100)} onChange={(e) => onBraidVizOpt("confHigh", Math.max(braidViz.confMed + 0.05, parseInt(e.target.value, 10) / 100))} className="w-28 accent-primary" aria-label="Solid threshold" />
+                </span>
+              </SettingsRow>
+              <SettingsRow label="Dashed at/above" hint="Confidence at which a braid is dashed (below this it is dotted).">
+                <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="tabular-nums w-9 text-right">{Math.round(braidViz.confMed * 100)}%</span>
+                  <input type="range" min={5} max={90} step={5} value={Math.round(braidViz.confMed * 100)} onChange={(e) => onBraidVizOpt("confMed", Math.min(braidViz.confHigh - 0.05, parseInt(e.target.value, 10) / 100))} className="w-28 accent-primary" aria-label="Dashed threshold" />
+                </span>
+              </SettingsRow>
               <SettingsRow label="Hide below confidence" hint={braidViz.hideBelowConfidence > 0 ? `Don't draw braids the engine is less than ${Math.round(braidViz.hideBelowConfidence * 100)}% sure of.` : "Draw every braid (no confidence cut)."}>
                 <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
                   <span className="tabular-nums w-9 text-right">{braidViz.hideBelowConfidence > 0 ? `${Math.round(braidViz.hideBelowConfidence * 100)}%` : "off"}</span>
@@ -1245,6 +1260,9 @@ function SettingsModal({
               </SettingsRow>
               <SettingsRow label="Word-order insensitive" hint="Compare readings as a bag of words, so a reordered clause counts as the same reading, not a substitution.">
                 <Toggle on={!!tokenizer.ignoreWordOrder} onClick={() => onTokenizer("ignoreWordOrder", !tokenizer.ignoreWordOrder)} />
+              </SettingsRow>
+              <SettingsRow label="Match singular/plural" hint="Fold a regular plural to its singular (lambs≈lamb, lovers≈lover), so number alone isn't a variant.">
+                <Toggle on={!!tokenizer.matchPluralSingular} onClick={() => onTokenizer("matchPluralSingular", !tokenizer.matchPluralSingular)} />
               </SettingsRow>
               <SettingsRow label="Segment by line (verse)" hint="Align line by line instead of sentence by sentence — for verse and drama.">
                 <Toggle on={engineOpts.segmentByLine} onClick={() => onEngineOpt("segmentByLine", !engineOpts.segmentByLine)} />

@@ -30,6 +30,12 @@ export interface NormalizeOptions {
    *  with the same words in a different order count as the same reading — a
    *  reordered clause is a match/variant, not an unrelated substitution. */
   ignoreWordOrder?: boolean;
+  /** TX-Engine: fold a regular plural to its singular for matching (strip a
+   *  trailing -s, not -ss), so "lambs"≈"lamb", "lovers"≈"lover", "loves"≈"love".
+   *  Helps a passage like "As wolves love lambs…" align with "…the wolf loves the
+   *  lamb…". Irregular plurals (wolves→wolf) aren't fully regularised, but the
+   *  regular ones around them lift the similarity enough to pair the clause. */
+  matchPluralSingular?: boolean;
 }
 
 export const DEFAULT_NORMALIZE: NormalizeOptions = {
@@ -39,6 +45,7 @@ export const DEFAULT_NORMALIZE: NormalizeOptions = {
   ignoreComments: false,
   regulariseSpelling: false,
   ignoreWordOrder: false,
+  matchPluralSingular: false,
 };
 
 /** Strip line and block comments across the common syntaxes (PDP-1 / assembler
@@ -79,7 +86,7 @@ function regulariseSpelling(s: string): string {
 const normCache = new Map<string, string>();
 let normCacheSig = "\0";
 function sigOf(o: NormalizeOptions): string {
-  return `${+!!o.ignoreCase}${+!!o.ignorePunctuation}${+!!o.ignoreWhitespace}${+!!o.ignoreComments}${+!!o.regulariseSpelling}${+!!o.ignoreWordOrder}`;
+  return `${+!!o.ignoreCase}${+!!o.ignorePunctuation}${+!!o.ignoreWhitespace}${+!!o.ignoreComments}${+!!o.regulariseSpelling}${+!!o.ignoreWordOrder}${+!!o.matchPluralSingular}`;
 }
 
 export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): string {
@@ -93,6 +100,7 @@ export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): s
   if (o.ignorePunctuation) r = r.replace(/[^\p{L}\p{N}\s]/gu, "");
   if (o.ignoreCase) r = r.toLowerCase();
   if (o.regulariseSpelling) r = regulariseSpelling(r);
+  if (o.matchPluralSingular) r = r.replace(/ies\b/gi, "y").replace(/([^s\W])s\b/gi, "$1");
   if (o.ignoreWordOrder) r = r.split(/\s+/).filter(Boolean).sort().join(" ");
   if (normCache.size > 60000) normCache.clear();
   normCache.set(s, r);

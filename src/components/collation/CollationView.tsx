@@ -105,6 +105,13 @@ export function CollationView({
   const { collation } = project;
   const { a: witnessA, b: witnessB, variants, metrics } = view;
   const mode = collation.mode;
+  // When the reader hides low-confidence braids, drop their PANEL highlighting too
+  // (a hidden ribbon shouldn't leave its sentences tinted). Match / addition /
+  // omission are confidence 1, so only fuzzy pairings are ever filtered out.
+  const panelVariants = useMemo(
+    () => (braidViz.hideBelowConfidence > 0 ? variants.filter((v) => confidenceOf(v) >= braidViz.hideBelowConfidence) : variants),
+    [variants, braidViz.hideBelowConfidence]
+  );
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -349,7 +356,7 @@ export function CollationView({
           {eddy.length >= 3 && (
             <div className="mb-4">
               <div className="text-[11px] text-muted-foreground mb-1.5">
-                <strong>Version distinctiveness (Eddy2)</strong> — each witness&apos;s mean lexical distance from all the others. Longest bar = the outlier.
+                <strong>Version distinctiveness (Eddy<sup>2</sup>)</strong> — each witness&apos;s mean lexical distance from all the others. Longest bar = the outlier.
               </div>
               <div className="space-y-1">
                 {(() => {
@@ -405,7 +412,7 @@ export function CollationView({
             <WitnessPanel
               side="a"
               witness={witnessA}
-              variants={variants}
+              variants={panelVariants}
               mode={mode}
               fontSize={fontSize}
               editMode={editSide === "a"}
@@ -521,7 +528,7 @@ export function CollationView({
             <WitnessPanel
               side="b"
               witness={witnessB}
-              variants={variants}
+              variants={panelVariants}
               mode={mode}
               fontSize={fontSize}
               editMode={editSide === "b"}
