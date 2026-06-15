@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree } from "lucide-react";
+import { Moon, Sun, X, RotateCcw, Spline, BarChart3, Search, ChevronUp, ChevronDown, ChevronRight, ListTree, Code2, Type } from "lucide-react";
 import type { Collation, CollationMode, VariantType, Witness } from "@/types/collation";
 import { VARIANT_TYPES, VARIANT_TYPE_COLORS, variantLabel, WITNESS_FOLDER } from "@/types/collation";
 import { MenuBar, type Menu, type MenuEntry } from "@/components/MenuBar";
@@ -24,6 +24,12 @@ const LANG_KEY = "source-variorum-lang";
 const USER_KEY = "source-variorum-user";
 const TOKENIZER_KEY = "source-variorum-tokenizer";
 const DETECT_MOVES_KEY = "source-variorum-detect-moves";
+
+/** A small glyph for each engine — CX (code) and TX (text) — reused in Help,
+ *  Analyse ▸ Engines, and Settings so the two engines read as one identity. */
+function EngineIcon({ engine, className = "w-3.5 h-3.5" }: { engine: CollationMode; className?: string }) {
+  return engine === "source" ? <Code2 className={className} /> : <Type className={className} />;
+}
 
 function uid(): string {
   try {
@@ -759,6 +765,7 @@ function EnginesModal({
         <p className="text-[13px]">Source Variorum collates with one of two engines. The mode picks which one runs; each segments and matches the witnesses differently, and carries its own braid options. Changing an option here recomputes the live braid.</p>
         <div className="flex items-center gap-2 flex-wrap">
           <label htmlFor="engine-pick" className="text-[12px] text-muted-foreground">Engine</label>
+          <EngineIcon engine={view} className="w-4 h-4 text-primary" />
           <select id="engine-pick" value={view} onChange={(e) => setView(e.target.value as CollationMode)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-2 py-1">
             <option value="source">CX-Engine — code</option>
             <option value="text">TX-Engine — text</option>
@@ -771,7 +778,7 @@ function EnginesModal({
         </div>
 
         <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
-          <h3 className="text-[13px] font-semibold">{isCX ? "CX-Engine — code" : "TX-Engine — text"}</h3>
+          <h3 className="flex items-center gap-1.5 text-[13px] font-semibold"><EngineIcon engine={view} className="w-4 h-4 text-primary" />{isCX ? "CX-Engine — code" : "TX-Engine — text"}</h3>
           {isCX ? (
             <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
               <li><strong>Unit:</strong> the <strong>line</strong>. Monospace, literal reading.</li>
@@ -836,8 +843,8 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two engines: the CX-Engine (code) &amp; the TX-Engine (text)</h3>
           <p>The mode (View menu or Settings) selects which <strong>engine</strong> collates the witnesses. It changes both the typography <em>and</em> how the braid is computed, because the two materials behave differently. See <strong>Analyse ▸ Engines (CX · TX)</strong> for each engine&rsquo;s settings.</p>
           <ul className="list-disc pl-5 space-y-1 mt-1.5">
-            <li>The <strong>CX-Engine</strong> (code) aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so it trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. Options: <em>ignore comments</em>, <em>detect moved blocks</em>. The braid stays tight and faithful to the listing.</li>
-            <li>The <strong>TX-Engine</strong> (text) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
+            <li><EngineIcon engine="source" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>CX-Engine</strong> (code) aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so it trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. Options: <em>ignore comments</em>, <em>detect moved blocks</em>. The braid stays tight and faithful to the listing.</li>
+            <li><EngineIcon engine="text" className="inline w-3.5 h-3.5 align-text-bottom mr-0.5 text-primary" />The <strong>TX-Engine</strong> (text) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
           </ul>
           <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style normalisation toggles; the engines differ in their unit of alignment, their matching thresholds, and their per-engine options (Settings ▸ CX-Engine / TX-Engine).</p>
         </section>
@@ -978,8 +985,10 @@ function SettingsModal({
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={"text-left px-2.5 py-1.5 rounded text-[13px] " + (tab === t.id ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted text-foreground/80")}
+              className={"flex items-center gap-1.5 text-left px-2.5 py-1.5 rounded text-[13px] " + (tab === t.id ? "bg-primary text-primary-foreground font-medium" : "hover:bg-muted text-foreground/80")}
             >
+              {t.id === "code" && <EngineIcon engine="source" className="w-3.5 h-3.5 shrink-0" />}
+              {t.id === "text" && <EngineIcon engine="text" className="w-3.5 h-3.5 shrink-0" />}
               {t.label}
             </button>
           ))}
@@ -1006,7 +1015,7 @@ function SettingsModal({
               <SettingsRow label="Mode" hint="Code (line/token, monospace) or Text (sentence/word, prose).">
                 <div className="flex rounded border border-border overflow-hidden text-[12px]">
                   {(["source", "text"] as CollationMode[]).map((m) => (
-                    <button key={m} onClick={() => onMode(m)} className={"px-3 py-1 " + (mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}>{m === "source" ? "Code" : "Text"}</button>
+                    <button key={m} onClick={() => onMode(m)} className={"flex items-center gap-1 px-3 py-1 " + (mode === m ? "bg-primary text-primary-foreground" : "bg-card hover:bg-muted")}><EngineIcon engine={m} className="w-3.5 h-3.5" />{m === "source" ? "Code" : "Text"}</button>
                   ))}
                 </div>
               </SettingsRow>

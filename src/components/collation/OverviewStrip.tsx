@@ -153,7 +153,7 @@ export function OverviewStrip({
     const total = Math.max(1, rows.length);
     const stride = Math.max(1, Math.ceil(total / MAX_ROWS));
     const rowStep = (VH / total) * stride;
-    const rowH = Math.max(0.6, rowStep * (mode === "text" ? 0.95 : 0.7));
+    const rowH = Math.max(0.6, rowStep * 0.72); // small gap → reads as lines, not a slab
     const blocks: { y: number; x: number; w: number; line: number }[] = [];
     for (let idx = 0; idx < total; idx += stride) {
       const y = (idx / total) * VH;
@@ -220,6 +220,13 @@ export function OverviewStrip({
   const heatW = HEAT_W;
   const mainX = showHeat ? HEAT_W + GAP : 0;
   const mainW = hasMain ? 10 - mainX : 0;
+  // In PROSE with both minimap + variant map on, split the main zone: the text
+  // map keeps the left ~64%, the change-density lane takes the right ~32% (with a
+  // small gap). Otherwise the minimap and the variant ticks each use the full
+  // width as before.
+  const proseSplit = colMinimap && colVariants && mode === "text";
+  const tintW = proseSplit ? mainW * 0.64 : mainW;
+  const laneW = proseSplit ? mainW * 0.32 : mainW;
 
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -244,17 +251,24 @@ export function OverviewStrip({
       <div className="flex-1 min-h-0 cursor-pointer" onClick={onClick} title="Overview — click to jump">
         <svg viewBox={`0 0 10 ${VH}`} preserveAspectRatio="none" className="w-full h-full block">
           {hasMain && <rect x={mainX} y={0} width={mainW} height={VH} className="fill-card/40" />}
-          {/* Panel minimap — word-blocks (reads as text). When the variant map is
-              on, blocks on a changed line are tinted by variant type, so the change
-              shows IN the text shape rather than as a separate signal. */}
+          {/* Panel minimap. CODE: word-blocks tinted by variant type, so change
+              shows IN the text shape (changes are sparse, indentation gives the
+              map its rhythm). PROSE: a CALM neutral document-map — in translations
+              almost every sentence is a substitution, so tinting every row paints
+              the whole strip; instead prose rows stay neutral (a navigable shape
+              of paragraphs/turns) and the change signal moves to a thin lane on
+              the right (below). */}
           {colMinimap && mini.blocks.map((b, i) => {
-            const t = colVariants ? lineType.get(b.line) : undefined;
-            return <rect key={`m${i}`} x={mainX + b.x * mainW} y={b.y} width={Math.max(0.2, b.w * mainW)} height={mini.rowH} rx={0.15} fill={t ? VARIANT_TYPE_COLORS[t] : "var(--foreground)"} opacity={t ? 0.85 : 0.22} />;
+            const t = colVariants && mode === "source" ? lineType.get(b.line) : undefined;
+            const neutralOp = mode === "text" ? 0.17 : 0.22;
+            return <rect key={`m${i}`} x={mainX + b.x * tintW} y={b.y} width={Math.max(0.2, b.w * tintW)} height={mini.rowH} rx={0.15} fill={t ? VARIANT_TYPE_COLORS[t] : "var(--foreground)"} opacity={t ? 0.85 : neutralOp} />;
           })}
-          {/* Variant map — only as standalone ticks when there is no minimap to
-              colour; otherwise the colour lives in the minimap above. */}
-          {colVariants && !colMinimap && vbands.map((b, i) => (
-            <rect key={`v${i}`} x={mainX + mainW - b.w * mainW} y={b.y} width={b.w * mainW} height={b.h} fill={b.color} opacity={0.7} rx={0.15} />
+          {/* Variant density lane. Drawn as standalone ticks when there is no
+              minimap to colour, AND alongside the PROSE minimap as a slim
+              right-edge histogram (so prose change-density is visible without
+              overloading the text map). For code the colour lives in the minimap. */}
+          {colVariants && (!colMinimap || mode === "text") && vbands.map((b, i) => (
+            <rect key={`v${i}`} x={mainX + mainW - b.w * laneW} y={b.y} width={b.w * laneW} height={b.h} fill={b.color} opacity={colMinimap && mode === "text" ? 0.85 : 0.7} rx={0.15} />
           ))}
           {colVariants && selectedY != null && <rect x={mainX} y={Math.max(0, selectedY - 1)} width={mainW} height={3} fill="var(--sv-variation)" />}
           {/* Version hotspots — a thin heat line on the left, before the minimap. */}
