@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw } from "lucide-react";
+import { X, Pencil, Maximize2, Minimize2, Copy, Check, Undo2, Redo2, Lock, LockOpen, Crosshair, Diff as DiffIcon, ArrowLeftRight, Spline, Download, XCircle, RotateCcw, ThumbsUp, Trash2 } from "lucide-react";
 import { diffLines, createTwoFilesPatch } from "diff";
 import type { ApparatusEntry, CollationMetrics, CollationMode, Variant, VariantType, Witness } from "@/types/collation";
 import type { LineAnnotation } from "@/types/annotations";
-import { VARIANT_TYPE_COLORS, variantLabel, comparableWitnesses, confidenceOf } from "@/types/collation";
+import { VARIANT_TYPE_COLORS, VARIANT_TYPES, variantLabel, comparableWitnesses, confidenceOf, variantSignature } from "@/types/collation";
 import { LANGS, highlightRanges, tokenStyle } from "@/lib/highlight";
 import { linkIdOf } from "@/lib/collate/manual";
 import type { useProject } from "@/hooks/useProject";
@@ -115,6 +115,15 @@ export function CollationView({
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // The selected braid + its editorial-override handlers (re-type / delete /
+  // confirm). Keyed by reading-pair signature so the override survives recompute;
+  // all go through project.commit, so they undo/redo and save with the project.
+  const selectedVariant = useMemo(() => variants.find((v) => v.id === selectedId) ?? null, [variants, selectedId]);
+  const selectedSig = selectedVariant ? variantSignature(selectedVariant) : null;
+  const selectedConfirmed = !!(selectedSig && collation.variantOverrides?.[selectedSig]?.confirmed);
+  const swapVariantType = (t: VariantType) => { if (selectedSig) project.setVariantOverride(selectedSig, { type: t }); };
+  const deleteSelectedBraid = () => { if (selectedSig) { project.setVariantOverride(selectedSig, { deleted: true }); setSelectedId(null); } };
+  const toggleConfirmBraid = () => { if (selectedSig) project.setVariantOverride(selectedSig, { confirmed: !selectedConfirmed }); };
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
@@ -399,6 +408,25 @@ export function CollationView({
           clears the current selection. In focus/expand mode one panel fills the
           width and the gutter + other panel are hidden. */}
       <div ref={wrapperRef} onClick={() => (advancedMode ? clearPicks() : onSelect(null))} className="relative grid flex-1 min-h-0" style={{ gridTemplateColumns: focusSide ? "1fr" : `1fr ${braidWidth}px 1fr` }}>
+        {/* Selected-braid editor: confirm (full confidence), re-type, or delete the
+            link. All undoable and saved with the project. */}
+        {selectedVariant && !advancedMode && (
+          <div onClick={(e) => e.stopPropagation()} className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1.5 px-2 py-1 rounded-lg bg-card/95 backdrop-blur border border-border shadow-md text-[11px]">
+            <span className="inline-flex items-center gap-1 pr-1">
+              <span className="w-2 h-2 rounded-full" style={{ background: VARIANT_TYPE_COLORS[selectedVariant.type] }} />
+              {Math.round(confidenceOf(selectedVariant) * 100)}%
+            </span>
+            <button onClick={toggleConfirmBraid} title={selectedConfirmed ? "Confirmed — full confidence (click to un-confirm)" : "Confirm — vouch this is a real correspondence (sets full confidence)"} className={"p-1 rounded border " + (selectedConfirmed ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border hover:bg-muted")}>
+              <ThumbsUp className="w-3 h-3" />
+            </button>
+            <select value={selectedVariant.type} onChange={(e) => swapVariantType(e.target.value as VariantType)} title="Swap this braid's type" className="rounded border border-border bg-card hover:bg-muted px-1 py-0.5 text-[11px]">
+              {VARIANT_TYPES.map((t) => <option key={t} value={t}>{variantLabel(t, mode)}</option>)}
+            </select>
+            <button onClick={deleteSelectedBraid} title="Delete this braid (undoable)" className="p-1 rounded border border-border bg-card hover:bg-destructive/10 hover:text-destructive hover:border-destructive/40">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        )}
         {focusSide !== "b" && (
           <div ref={panelARef} data-sv-scroll="a" onScroll={onPanelScroll("a")} className="border-r border-border min-w-0 bg-card overflow-y-auto min-h-0">
             <WitnessHeader

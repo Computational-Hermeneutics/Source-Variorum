@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { Collation, CollationMode, LineAnnotation, ManualLink, Witness } from "@/types";
 import { WITNESS_FOLDER, comparableWitnesses } from "@/types/collation";
+import type { VariantOverride } from "@/types/collation";
 
 const HISTORY_CAP = 60;
 
@@ -320,6 +321,21 @@ export function useProject(initial: Collation) {
     [commit]
   );
 
+  // Editorial override of one braid (re-type / delete / confirm), keyed by the
+  // reading-pair signature so it survives recompute. Merges into any existing
+  // override; an empty patch (all fields cleared) removes it. Undoable via commit.
+  const setVariantOverride = useCallback(
+    (signature: string, patch: Partial<VariantOverride>) =>
+      commit((c) => {
+        const next = { ...(c.variantOverrides ?? {}) };
+        const merged = { ...next[signature], ...patch };
+        if (!merged.type && !merged.deleted && !merged.confirmed) delete next[signature];
+        else next[signature] = merged;
+        return { ...c, variantOverrides: next };
+      }),
+    [commit]
+  );
+
   const addAnnotation = useCallback(
     (witnessId: string, ann: LineAnnotation) =>
       commit((c) => ({
@@ -381,6 +397,7 @@ export function useProject(initial: Collation) {
     addManualLink,
     removeManualLink,
     editNote,
+    setVariantOverride,
     addAnnotation,
     removeAnnotation,
   };

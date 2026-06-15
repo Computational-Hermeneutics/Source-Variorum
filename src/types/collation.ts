@@ -112,6 +112,23 @@ export function confidenceOf(v: Variant): number {
   return v.similarity;
 }
 
+/** An editor's override of one auto-detected braid. */
+export interface VariantOverride {
+  /** Re-type the braid (e.g. call a substitution a transposition, or a match). */
+  type?: VariantType;
+  /** Drop the braid entirely (the two readings no longer count as linked). */
+  deleted?: boolean;
+  /** Editor vouches this pairing is correct ⇒ treat as full confidence. */
+  confirmed?: boolean;
+}
+
+/** Stable key for a braid: its reading pair (so an override survives recompute,
+ *  unlike the positional `v0,v1,…` ids). Witness-text edits that change a reading
+ *  drop its override, which is the right behaviour. */
+export function variantSignature(v: Pick<Variant, "textA" | "textB">): string {
+  return `${v.textA}␟${v.textB}`;
+}
+
 /** Colours for tinting passages and ribbons. Editorial palette, not Vector Lab. */
 export const VARIANT_TYPE_COLORS: Record<VariantType, string> = {
   match: "#9fb8c4", // muted blue (the braid's resting colour)
@@ -243,6 +260,10 @@ export interface Collation {
   /** Editor-made manual links, keyed by the witness pair `${leftId}|${rightId}`.
    *  They override the auto-collation for that specific pairing. */
   manualLinks?: Record<string, ManualLink[]>;
+  /** Per-braid editorial overrides, keyed by `variantSignature` (the reading
+   *  pair, so they survive recompute). The editor can re-type a braid, delete it,
+   *  or confirm it (vouching it is a real correspondence ⇒ full confidence). */
+  variantOverrides?: Record<string, VariantOverride>;
   /** Explicit folder names in the Sources organiser (incl. ones with no witness yet). */
   folders?: string[];
   /** Soft-deleted witnesses, recoverable from the organiser's trash. */

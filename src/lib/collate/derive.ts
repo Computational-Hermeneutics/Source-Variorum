@@ -8,6 +8,7 @@
  */
 
 import type { Collation, Witness } from "@/types/collation";
+import { variantSignature } from "@/types/collation";
 import { collate } from "./collate";
 import type { NormalizeOptions } from "./similarity";
 import { buildApparatus } from "./apparatus";
@@ -52,6 +53,18 @@ export function deriveView(
   });
   const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
   if (links.length) variants = applyManualLinks(variants, links, a, b);
+  // Editorial overrides: re-type, delete, or confirm individual braids. Applied
+  // after auto-collation + manual links so the editor always has the last word.
+  const ov = c.variantOverrides;
+  if (ov && Object.keys(ov).length) {
+    variants = variants.flatMap((v) => {
+      const o = ov[variantSignature(v)];
+      if (!o) return [v];
+      if (o.deleted) return [];
+      if (!o.type && !o.confirmed) return [v];
+      return [{ ...v, ...(o.type ? { type: o.type } : {}), ...(o.confirmed ? { similarity: 1 } : {}) }];
+    });
+  }
   const apparatus = buildApparatus(variants, a, b, c);
   const metrics = computeCollationMetrics(variants, a, b);
   return { a, b, variants, apparatus, metrics };
