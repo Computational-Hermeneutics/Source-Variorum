@@ -28,11 +28,16 @@ export function pairOf(c: Collation): [Witness, Witness] {
 }
 
 /** Recompute the full derived view (variants + apparatus + metrics) from a
- *  collation. `normalize` lets the caller pass the active tokenizer settings
- *  (ignore case / punctuation / whitespace); defaults to the engine defaults. */
-export function deriveView(c: Collation, normalize?: NormalizeOptions) {
+ *  collation. `normalize` lets the caller pass the active engine settings
+ *  (ignore case / punctuation / whitespace / comments / spelling); `detectMoves`
+ *  toggles transposition recovery. Both default to the engine defaults. */
+export function deriveView(c: Collation, normalize?: NormalizeOptions, detectMoves?: boolean) {
   const [a, b] = pairOf(c);
-  let variants = collate(a, b, normalize ? { mode: c.mode, normalize } : { mode: c.mode });
+  let variants = collate(a, b, {
+    mode: c.mode,
+    ...(normalize ? { normalize } : {}),
+    ...(detectMoves !== undefined ? { detectMoves } : {}),
+  });
   const links = c.manualLinks?.[pairKey(c.leftId, c.rightId)] ?? [];
   if (links.length) variants = applyManualLinks(variants, links, a, b);
   const apparatus = buildApparatus(variants, a, b, c);

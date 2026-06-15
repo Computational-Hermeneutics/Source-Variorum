@@ -23,18 +23,35 @@ across the two columns, including passages that have **moved** relative to one
 another. The crossing of those ribbons is the analytical payload. It shows, at a
 glance, where text has been added, deleted, substituted, or transposed.
 
-## Two modes
+## Two engines: CX (code) and TX (text)
 
-- **Source code** — line- and token-aware, monospace, for collating versions of
-  code and reading the movement of code as a cultural-textual process. **Syntax
-  highlighting** for common modern languages (JavaScript/TS, Python, HTML, CSS,
-  C/C++, Java, Rust, Go, PHP, SQL, JSON, XML/TEI, Markdown) and historical
-  assembly dialects (PDP-1 MACRO, AGC, MAD, FORTRAN, IPL-V, BASIC), chosen
-  **per panel** and coloured as a foreground layer over the variant tints.
-- **Text** — sentence- and word-aware, proportional type, witness sigla, for
-  prose witnesses, paratexts, and classical / hermeneutic comparison.
+The mode selects which **collation engine** runs. They are not just two
+typographies over one diff: each segments and matches the witnesses differently,
+and carries its own braid options (Analyse ▸ Engines, or Settings).
 
-The Code/Text mode lives in the **View** menu and **Settings**.
+- **CX-Engine — code.** Aligns **line by line**, monospace, and reads
+  **literally**: source is near one-to-one, so it trusts exact line
+  correspondence, only pairs genuinely-alike leftover lines (a renamed label, a
+  changed operand), and marks a clean addition/deletion otherwise; a block is
+  *moved* only when near-identical. Options: **ignore comments** (strip `;` `//`
+  `#` `/* … */` so re-/de-commented code still aligns), **detect moved blocks**.
+  **Syntax highlighting** for common modern languages (JavaScript/TS, Python,
+  HTML, CSS, C/C++, Java, Rust, Go, PHP, SQL, JSON, XML/TEI, Markdown) and
+  historical assembly dialects (PDP-1 MACRO, AGC, MAD, FORTRAN, IPL-V, BASIC),
+  chosen **per panel** and coloured over the variant tints.
+- **TX-Engine — text.** Aligns **sentence by sentence**, proportional type,
+  witness sigla, and reads **smartly**: prose is rephrased, so it pairs loosely
+  (a reworded sentence stays one substitution locus, not delete-plus-add) and
+  accepts fuzzier moves — correspondence is semantic, not positional. Options:
+  **regularise spelling** (fold early-modern ↔ modern orthography — long-s, u/v,
+  i/j, vv→w, doubled letters, final -e — so old-spelling and modern witnesses
+  align), **ignore accidentals** (punctuation), **detect moved passages**.
+
+Both share one similarity primitive (Sørensen–Dice over character bigrams) and
+the Juxta-style normalisation toggles; they differ in their unit of alignment,
+matching thresholds, and per-engine options. The active engine lives in the
+**View** menu and **Settings**; **Analyse ▸ Engines (CX · TX)** explains and
+configures each.
 
 ## What it shows
 

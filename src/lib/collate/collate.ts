@@ -34,6 +34,10 @@ export interface CollateOptions {
   subThreshold: number;
   /** Normalisation (which trivial differences to ignore when matching). */
   normalize: NormalizeOptions;
+  /** Recover relocated blocks as TRANSPOSITIONS (the move-detection pass). When
+   *  off, displaced text falls through to plain addition/deletion — a tighter,
+   *  more literal braid. Default on. */
+  detectMoves: boolean;
 }
 
 export const DEFAULT_OPTIONS: CollateOptions = {
@@ -43,6 +47,7 @@ export const DEFAULT_OPTIONS: CollateOptions = {
   minMoveLength: 12,
   subThreshold: 0.2,
   normalize: DEFAULT_NORMALIZE,
+  detectMoves: true,
 };
 
 /**
@@ -368,7 +373,11 @@ export function collate(
   // transpositions: a whole relocated block matches a whole block elsewhere.
   const delPool = coalesce(delSegs);
   const addPool = coalesce(addSegs);
-  const { moves, leftDels, leftAdds } = detectMoves(delPool, addPool, opts);
+  // Move detection is optional: with it off, displaced runs stay add/delete for a
+  // tighter, more literal braid (useful in the CX-Engine for small code edits).
+  const { moves, leftDels, leftAdds } = opts.detectMoves === false
+    ? { moves: [] as RawVariant[], leftDels: delPool, leftAdds: addPool }
+    : detectMoves(delPool, addPool, opts);
   raw.push(...moves);
   // Similarity-aware residue alignment: pair what's left into substitutions
   // before falling back to plain omission/addition.

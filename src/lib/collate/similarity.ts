@@ -18,24 +18,61 @@ export interface NormalizeOptions {
   ignoreCase: boolean;
   ignorePunctuation: boolean;
   ignoreWhitespace: boolean;
+  /** CX-Engine: strip line/block comments (`;` `//` `#` `/* … *​/`) before
+   *  matching, so re-commented or de-commented code still aligns to its twin. */
+  ignoreComments?: boolean;
+  /** TX-Engine: fold early-modern ↔ modern orthography (long-s, u/v and i/j
+   *  allographs, vv→w, doubled letters, word-final -e) so old-spelling and
+   *  modernised witnesses align. Heuristic and deliberately aggressive: it can
+   *  over-merge (e.g. "hat"≈"hate"), so it is off by default. */
+  regulariseSpelling?: boolean;
 }
 
 export const DEFAULT_NORMALIZE: NormalizeOptions = {
   ignoreCase: true,
   ignorePunctuation: false,
   ignoreWhitespace: true,
+  ignoreComments: false,
+  regulariseSpelling: false,
 };
+
+/** Strip line and block comments across the common syntaxes (PDP-1 / assembler
+ *  `;`, C/JS `//` and `/​* *​/`, shell/Python `#`). Heuristic — it does not parse
+ *  strings — but for collation it is enough to keep a re-commented line matching. */
+function stripComments(s: string): string {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, " ") // block comments
+    .replace(/\/\/[^\n]*/g, " ") // // to end of line
+    .replace(/(^|[ \t]);[^\n]*/gm, "$1 ") // ; to end of line (asm / PDP-1)
+    .replace(/#[^\n]*/g, " "); // # to end of line
+}
+
+/** Fold early-modern English orthography toward a modern matching key. Operates
+ *  on a lowercased copy used only for comparison (never displayed). */
+function regulariseSpelling(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ſ/g, "s") // long s
+    .replace(/vv/g, "w")
+    .replace(/v/g, "u") // u/v allographs → one class
+    .replace(/j/g, "i") // i/j allographs → one class
+    .replace(/(.)\1+/g, "$1") // collapse any doubled letter (Moore→More)
+    .replace(/e\b/g, ""); // drop word-final e (More→Mor, loue→lou)
+}
 
 /** Normalise a reading for comparison. With the defaults this collapses
  *  whitespace and lowercases, so trivial reflow/indentation/case differences do
  *  not register as variants; punctuation, case, or whitespace can each be kept
- *  significant by turning the corresponding flag off. Callers that need verbatim
- *  equality compare the raw strings separately. */
+ *  significant by turning the corresponding flag off. The optional engine flags
+ *  (ignoreComments, regulariseSpelling) add code- and text-specific folding.
+ *  Callers that need verbatim equality compare the raw strings separately. */
 export function normalize(s: string, o: NormalizeOptions = DEFAULT_NORMALIZE): string {
   let r = s;
+  if (o.ignoreComments) r = stripComments(r);
   if (o.ignoreWhitespace) r = r.replace(/\s+/g, " ").trim();
   if (o.ignorePunctuation) r = r.replace(/[^\p{L}\p{N}\s]/gu, "");
   if (o.ignoreCase) r = r.toLowerCase();
+  if (o.regulariseSpelling) r = regulariseSpelling(r);
   return r;
 }
 

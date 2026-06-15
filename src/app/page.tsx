@@ -23,6 +23,7 @@ const FONT_KEY = "source-variorum-fontsize";
 const LANG_KEY = "source-variorum-lang";
 const USER_KEY = "source-variorum-user";
 const TOKENIZER_KEY = "source-variorum-tokenizer";
+const DETECT_MOVES_KEY = "source-variorum-detect-moves";
 
 function uid(): string {
   try {
@@ -140,6 +141,8 @@ export default function Home() {
   const langTouched = useRef(false);
   const [userName, setUserName] = useState("");
   const [tokenizer, setTokenizer] = useState<NormalizeOptions>(DEFAULT_NORMALIZE);
+  const [detectMoves, setDetectMoves] = useState(true);
+  const [showEngines, setShowEngines] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState<Set<VariantType>>(() => new Set(VARIANT_TYPES));
   const [showDeepDive, setShowDeepDive] = useState(false);
   const [showOverview, setShowOverview] = useState(false);
@@ -182,6 +185,8 @@ export default function Home() {
       if (un) setUserName(un);
       const tk = localStorage.getItem(TOKENIZER_KEY);
       if (tk) setTokenizer({ ...DEFAULT_NORMALIZE, ...JSON.parse(tk) });
+      const dm = localStorage.getItem(DETECT_MOVES_KEY);
+      if (dm != null) setDetectMoves(dm === "1");
       const sc = localStorage.getItem("source-variorum-strip-cols");
       if (sc) setStripCols((prev) => ({ ...prev, ...JSON.parse(sc) }));
       if (localStorage.getItem("source-variorum-sidebar-hidden") === "1") setSidebarHidden(true);
@@ -237,7 +242,7 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [project]);
 
-  const view = useMemo(() => deriveView(collation, tokenizer), [collation, tokenizer]);
+  const view = useMemo(() => deriveView(collation, tokenizer, detectMoves), [collation, tokenizer, detectMoves]);
 
   // Version hotspots (base vs every other witness, aggregated): only meaningful
   // with 3+ witnesses, and only computed when the overview is actually open so we
@@ -256,6 +261,10 @@ export default function Home() {
     [showOverview, collation.witnesses, tokenizer]
   );
 
+  const setDetectMovesP = (val: boolean) => {
+    setDetectMoves(val);
+    try { localStorage.setItem(DETECT_MOVES_KEY, val ? "1" : "0"); } catch { /* ignore */ }
+  };
   const setTokenizerOpt = (key: keyof NormalizeOptions, val: boolean) => {
     setTokenizer((prev) => {
       const next = { ...prev, [key]: val };
@@ -387,6 +396,8 @@ export default function Home() {
         { kind: "action", label: "Deep dive…", onClick: () => setShowDeepDive(true) },
         { kind: "separator" },
         { kind: "action", label: "Witness statistics…", onClick: () => setShowStats(true) },
+        { kind: "separator" },
+        { kind: "action", label: "Engines (CX · TX)…", onClick: () => setShowEngines(true) },
       ],
     },
     {
@@ -544,6 +555,17 @@ export default function Home() {
 
       {showAbout && <AboutModal onClose={() => setShowAbout(false)} />}
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showEngines && (
+        <EnginesModal
+          mode={collation.mode}
+          onMode={project.setMode}
+          tokenizer={tokenizer}
+          onTokenizer={setTokenizerOpt}
+          detectMoves={detectMoves}
+          onDetectMoves={setDetectMovesP}
+          onClose={() => setShowEngines(false)}
+        />
+      )}
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
@@ -560,6 +582,8 @@ export default function Home() {
           onMode={project.setMode}
           tokenizer={tokenizer}
           onTokenizer={setTokenizerOpt}
+          detectMoves={detectMoves}
+          onDetectMoves={setDetectMovesP}
           onResetData={() => {
             if (!confirm("Clear all saved data (the autosaved working project and preferences) and reload? This cannot be undone.")) return;
             try {
@@ -709,6 +733,94 @@ function ModalShell({ title, subtitle, onClose, children, footer }: { title: str
 }
 
 
+function EnginesModal({
+  mode,
+  onMode,
+  tokenizer,
+  onTokenizer,
+  detectMoves,
+  onDetectMoves,
+  onClose,
+}: {
+  mode: CollationMode;
+  onMode: (m: CollationMode) => void;
+  tokenizer: NormalizeOptions;
+  onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
+  detectMoves: boolean;
+  onDetectMoves: (val: boolean) => void;
+  onClose: () => void;
+}) {
+  const [view, setView] = useState<CollationMode>(mode);
+  const isCX = view === "source";
+  const active = mode === view;
+  return (
+    <ModalShell title="Engines" subtitle="Two collation engines, one per material" onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-[13px]">Source Variorum collates with one of two engines. The mode picks which one runs; each segments and matches the witnesses differently, and carries its own braid options. Changing an option here recomputes the live braid.</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <label htmlFor="engine-pick" className="text-[12px] text-muted-foreground">Engine</label>
+          <select id="engine-pick" value={view} onChange={(e) => setView(e.target.value as CollationMode)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-2 py-1">
+            <option value="source">CX-Engine — code</option>
+            <option value="text">TX-Engine — text</option>
+          </select>
+          {active ? (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary/15 text-primary font-medium">Active</span>
+          ) : (
+            <button onClick={() => onMode(view)} className="text-[11px] px-2.5 py-1 rounded border border-border bg-card hover:bg-muted">Make active</button>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-2">
+          <h3 className="text-[13px] font-semibold">{isCX ? "CX-Engine — code" : "TX-Engine — text"}</h3>
+          {isCX ? (
+            <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
+              <li><strong>Unit:</strong> the <strong>line</strong>. Monospace, literal reading.</li>
+              <li><strong>Matching:</strong> source is near one-to-one, so it trusts exact line correspondence; only genuinely-alike leftover lines pair (a renamed label, a changed operand), otherwise a clean <strong>addition</strong>/<strong>deletion</strong>. A block is <strong>moved</strong> only when near-identical.</li>
+              <li><strong>Good for:</strong> program listings, versions of a source file, disassemblies — where structure and exact tokens matter.</li>
+            </ul>
+          ) : (
+            <ul className="list-disc pl-5 space-y-1 text-[12.5px]">
+              <li><strong>Unit:</strong> the <strong>sentence</strong>. Proportional type, smart reading.</li>
+              <li><strong>Matching:</strong> prose is routinely rephrased, so it pairs loosely — a reworded sentence stays one <strong>substitution</strong> locus rather than an unrelated delete-plus-add — and accepts fuzzier <strong>moves</strong>. Correspondence is semantic, not positional.</li>
+              <li><strong>Good for:</strong> editions, translations, drafts — where the &ldquo;same&rdquo; passage is said differently.</li>
+            </ul>
+          )}
+        </div>
+
+        <div>
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">{isCX ? "CX-Engine options" : "TX-Engine options"}</h4>
+          <div className="divide-y divide-border">
+            {isCX ? (
+              <>
+                <SettingsRow label="Ignore comments" hint="Strip ; // # /* … */ before matching, so a re-/de-commented line still aligns.">
+                  <Toggle on={!!tokenizer.ignoreComments} onClick={() => onTokenizer("ignoreComments", !tokenizer.ignoreComments)} />
+                </SettingsRow>
+                <SettingsRow label="Detect moved blocks" hint="Recover relocated code as a transposition. Off ⇒ a tighter add/delete braid.">
+                  <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
+                </SettingsRow>
+              </>
+            ) : (
+              <>
+                <SettingsRow label="Regularise spelling" hint="Fold early-modern ↔ modern orthography (long-s, u/v, i/j, vv→w, doubled letters, final -e). Aggressive — can over-merge.">
+                  <Toggle on={!!tokenizer.regulariseSpelling} onClick={() => onTokenizer("regulariseSpelling", !tokenizer.regulariseSpelling)} />
+                </SettingsRow>
+                <SettingsRow label="Ignore accidentals" hint="Treat punctuation as non-substantive (the substantives/accidentals distinction).">
+                  <Toggle on={tokenizer.ignorePunctuation} onClick={() => onTokenizer("ignorePunctuation", !tokenizer.ignorePunctuation)} />
+                </SettingsRow>
+                <SettingsRow label="Detect moved passages" hint="Recover relocated prose as a transposition. Off ⇒ plain addition/omission.">
+                  <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
+                </SettingsRow>
+              </>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5">Shared normalisation (ignore case / punctuation / whitespace) and more options live in <strong>Settings ▸ {isCX ? "CX-Engine" : "TX-Engine"}</strong>.</p>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+
 function HelpModal({ onClose }: { onClose: () => void }) {
   const Key = ({ children }: { children: React.ReactNode }) => (
     <kbd className="px-1.5 py-0.5 rounded border border-border bg-muted text-[11px] font-mono">{children}</kbd>
@@ -721,13 +833,13 @@ function HelpModal({ onClose }: { onClose: () => void }) {
           <p>Two witnesses sit side by side with a central <strong>braid</strong> of ribbons connecting matching passages, including text that has <strong>moved</strong> between them. The left panel is the <strong>base</strong> (copy-text). Click any passage or ribbon to highlight the shared reading in both panels and fade the rest; click empty space to clear.</p>
         </section>
         <section>
-          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two collation engines: Code &amp; Text</h3>
-          <p>The mode (View menu or Settings) changes both the typography <em>and</em> how the braid is computed, because the two materials behave differently:</p>
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Two engines: the CX-Engine (code) &amp; the TX-Engine (text)</h3>
+          <p>The mode (View menu or Settings) selects which <strong>engine</strong> collates the witnesses. It changes both the typography <em>and</em> how the braid is computed, because the two materials behave differently. See <strong>Analyse ▸ Engines (CX · TX)</strong> for each engine&rsquo;s settings.</p>
           <ul className="list-disc pl-5 space-y-1 mt-1.5">
-            <li><strong>Code</strong> aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so the engine trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. The braid stays tight and faithful to the listing.</li>
-            <li><strong>Text</strong> aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. The engine pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Correspondence here is semantic, not positional.</li>
+            <li>The <strong>CX-Engine</strong> (code) aligns <strong>line by line</strong> in monospace and reads <strong>literally</strong>: source is close to one-to-one, so it trusts exact line correspondence, only pairs leftover lines that are genuinely alike (a renamed label, a changed operand), and otherwise marks a clean <strong>addition</strong> or <strong>deletion</strong>; a block counts as <strong>moved</strong> only when near-identical. Options: <em>ignore comments</em>, <em>detect moved blocks</em>. The braid stays tight and faithful to the listing.</li>
+            <li>The <strong>TX-Engine</strong> (text) aligns <strong>sentence by sentence</strong> in proportional type and reads <strong>smartly</strong>: prose is discourse, so the &ldquo;same&rdquo; passage is routinely rephrased. It pairs much more loosely, so a reworded sentence still registers as one <strong>substitution</strong> locus rather than an unrelated delete-plus-add, and it accepts fuzzier <strong>moves</strong>. Options: <em>regularise spelling</em> (old↔modern), <em>ignore accidentals</em>. Correspondence here is semantic, not positional.</li>
           </ul>
-          <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style tokenizer toggles (Settings ▸ Text); only the matching thresholds differ by mode.</p>
+          <p className="text-[12px] text-muted-foreground mt-1.5">Both share one similarity primitive (Sørensen–Dice over character bigrams) and the Juxta-style normalisation toggles; the engines differ in their unit of alignment, their matching thresholds, and their per-engine options (Settings ▸ CX-Engine / TX-Engine).</p>
         </section>
         <section>
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">Building a collation</h3>
@@ -780,8 +892,8 @@ type SettingsTab = "user" | "appearance" | "code" | "text";
 const SETTINGS_TABS: { id: SettingsTab; label: string }[] = [
   { id: "user", label: "User" },
   { id: "appearance", label: "Appearance" },
-  { id: "code", label: "Code" },
-  { id: "text", label: "Text" },
+  { id: "code", label: "CX-Engine" },
+  { id: "text", label: "TX-Engine" },
 ];
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -824,6 +936,8 @@ function SettingsModal({
   onMode,
   tokenizer,
   onTokenizer,
+  detectMoves,
+  onDetectMoves,
   onResetData,
 }: {
   onClose: () => void;
@@ -840,6 +954,8 @@ function SettingsModal({
   onMode: (m: CollationMode) => void;
   tokenizer: NormalizeOptions;
   onTokenizer: (key: keyof NormalizeOptions, val: boolean) => void;
+  detectMoves: boolean;
+  onDetectMoves: (val: boolean) => void;
   onResetData: () => void;
 }) {
   const [tab, setTab] = useState<SettingsTab>("user");
@@ -911,6 +1027,13 @@ function SettingsModal({
 
           {tab === "code" && (
             <div className="divide-y divide-border">
+              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>CX-Engine</strong> aligns code <strong>line by line</strong> and reads literally. These options change how the braid is computed for <em>code</em> witnesses.</div>
+              <SettingsRow label="Ignore comments" hint="Strip ; // # /* … */ before matching, so a re-/de-commented line still aligns.">
+                <Toggle on={!!tokenizer.ignoreComments} onClick={() => onTokenizer("ignoreComments", !tokenizer.ignoreComments)} />
+              </SettingsRow>
+              <SettingsRow label="Detect moved blocks" hint="Recover relocated code as a transposition. Off ⇒ a tighter add/delete braid.">
+                <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
+              </SettingsRow>
               <SettingsRow label="Default syntax language" hint="Used for code-mode witnesses when not auto-detected.">
                 <select value={lang} onChange={(e) => onLang(e.target.value)} className="rounded border border-border bg-card hover:bg-muted text-[12px] px-1.5 py-1 max-w-[12rem]">
                   <option value="none">No highlighting</option>
@@ -926,17 +1049,23 @@ function SettingsModal({
                   </optgroup>
                 </select>
               </SettingsRow>
-              <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more code options will live here.</div>
+              <div className="py-2.5 text-[11px] text-muted-foreground">Per-panel language override and more CX-Engine options will live here.</div>
             </div>
           )}
 
           {tab === "text" && (
             <div className="divide-y divide-border">
-              <div className="pb-2 text-[11px] text-muted-foreground">When aligning witnesses, treat these trivial differences as <em>not</em> a variant (Juxta-style tokenizer settings). Applies to both modes.</div>
+              <div className="pb-2 text-[11px] text-muted-foreground">The <strong>TX-Engine</strong> aligns prose <strong>sentence by sentence</strong> and reads smartly. These options decide which differences count as a real variant (Juxta-style normalisation). The case / punctuation / whitespace toggles apply to both engines.</div>
+              <SettingsRow label="Regularise spelling" hint="Fold early-modern ↔ modern orthography (long-s, u/v, i/j, vv→w, doubled letters, final -e) so old-spelling and modern witnesses align. Aggressive — can over-merge.">
+                <Toggle on={!!tokenizer.regulariseSpelling} onClick={() => onTokenizer("regulariseSpelling", !tokenizer.regulariseSpelling)} />
+              </SettingsRow>
+              <SettingsRow label="Detect moved passages" hint="Recover relocated prose as a transposition. Off ⇒ plain addition/omission.">
+                <Toggle on={detectMoves} onClick={() => onDetectMoves(!detectMoves)} />
+              </SettingsRow>
               <SettingsRow label="Ignore case" hint="“The” and “the” count as the same reading.">
                 <Toggle on={tokenizer.ignoreCase} onClick={() => onTokenizer("ignoreCase", !tokenizer.ignoreCase)} />
               </SettingsRow>
-              <SettingsRow label="Ignore punctuation" hint="Commas, full stops, quotes etc. don’t count as differences.">
+              <SettingsRow label="Ignore punctuation" hint="Accidentals: commas, full stops, quotes etc. don’t count as differences.">
                 <Toggle on={tokenizer.ignorePunctuation} onClick={() => onTokenizer("ignorePunctuation", !tokenizer.ignorePunctuation)} />
               </SettingsRow>
               <SettingsRow label="Ignore whitespace" hint="Reflow / indentation / extra spaces don’t count.">
