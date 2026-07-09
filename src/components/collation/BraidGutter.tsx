@@ -31,6 +31,10 @@ export const CONF_MED = 0.5;
 
 /** Visualisation controls for the braid (set in Settings ▸ Braid). */
 export interface BraidViz {
+  /** Draw all ribbons when nothing is selected. Off by default: the full braid
+   *  at rest is overwhelming on first open, so ribbons appear only for the
+   *  locus you select (the panel tints still show every variant). */
+  showAtRest: boolean;
   /** Don't draw braids whose confidence is below this (0 = draw all). */
   hideBelowConfidence: number;
   /** Global opacity multiplier for ribbons (0.1–1). */
@@ -47,7 +51,7 @@ export interface BraidViz {
   confMed: number;
 }
 
-export const DEFAULT_BRAID_VIZ: BraidViz = { hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0, cableSag: 0.5, confHigh: CONF_HIGH, confMed: CONF_MED };
+export const DEFAULT_BRAID_VIZ: BraidViz = { showAtRest: false, hideBelowConfidence: 0, opacity: 1, hideLongDistance: 0, cableSag: 0.5, confHigh: CONF_HIGH, confMed: CONF_MED };
 
 export function BraidGutter({
   width,
@@ -73,6 +77,10 @@ export function BraidGutter({
   onHover: (id: string | null) => void;
 }) {
   const anySelected = selectedId !== null;
+  // At rest (nothing selected), the full braid is overwhelming, so unless the
+  // reader opts in (viz.showAtRest) we draw no ribbons until a locus is
+  // selected. Hover still works — hovering a variant lights only its ribbon.
+  const restQuiet = !anySelected && !viz.showAtRest;
   // Draw matches first (underneath), then changes, then the active ribbon on top.
   const sorted = [...ribbons].sort((a, b) => {
     const score = (r: Ribbon) =>
@@ -88,6 +96,8 @@ export function BraidGutter({
       style={{ overflow: "visible" }}
     >
       {sorted.map((r) => {
+        // Nothing selected and "show at rest" off: draw only the hovered ribbon.
+        if (restQuiet && r.id !== hoveredId) return null;
         if (!visibleTypes.has(r.type)) return null;
         // Hide braids the engine is too unsure of, when the reader has asked.
         if (viz.hideBelowConfidence > 0 && r.confidence < viz.hideBelowConfidence) return null;

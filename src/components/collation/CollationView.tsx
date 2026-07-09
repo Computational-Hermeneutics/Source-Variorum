@@ -174,8 +174,10 @@ export function CollationView({
   const [pendingAnn, setPendingAnn] = useState<{ witnessId: string; line: number; editId?: string; initial?: string } | null>(null);
   const [showDiff, setShowDiff] = useState(false);
   const [apparatusTab, setApparatusTab] = useState<"notebook" | "apparatus">("apparatus");
-  // Braid-analysis = the ribbons + the variant tints. One control: turning it off
-  // also collapses the braid gutter (plain reading); turning it on re-opens it.
+  // Braid-analysis = the ribbons + the gutter. Turning it off collapses the
+  // braid gutter to reclaim the space; turning it on re-opens it. The variant
+  // highlighting (panel tints) stays on either way — collapsing the braid never
+  // removes the highlighting.
   const [showAnalysis, setShowAnalysis] = useState(true);
   useEffect(() => { try { if (localStorage.getItem("source-variorum-analysis") === "0") setShowAnalysis(false); } catch { /* ignore */ } }, []);
   const setBraidAnalysis = (on: boolean) => {
@@ -607,7 +609,7 @@ export function CollationView({
               lang={langA}
               isDark={isDark}
               search={search}
-              analysis={showAnalysis}
+              analysis={true}
               annotatedNotes={annNotesA}
               onOpenAnnotation={requestAnnotate(witnessA.id)}
             />
@@ -648,7 +650,7 @@ export function CollationView({
             {/* Always visible: braid-analysis toggle (also collapses/opens) + lock.
                 Sits on a translucent panel so it reads as a floating toolbar. */}
             <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 p-1 rounded-lg bg-card/70 backdrop-blur border border-border/60 shadow-sm">
-              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Hide braid analysis (ribbons + tints) and collapse the panel" : "Show braid analysis and open the panel"} className={"p-0.5 rounded border shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" : "bg-card/90 border-border text-muted-foreground hover:bg-muted")}>
+              <button onClick={(e) => { e.stopPropagation(); setBraidAnalysis(!showAnalysis); }} title={showAnalysis ? "Collapse the braid (hide ribbons) — the text highlighting stays on" : "Open the braid (show ribbons)"} className={"p-0.5 rounded border shadow-sm " + (showAnalysis ? "bg-primary text-primary-foreground border-primary hover:bg-primary/90" : "bg-card/90 border-border text-muted-foreground hover:bg-muted")}>
                 <Spline className="w-3 h-3" />
               </button>
               <div className="flex flex-col items-stretch rounded border border-border overflow-hidden bg-card/90 shadow-sm">
@@ -726,7 +728,7 @@ export function CollationView({
               lang={langB}
               isDark={isDark}
               search={search}
-              analysis={showAnalysis}
+              analysis={true}
               annotatedNotes={annNotesB}
               onOpenAnnotation={requestAnnotate(witnessB.id)}
             />
