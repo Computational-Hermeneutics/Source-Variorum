@@ -15,7 +15,7 @@ authors:
     orcid: "https://orcid.org/0000-0002-2147-1366"
     affiliation: "University of Sussex"
 repository-code: "https://github.com/Computational-Hermeneutics/Source-Variorum"
-license: MIT
+license: GPL-3.0-or-later
 version: "0.9.3"
 date-released: "2026-06-13"
 keywords:
