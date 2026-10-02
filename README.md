@@ -23,6 +23,10 @@ across the two columns, including passages that have **moved** relative to one
 another. The crossing of those ribbons is the analytical payload. It shows, at a
 glance, where text has been added, deleted, substituted, or transposed.
 
+![The braid: two translations of Plato's Phaedrus collated side by side, with ribbons connecting matching passages across the columns](docs/screenshots/01-braid-text-phaedrus.png)
+
+> The braid in Text mode: Jowett (1892) and Fowler (1925) translations of Plato's *Phaedrus* side by side. Changed words are tinted in each column; ribbons in the central gutter connect the matching passages. The vertical strip on the left is a whole-document minimap of the variation.
+
 ## Two engines: CX (code) and TX (text)
 
 The mode selects which **collation engine** runs. They are not just two
@@ -119,6 +123,40 @@ configures each.
 - A **find** box in the status bar marks matches across both panels with
   next/previous navigation.
 - Line numbers in both panels, kept visible while editing.
+
+## Screenshots
+
+### Code mode, with syntax highlighting
+
+![Spacewar! source collated in Code mode, with PDP-1 MACRO syntax highlighting over the variant tints](docs/screenshots/03-code-mode-pdp1-spacewar.png)
+
+> The CX-Engine on two versions of the *Spacewar!* PDP-1 source (1962). Line-by-line alignment, PDP-1 MACRO syntax highlighting (green comments, orange `define` directives, coloured instructions) layered over the variant tints, with the braid showing where code was added, changed, or moved.
+
+### Editing the braid (User mode)
+
+![A selected substitution locus, highlighted in both panels, with the editorial action bar open](docs/screenshots/02-editorial-locus-user-mode.png)
+
+> Selecting a locus lights its ribbon and isolates it from the rest. The floating action bar shows the similarity score and lets you approve, doubt, flag, retype, or delete the pairing. Edits persist as a separate editorial layer, so **User** mode is your close read and **Auto** stays the pristine engine reading.
+
+### A multi-witness project
+
+![An Othello project with four editions in the sidebar, Globe and First Folio braided in the panels](docs/screenshots/07-workbench-othello.png)
+
+> A project holds any number of witnesses (here four *Othello* editions, 1623–1993) in a foldered sidebar; you pick any two to braid. The Globe (1866) against the First Folio (1623, old spelling) shows the spelling-regularisation and move detection at work: dense ribbons, with a transposed passage crossing the gutter.
+
+### Analysis views
+
+![The stemma distance-tree view: a dendrogram and distance matrix over the Spacewar! corpus](docs/screenshots/04-stemma-distance-tree.png)
+
+> **Stemma (distance tree).** A UPGMA dendrogram and distance-matrix heatmap over the whole corpus, clustering the witnesses that read alike, a computational *stemma codicum*.
+
+![The change-overview view: an Eddy distinctiveness bar chart and a Viv hotspot histogram](docs/screenshots/06-change-overview.png)
+
+> **Change overview.** Across all witnesses: the *Eddy²* ranking of each version's distance from the rest (the outlier at the top), and the *Viv* hotspot histogram marking the passages the versions most contest.
+
+![The dotplot view: a self-similarity matrix of two Spacewar! versions](docs/screenshots/05-dotplot.png)
+
+> **Dotplot (A × B).** A self-similarity matrix of two witnesses. The diagonal is shared order; off-diagonal marks and gaps are moved, repeated, added, or deleted lines.
 
 ## The project workbench
 
