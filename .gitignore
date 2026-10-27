@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Local-only inbox / scratch (David, 2026-10-27 convention); never committed
+_tmp/
