@@ -16,8 +16,8 @@ authors:
     affiliation: "University of Sussex"
 repository-code: "https://github.com/Computational-Hermeneutics/Source-Variorum"
 license: GPL-3.0-or-later
-version: "0.9.3"
-date-released: "2026-06-13"
+version: "0.9.4"
+date-released: "2026-10-27"
 keywords:
   - textual criticism
   - variorum
