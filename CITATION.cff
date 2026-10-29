@@ -14,6 +14,7 @@ authors:
     given-names: David M.
     orcid: "https://orcid.org/0000-0002-7737-5586"
     affiliation: "University of Sussex"
+doi: 10.5281/zenodo.23763287
 repository-code: "https://github.com/Computational-Hermeneutics/Source-Variorum"
 license: GPL-3.0-or-later
 version: "0.9.6"

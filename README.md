@@ -276,3 +276,9 @@ Stack: Next.js 16, React, TypeScript, Tailwind, CodeMirror, jsdiff, jsPDF.
 GNU General Public License v3.0 or later (GPL-3.0-or-later) © 2026 David M. Berry. See [LICENSE](LICENSE).
 
 Source Variorum was previously released under the MIT License. As sole copyright holder, David M. Berry has relicensed the project, including all prior versions, under the GPL-3.0-or-later.
+
+## Citation
+
+[![DOI](https://zenodo.org/badge/1268282281.svg)](https://doi.org/10.5281/zenodo.23763287)
+
+If you use Source Variorum in your research, please cite it via its Zenodo archive. The concept DOI [10.5281/zenodo.23763287](https://doi.org/10.5281/zenodo.23763287) always resolves to the latest version; version 0.9.6 is archived at [10.5281/zenodo.23763288](https://doi.org/10.5281/zenodo.23763288). Full citation metadata is in [CITATION.cff](CITATION.cff).
