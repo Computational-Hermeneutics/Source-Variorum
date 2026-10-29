@@ -12,12 +12,12 @@ abstract: >
 authors:
   - family-names: Berry
     given-names: David M.
-    orcid: "https://orcid.org/0000-0002-2147-1366"
+    orcid: "https://orcid.org/0000-0002-7737-5586"
     affiliation: "University of Sussex"
 repository-code: "https://github.com/Computational-Hermeneutics/Source-Variorum"
 license: GPL-3.0-or-later
-version: "0.9.5"
-date-released: "2026-10-27"
+version: "0.9.6"
+date-released: "2026-10-29"
 keywords:
   - textual criticism
   - variorum
